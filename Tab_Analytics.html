@@ -220,7 +220,7 @@ const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin,
         'TikTok Shop': '#ec4899',    // Hồng TikTok
         'Cộng Tác Viên': '#10b981',  // Xanh Emerald
         'Bán Lẻ': '#0284c7',        // Xanh Dương
-        'Bán Sỉ': '#8b5cf6',        // Tím Violet
+        'Bán Sỉ': '#d4af37',        // Tím Violet
         'Bảo Hành': '#ef4444'       // Đỏ Rose
     };
 
@@ -597,7 +597,7 @@ const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin,
             <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-[#121214] p-3.5 rounded-2xl border border-white/[0.08] shadow-md">
                 
                 {/* Date Range Selector & Presets */}
-                <div className="flex items-center gap-2 bg-[#18181b] px-3.5 py-2 rounded-xl border border-white/[0.08] flex-wrap sm:flex-nowrap">
+                <div className="flex items-center gap-2 bg-[#121214] px-3.5 py-2 rounded-xl border border-white/[0.08] flex-wrap sm:flex-nowrap">
                     <i className="far fa-calendar-alt text-[#d4af37] text-sm mr-1"></i>
                     <input
                         type="date"
@@ -625,31 +625,31 @@ const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin,
 
                 {/* Shop Filter & Action Buttons */}
                 <div className="flex items-center gap-2">
-                    <div className="relative flex items-center bg-[#18181b] px-3.5 py-2 rounded-xl border border-white/[0.08] w-full sm:w-56">
+                    <div className="relative flex items-center bg-[#121214] px-3.5 py-2 rounded-xl border border-white/[0.08] w-full sm:w-56">
                         <i className="fas fa-store text-[#d4af37] text-xs mr-2"></i>
                         <select
                             value={filterChannel}
                             onChange={(e) => setFilterChannel(e.target.value)}
                             className="bg-transparent text-white font-bold text-xs sm:text-sm outline-none cursor-pointer w-full"
                         >
-                            <option value="Tất cả kênh" className="bg-[#18181b] text-white">Tất cả kênh bán</option>
-                            <option value="Shopee VN" className="bg-[#18181b] text-white">Shopee VN</option>
-                            <option value="Shopee TH" className="bg-[#18181b] text-white">Shopee TH (Thái)</option>
-                            <option value="Shopee SG" className="bg-[#18181b] text-white">Shopee SG (Sing)</option>
-                            <option value="Shopee MA" className="bg-[#18181b] text-white">Shopee MA (Malay)</option>
-                            <option value="Shopee PH" className="bg-[#18181b] text-white">Shopee PH (Philip)</option>
-                            <option value="Shopee TW" className="bg-[#18181b] text-white">Shopee TW (Đài)</option>
-                            <option value="TikTok Shop" className="bg-[#18181b] text-white">TikTok Shop</option>
-                            <option value="Cộng Tác Viên" className="bg-[#18181b] text-white">Cộng Tác Viên</option>
-                            <option value="Bán Lẻ" className="bg-[#18181b] text-white">Bán Lẻ</option>
-                            <option value="Bán Sỉ" className="bg-[#18181b] text-white">Bán Sỉ</option>
-                            <option value="Bảo Hành" className="bg-[#18181b] text-white">Bảo Hành</option>
+                            <option value="Tất cả kênh" className="bg-[#121214] text-white">Tất cả kênh bán</option>
+                            <option value="Shopee VN" className="bg-[#121214] text-white">Shopee VN</option>
+                            <option value="Shopee TH" className="bg-[#121214] text-white">Shopee TH (Thái)</option>
+                            <option value="Shopee SG" className="bg-[#121214] text-white">Shopee SG (Sing)</option>
+                            <option value="Shopee MA" className="bg-[#121214] text-white">Shopee MA (Malay)</option>
+                            <option value="Shopee PH" className="bg-[#121214] text-white">Shopee PH (Philip)</option>
+                            <option value="Shopee TW" className="bg-[#121214] text-white">Shopee TW (Đài)</option>
+                            <option value="TikTok Shop" className="bg-[#121214] text-white">TikTok Shop</option>
+                            <option value="Cộng Tác Viên" className="bg-[#121214] text-white">Cộng Tác Viên</option>
+                            <option value="Bán Lẻ" className="bg-[#121214] text-white">Bán Lẻ</option>
+                            <option value="Bán Sỉ" className="bg-[#121214] text-white">Bán Sỉ</option>
+                            <option value="Bảo Hành" className="bg-[#121214] text-white">Bảo Hành</option>
                         </select>
                     </div>
 
                     <button
                         onClick={() => setShowCostModal(true)}
-                        className="h-10 px-3.5 bg-[#18181b] hover:bg-zinc-800 text-[#d4af37] border border-white/[0.08] rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 shrink-0"
+                        className="h-10 px-3.5 bg-[#121214] hover:bg-zinc-800 text-[#d4af37] border border-white/[0.08] rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 shrink-0"
                         title="Cấu hình chi phí vận hành thêm"
                     >
                         <i className="fas fa-receipt"></i>
@@ -659,7 +659,7 @@ const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin,
                     <button
                         onClick={() => setReloadKey(k => k + 1)}
                         title="Làm mới số liệu"
-                        className="w-10 h-10 bg-[#18181b] hover:bg-zinc-800 text-[#d4af37] border border-white/[0.08] rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-sm active:scale-95 shrink-0"
+                        className="w-10 h-10 bg-[#121214] hover:bg-zinc-800 text-[#d4af37] border border-white/[0.08] rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-sm active:scale-95 shrink-0"
                     >
                         <i className="fas fa-sync-alt text-xs"></i>
                     </button>
@@ -869,7 +869,7 @@ const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin,
                 <div className="overflow-x-auto custom-scrollbar">
                     <table className="w-full text-left text-xs border-collapse">
                         <thead>
-                            <tr className="border-b border-white/[0.08] text-zinc-400 font-bold uppercase text-[10px] tracking-wider bg-[#18181b]/50">
+                            <tr className="border-b border-white/[0.08] text-zinc-400 font-bold uppercase text-[10px] tracking-wider bg-[#121214]/50">
                                 <th className="py-3 px-3">Kênh bán hàng</th>
                                 <th className="py-3 px-3 text-center">Đơn bán</th>
                                 <th className="py-3 px-3 text-right">Doanh thu</th>
@@ -910,7 +910,7 @@ const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin,
                             )}
                         </tbody>
                         <tfoot>
-                            <tr className="border-t-2 border-white/[0.1] bg-[#18181b] font-black text-zinc-100">
+                            <tr className="border-t-2 border-white/[0.1] bg-[#121214] font-black text-zinc-100">
                                 <td className="py-3.5 px-3 uppercase text-[11px] text-[#d4af37]">TỔNG CỘNG</td>
                                 <td className="py-3.5 px-3 text-center font-mono">{stats.totalSold.toLocaleString('vi-VN')}</td>
                                 <td className="py-3.5 px-3 text-right font-mono text-emerald-400">{formatMoney(stats.totalRevenue)}đ</td>
@@ -942,7 +942,7 @@ const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin,
                         </div>
 
                         {/* Form thêm chi phí */}
-                        <div className="space-y-3 bg-[#18181b] p-3.5 rounded-xl border border-white/[0.08]">
+                        <div className="space-y-3 bg-[#121214] p-3.5 rounded-xl border border-white/[0.08]">
                             <div>
                                 <label className="text-[11px] font-bold text-zinc-400 mb-1 block">Tên khoản chi:</label>
                                 <input
@@ -987,7 +987,7 @@ const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin,
                         {/* Danh sách chi phí hiện có */}
                         <div className="max-h-48 overflow-y-auto space-y-2 custom-scrollbar pr-1">
                             {extraCosts.map((c) => (
-                                <div key={c.id} className="flex justify-between items-center bg-[#18181b] p-2.5 rounded-xl border border-white/[0.08] text-xs">
+                                <div key={c.id} className="flex justify-between items-center bg-[#121214] p-2.5 rounded-xl border border-white/[0.08] text-xs">
                                     <div className="flex flex-col">
                                         <span className="text-white font-bold">{c.name}</span>
                                         <span className="text-zinc-400 text-[10px]">{c.type === 'per_month' ? 'Phân bổ theo tháng' : 'Phân bổ theo mỗi đơn'}</span>

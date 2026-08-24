@@ -261,7 +261,7 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
         </div>
         
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
-            <div className="flex items-center bg-[#18181b] border border-white/[0.08] rounded-xl px-3 py-2">
+            <div className="flex items-center bg-[#121214] border border-white/[0.08] rounded-xl px-3 py-2">
                 <i className="far fa-calendar-alt text-[#d4af37] text-xs mr-2"></i>
                 <input
                     type="month"
@@ -272,15 +272,15 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
             </div>
 
             {isAdminOrKetoan ? (
-                <div className="flex items-center bg-[#18181b] border border-white/[0.08] rounded-xl px-3 py-2 sm:w-60">
+                <div className="flex items-center bg-[#121214] border border-white/[0.08] rounded-xl px-3 py-2 sm:w-60">
                     <i className="fas fa-user-tie text-[#d4af37] text-xs mr-2"></i>
                     <select
                         value={selectedCTV}
                         onChange={(e) => setSelectedCTV(e.target.value)}
                         className="bg-transparent text-xs sm:text-sm font-bold text-white outline-none cursor-pointer w-full"
                     >
-                        {ctvList.length === 0 && <option value="" className="bg-[#18181b] text-white">Không có CTV nào</option>}
-                        {ctvList.map(c => <option key={c} value={c} className="bg-[#18181b] text-white">{c}</option>)}
+                        {ctvList.length === 0 && <option value="" className="bg-[#121214] text-white">Không có CTV nào</option>}
+                        {ctvList.map(c => <option key={c} value={c} className="bg-[#121214] text-white">{c}</option>)}
                     </select>
                 </div>
             ) : (
@@ -350,7 +350,7 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
                 {debtStats.orderDebt > 0 ? `+${formatMoney(debtStats.orderDebt)}` : (debtStats.orderDebt < 0 ? `${formatMoney(Math.abs(debtStats.orderDebt))}` : '0')}
                 <span className="text-xs font-normal opacity-60 ml-0.5">đ</span>
             </div>
-            <div className="mt-3 text-[11px] text-zinc-400 font-medium flex justify-between border-t border-white/[0.06] pt-2.5 flex-wrap gap-1">
+            <div className="mt-3 text-[11px] text-zinc-400 font-medium flex justify-between border-t border-white/[0.08] pt-2.5 flex-wrap gap-1">
                 <span>Doanh số: <b className="text-zinc-200 font-mono">{formatMoney(debtStats.totalOrderRevenue)}đ</b></span>
                 <span>Thu COD (Xưởng): <b className="text-emerald-400 font-mono">{formatMoney(debtStats.totalOrderCOD)}đ</b></span>
             </div>
@@ -368,7 +368,7 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
                 {debtStats.extraDebt > 0 ? `+${formatMoney(debtStats.extraDebt)}` : (debtStats.extraDebt < 0 ? `${formatMoney(Math.abs(debtStats.extraDebt))}` : '0')}
                 <span className="text-xs font-normal opacity-60 ml-0.5">đ</span>
             </div>
-            <div className="mt-3 text-[11px] text-zinc-400 font-medium flex justify-between border-t border-white/[0.06] pt-2.5 flex-wrap gap-1">
+            <div className="mt-3 text-[11px] text-zinc-400 font-medium flex justify-between border-t border-white/[0.08] pt-2.5 flex-wrap gap-1">
                 <span>CTV đã TT: <b className="text-emerald-400 font-mono">{formatMoney(debtStats.totalPaidByCTV)}đ</b></span>
                 <span>Shop đã trả: <b className="text-sky-400 font-mono">{formatMoney(debtStats.totalPaidByShop)}đ</b></span>
             </div>
@@ -398,7 +398,7 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
                 {debtStats.finalDebt > 0 ? `+${formatMoney(debtStats.finalDebt)}` : (debtStats.finalDebt < 0 ? `${formatMoney(Math.abs(debtStats.finalDebt))}` : '0')}
                 <span className="text-xs font-normal opacity-60 ml-0.5">đ</span>
             </div>
-            <div className="mt-3 text-[11px] text-zinc-400 font-medium flex items-center gap-1.5 border-t border-white/[0.06] pt-2.5">
+            <div className="mt-3 text-[11px] text-zinc-400 font-medium flex items-center gap-1.5 border-t border-white/[0.08] pt-2.5">
                 <i className={`fas ${debtStats.finalDebt > 0 ? 'fa-exclamation-circle text-rose-400' : (debtStats.finalDebt < 0 ? 'fa-arrow-down text-emerald-400' : 'fa-check-circle text-[#d4af37]')} text-[10px]`}></i>
                 <span>
                     {debtStats.finalDebt > 0 ? 'CTV cần chuyển khoản thanh toán cho Xưởng' : (debtStats.finalDebt < 0 ? 'Xưởng cần chuyển khoản trả hoa hồng cho CTV' : 'Đã tất toán toàn bộ công nợ')}
@@ -420,7 +420,7 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
                     <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">
                         Lịch Sử Đơn Hàng
                     </h3>
-                    <span className="text-xs font-mono font-bold bg-[#18181b] text-zinc-300 px-2 py-0.5 rounded-md border border-white/[0.08]">
+                    <span className="text-xs font-mono font-bold bg-[#121214] text-zinc-300 px-2 py-0.5 rounded-md border border-white/[0.08]">
                         {filteredOrders.length}
                     </span>
                 </div>
@@ -431,7 +431,7 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
                         placeholder="Tìm khách, mã đơn..."
                         value={orderSearchQuery}
                         onChange={e => setOrderSearchQuery(e.target.value)}
-                        className="bg-[#18181b] border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white outline-none focus:border-[#d4af37] w-full sm:w-44 pl-7"
+                        className="bg-[#121214] border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white outline-none focus:border-[#d4af37] w-full sm:w-44 pl-7"
                     />
                     <i className="fas fa-search text-[10px] text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
                 </div>
@@ -455,7 +455,7 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
                         const dateStr = (o.date || o.createdAt || '').substring(0, 10);
 
                         return (
-                            <div key={o.id} className="bg-[#18181b] border border-white/[0.06] hover:border-white/[0.12] rounded-xl p-3.5 transition-all space-y-2.5 shadow-sm">
+                            <div key={o.id} className="bg-[#121214] border border-white/[0.08] hover:border-white/[0.12] rounded-xl p-3.5 transition-all space-y-2.5 shadow-sm">
                                 <div className="flex justify-between items-start gap-2">
                                     <div className="min-w-0">
                                         <div className="text-[13px] font-black text-white truncate flex items-center gap-1.5">
@@ -472,7 +472,7 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
                                                 const isReturned = s === 'HÀNG HOÀN' || s.includes('HOÀN');
                                                 const isCanceled = s === 'ĐƠN HUỶ' || s.includes('HUỶ') || s.includes('HỦY');
                                                 
-                                                let badgeClass = 'bg-[#27272a] text-zinc-300 border-white/[0.06]';
+                                                let badgeClass = 'bg-[#27272a] text-zinc-300 border-white/[0.08]';
                                                 let badgeText = o.status || 'Chờ Sản Xuất';
                                                 
                                                 if (isReconciled) {
@@ -524,7 +524,7 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
                                     </div>
                                 </div>
 
-                                <div className="flex items-center justify-between border-t border-white/[0.06] pt-2">
+                                <div className="flex items-center justify-between border-t border-white/[0.08] pt-2">
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                         <button
                                             onClick={() => setViewingDetailOrder(o)}
@@ -572,7 +572,7 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
                 <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
                     <i className="fas fa-money-bill-transfer text-amber-400"></i>
                     <span>Giao Dịch Phụ Phí & Thanh Toán</span>
-                    <span className="text-xs font-mono font-bold bg-[#18181b] text-zinc-300 px-2 py-0.5 rounded-md border border-white/[0.08]">
+                    <span className="text-xs font-mono font-bold bg-[#121214] text-zinc-300 px-2 py-0.5 rounded-md border border-white/[0.08]">
                         {ctvTxs.length}
                     </span>
                 </h3>
@@ -590,7 +590,7 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
             
             {/* Form Thêm/Sửa Phụ Phí */}
             {showAddTx && (
-                <div className="bg-[#18181b] border border-[#d4af37]/30 rounded-xl p-3.5 mb-3 animate-fade-in shadow-md space-y-3">
+                <div className="bg-[#121214] border border-[#d4af37]/30 rounded-xl p-3.5 mb-3 animate-fade-in shadow-md space-y-3">
                     <div className="grid grid-cols-2 gap-2.5">
                         <div>
                             <label className="text-[10px] font-bold text-zinc-400 uppercase mb-1 block">Loại Giao Dịch</label>
@@ -599,13 +599,13 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
                                 onChange={e => setTxType(e.target.value)}
                                 className="w-full bg-[#121214] border border-white/[0.1] rounded-lg px-2.5 py-2 text-xs font-bold text-white outline-none focus:border-[#d4af37] cursor-pointer"
                             >
-                                <option value="PHÍ VẬN CHUYỂN" className="bg-[#18181b] text-white">Phí Vận Chuyển (+ Nợ CTV)</option>
-                                <option value="PHÍ HOÀN HÀNG" className="bg-[#18181b] text-white">Phí Hoàn Hàng (+ Nợ CTV)</option>
-                                <option value="KHÁC" className="bg-[#18181b] text-white">Khác (+ Nợ CTV)</option>
-                                <option value="CTV THANH TOÁN" className="bg-[#18181b] text-white">CTV Thanh Toán (- Nợ CTV)</option>
-                                <option value="XƯỞNG THANH TOÁN" className="bg-[#18181b] text-white">Xưởng Trả Hoa Hồng (+ Nợ CTV)</option>
-                                <option value="DƯ NỢ KỲ TRƯỚC (CTV NỢ)" className="bg-[#18181b] text-white">Nợ kỳ trước (CTV nợ Xưởng)</option>
-                                <option value="DƯ NỢ KỲ TRƯỚC (XƯỞNG NỢ)" className="bg-[#18181b] text-white">Nợ kỳ trước (Xưởng nợ CTV)</option>
+                                <option value="PHÍ VẬN CHUYỂN" className="bg-[#121214] text-white">Phí Vận Chuyển (+ Nợ CTV)</option>
+                                <option value="PHÍ HOÀN HÀNG" className="bg-[#121214] text-white">Phí Hoàn Hàng (+ Nợ CTV)</option>
+                                <option value="KHÁC" className="bg-[#121214] text-white">Khác (+ Nợ CTV)</option>
+                                <option value="CTV THANH TOÁN" className="bg-[#121214] text-white">CTV Thanh Toán (- Nợ CTV)</option>
+                                <option value="XƯỞNG THANH TOÁN" className="bg-[#121214] text-white">Xưởng Trả Hoa Hồng (+ Nợ CTV)</option>
+                                <option value="DƯ NỢ KỲ TRƯỚC (CTV NỢ)" className="bg-[#121214] text-white">Nợ kỳ trước (CTV nợ Xưởng)</option>
+                                <option value="DƯ NỢ KỲ TRƯỚC (XƯỞNG NỢ)" className="bg-[#121214] text-white">Nợ kỳ trước (Xưởng nợ CTV)</option>
                             </select>
                         </div>
                         <div>
@@ -662,7 +662,7 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
                         const isReduceDebt = type === 'THANH TOÁN' || type === 'CTV THANH TOÁN' || type === 'DƯ NỢ KỲ TRƯỚC (SHOP NỢ)' || type === 'DƯ NỢ KỲ TRƯỚC (XƯỞNG NỢ)';
 
                         return (
-                            <div key={t.id} className="bg-[#18181b] border border-white/[0.06] hover:border-white/[0.12] rounded-xl p-3.5 flex justify-between items-center transition-all shadow-sm">
+                            <div key={t.id} className="bg-[#121214] border border-white/[0.08] hover:border-white/[0.12] rounded-xl p-3.5 flex justify-between items-center transition-all shadow-sm">
                                 <div className="min-w-0">
                                     <div className="text-xs font-black text-white uppercase tracking-wide flex items-center gap-1.5">
                                         <span>{t.type}</span>
@@ -775,7 +775,7 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
     const isReturned = s === 'HÀNG HOÀN' || s.includes('HOÀN');
     const isCanceled = s === 'ĐƠN HUỶ' || s.includes('HUỶ') || s.includes('HỦY');
 
-    let badgeClass = 'bg-[#27272a] text-zinc-300 border-white/[0.06]';
+    let badgeClass = 'bg-[#27272a] text-zinc-300 border-white/[0.08]';
     let badgeText = order.status || 'Chờ Sản Xuất';
     let badgeIcon = 'fa-clock';
 
@@ -907,9 +907,9 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
                             ? 'bg-gradient-to-br from-rose-950/20 via-[#18181b] to-[#121214] border-rose-500/30' 
                             : (orderDebtVal < 0 
                                 ? 'bg-gradient-to-br from-emerald-950/20 via-[#18181b] to-[#121214] border-emerald-500/30' 
-                                : 'bg-[#18181b] border-white/[0.08]')
+                                : 'bg-[#121214] border-white/[0.08]')
                     }`}>
-                        <div className="flex items-center justify-between mb-3 border-b border-white/[0.06] pb-2">
+                        <div className="flex items-center justify-between mb-3 border-b border-white/[0.08] pb-2">
                             <span className="text-[11px] font-black uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
                                 <i className="fas fa-coins text-[#d4af37]"></i> Hạch Toán Tài Chính & Dư Nợ Đơn
                             </span>
@@ -923,19 +923,19 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
                         </div>
 
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-                            <div className="bg-[#121214] border border-white/[0.06] p-2.5 rounded-xl">
+                            <div className="bg-[#121214] border border-white/[0.08] p-2.5 rounded-xl">
                                 <span className="text-[10px] text-zinc-400 block mb-0.5">Giá Hàng</span>
                                 <span className="text-sm font-bold font-mono text-white">{formatMoney(order.revenue)}đ</span>
                             </div>
-                            <div className="bg-[#121214] border border-white/[0.06] p-2.5 rounded-xl">
+                            <div className="bg-[#121214] border border-white/[0.08] p-2.5 rounded-xl">
                                 <span className="text-[10px] text-zinc-400 block mb-0.5">Thu COD (Xưởng)</span>
                                 <span className="text-sm font-bold font-mono text-amber-400">{formatMoney(order.cod)}đ</span>
                             </div>
-                            <div className="bg-[#121214] border border-white/[0.06] p-2.5 rounded-xl">
+                            <div className="bg-[#121214] border border-white/[0.08] p-2.5 rounded-xl">
                                 <span className="text-[10px] text-zinc-400 block mb-0.5">Khách Cọc / Trả Trước</span>
                                 <span className="text-sm font-bold font-mono text-sky-400">{formatMoney(order.prePaid)}đ</span>
                             </div>
-                            <div className="bg-[#121214] border border-white/[0.06] p-2.5 rounded-xl">
+                            <div className="bg-[#121214] border border-white/[0.08] p-2.5 rounded-xl">
                                 <span className="text-[10px] text-zinc-400 block mb-0.5">Phụ Phí Gắn Đơn</span>
                                 <span className={`text-sm font-bold font-mono ${extraExp > 0 ? 'text-amber-400' : 'text-zinc-400'}`}>
                                     {extraExp > 0 ? '+' : ''}{formatMoney(extraExp)}đ
@@ -943,7 +943,7 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
                             </div>
                         </div>
 
-                        <div className="mt-2.5 text-[10px] text-zinc-400 italic flex items-center justify-between pt-2 border-t border-white/[0.04] flex-wrap gap-1">
+                        <div className="mt-2.5 text-[10px] text-zinc-400 italic flex items-center justify-between pt-2 border-t border-white/[0.08] flex-wrap gap-1">
                             <span>Công thức: Giá hàng ({formatMoney(order.revenue)}) + Phụ phí ({formatMoney(extraExp)}) - Thu COD ({formatMoney(order.cod)}) - Cọc ({formatMoney(order.prePaid)})</span>
                             <span className="font-bold text-zinc-300 font-mono">
                                 = {orderDebtVal > 0 ? `+${formatMoney(orderDebtVal)}đ (CTV nợ Shop)` : (orderDebtVal < 0 ? `Dư ${formatMoney(Math.abs(orderDebtVal))}đ (Shop trả CTV)` : '0đ')}
@@ -955,8 +955,8 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         
                         {/* Box 1: Khách Hàng */}
-                        <div className="bg-[#18181b] border border-white/[0.08] rounded-2xl p-3.5 space-y-2">
-                            <div className="text-[11px] font-black uppercase tracking-wider text-zinc-400 flex items-center gap-1.5 border-b border-white/[0.06] pb-1.5">
+                        <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-3.5 space-y-2">
+                            <div className="text-[11px] font-black uppercase tracking-wider text-zinc-400 flex items-center gap-1.5 border-b border-white/[0.08] pb-1.5">
                                 <i className="fas fa-user text-sky-400"></i> Thông Tin Khách Hàng
                             </div>
                             <div className="space-y-1.5 text-[11px]">
@@ -975,11 +975,11 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
                                 </div>
                                 <div>
                                     <span className="text-zinc-400 block mb-0.5">Địa chỉ:</span>
-                                    <div className="text-zinc-200 bg-[#121214] p-2 rounded-lg border border-white/[0.04] leading-relaxed">
+                                    <div className="text-zinc-200 bg-[#121214] p-2 rounded-lg border border-white/[0.08] leading-relaxed">
                                         {order.address || 'Không có địa chỉ cụ thể'}
                                     </div>
                                 </div>
-                                <div className="flex justify-between pt-1 text-[10px] text-zinc-400 border-t border-white/[0.04]">
+                                <div className="flex justify-between pt-1 text-[10px] text-zinc-400 border-t border-white/[0.08]">
                                     <span>Người tạo / CTV: <b className="text-zinc-200">{order.updatedBy || order.createdBy || order.responsibleUser || 'Hệ thống'}</b></span>
                                     <span>Kênh: <b className="text-[#d4af37]">{order.channel || 'CTV'}</b></span>
                                 </div>
@@ -987,8 +987,8 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
                         </div>
 
                         {/* Box 2: Vận Chuyển & Giao Vận */}
-                        <div className="bg-[#18181b] border border-white/[0.08] rounded-2xl p-3.5 space-y-2">
-                            <div className="text-[11px] font-black uppercase tracking-wider text-zinc-400 flex items-center gap-1.5 border-b border-white/[0.06] pb-1.5">
+                        <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-3.5 space-y-2">
+                            <div className="text-[11px] font-black uppercase tracking-wider text-zinc-400 flex items-center gap-1.5 border-b border-white/[0.08] pb-1.5">
                                 <i className="fas fa-truck-fast text-amber-400"></i> Vận Chuyển & Giao Vận
                             </div>
                             <div className="space-y-1.5 text-[11px]">
@@ -1021,7 +1021,7 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
                                 </div>
                                 <div>
                                     <span className="text-zinc-400 block mb-0.5">Ghi chú đơn hàng:</span>
-                                    <div className="text-zinc-300 bg-[#121214] p-2 rounded-lg border border-white/[0.04] italic">
+                                    <div className="text-zinc-300 bg-[#121214] p-2 rounded-lg border border-white/[0.08] italic">
                                         {order.note || 'Không có ghi chú đặc biệt'}
                                     </div>
                                 </div>
@@ -1030,8 +1030,8 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
                     </div>
 
                     {/* BENTO ROW 3: TIẾN ĐỘ SẢN XUẤT (NẾU CÓ LỆNH SẢN XUẤT) */}
-                    <div className="bg-[#18181b] border border-white/[0.08] rounded-2xl p-3.5 space-y-3">
-                        <div className="text-[11px] font-black uppercase tracking-wider text-zinc-400 flex items-center justify-between border-b border-white/[0.06] pb-2">
+                    <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-3.5 space-y-3">
+                        <div className="text-[11px] font-black uppercase tracking-wider text-zinc-400 flex items-center justify-between border-b border-white/[0.08] pb-2">
                             <span className="flex items-center gap-1.5">
                                 <i className="fas fa-hammer text-[#d4af37]"></i> Tiến Độ Sản Xuất & Kiểm Định ({relatedProds.length})
                             </span>
@@ -1041,7 +1041,7 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
                         {relatedProds.length > 0 ? (
                             <div className="space-y-3">
                                 {relatedProds.map((p, idx) => (
-                                    <div key={p.id || idx} className="bg-[#121214] border border-white/[0.06] rounded-xl p-3 space-y-2.5">
+                                    <div key={p.id || idx} className="bg-[#121214] border border-white/[0.08] rounded-xl p-3 space-y-2.5">
                                         <div className="flex items-center justify-between">
                                             <span className="font-bold text-white text-xs">{p.name || 'Layout Sản Xuất'}</span>
                                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
@@ -1055,7 +1055,7 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
                                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10px]">
                                             
                                             {/* Khâu 1 */}
-                                            <div className="bg-[#18181b] p-2 rounded-lg border border-white/[0.04] space-y-1">
+                                            <div className="bg-[#121214] p-2 rounded-lg border border-white/[0.08] space-y-1">
                                                 <div className="font-bold text-zinc-300 flex justify-between">
                                                     <span>Khâu 1 (Khung/Phôi)</span>
                                                     <span className={p.p1_status === 'Done' ? 'text-emerald-400' : 'text-zinc-500'}>{p.p1_status || 'Pending'}</span>
@@ -1072,7 +1072,7 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
                                             </div>
 
                                             {/* Khâu 2 */}
-                                            <div className="bg-[#18181b] p-2 rounded-lg border border-white/[0.04] space-y-1">
+                                            <div className="bg-[#121214] p-2 rounded-lg border border-white/[0.08] space-y-1">
                                                 <div className="font-bold text-zinc-300 flex justify-between">
                                                     <span>Khâu 2 (Gắn rêu)</span>
                                                     <span className={p.p2_status === 'Done' ? 'text-emerald-400' : 'text-zinc-500'}>{p.p2_status || 'Pending'}</span>
@@ -1089,7 +1089,7 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
                                             </div>
 
                                             {/* KCS */}
-                                            <div className="bg-[#18181b] p-2 rounded-lg border border-white/[0.04] space-y-1">
+                                            <div className="bg-[#121214] p-2 rounded-lg border border-white/[0.08] space-y-1">
                                                 <div className="font-bold text-zinc-300 flex justify-between">
                                                     <span>KCS Kiểm Định</span>
                                                     <span className={p.qc_status === 'Passed' || p.qc_status === 'Done' ? 'text-emerald-400' : 'text-zinc-500'}>{p.qc_status || 'Chờ'}</span>
@@ -1110,11 +1110,11 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
 
                         {/* Phụ kiện đính kèm */}
                         {parsedAccessories.length > 0 && (
-                            <div className="pt-2 border-t border-white/[0.04]">
+                            <div className="pt-2 border-t border-white/[0.08]">
                                 <span className="text-[10px] font-bold text-zinc-400 block mb-1.5">Phụ Kiện Đính Kèm ({parsedAccessories.length}):</span>
                                 <div className="flex flex-wrap gap-1.5">
                                     {parsedAccessories.map((a, i) => (
-                                        <span key={i} className="bg-[#121214] border border-white/[0.06] text-zinc-200 px-2 py-1 rounded-lg text-[10px] font-medium flex items-center gap-1.5">
+                                        <span key={i} className="bg-[#121214] border border-white/[0.08] text-zinc-200 px-2 py-1 rounded-lg text-[10px] font-medium flex items-center gap-1.5">
                                             <i className="fas fa-cube text-[#d4af37] text-[8px]"></i>
                                             <span>{a.name || a.Name}</span>
                                             <b className="text-amber-400">x{a.quantity || 1}</b>
@@ -1126,8 +1126,8 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
                     </div>
 
                     {/* BENTO ROW 4: TIẾN ĐỘ ĐÓNG GÓI & ẢNH THỰC TẾ */}
-                    <div className="bg-[#18181b] border border-white/[0.08] rounded-2xl p-3.5 space-y-3">
-                        <div className="text-[11px] font-black uppercase tracking-wider text-zinc-400 flex items-center justify-between border-b border-white/[0.06] pb-2">
+                    <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-3.5 space-y-3">
+                        <div className="text-[11px] font-black uppercase tracking-wider text-zinc-400 flex items-center justify-between border-b border-white/[0.08] pb-2">
                             <span className="flex items-center gap-1.5">
                                 <i className="fas fa-box-open text-sky-400"></i> Đóng Gói & Xuất Kho ({relatedPackings.length})
                             </span>
@@ -1143,7 +1143,7 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
                                     const boxImg = parts.length > 1 ? parts[1] : (pk.photoBefore ? pk.photo : '');
 
                                     return (
-                                        <div key={pk.id || i} className="bg-[#121214] border border-white/[0.06] p-3 rounded-xl space-y-2">
+                                        <div key={pk.id || i} className="bg-[#121214] border border-white/[0.08] p-3 rounded-xl space-y-2">
                                             <div className="flex items-center justify-between text-[11px]">
                                                 <span>Nhân sự đóng: <b className="text-white">{pk.user || 'Nhân sự'}</b></span>
                                                 <span className="text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
@@ -1190,15 +1190,15 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
 
                     {/* BENTO ROW 5: CÁC GIAO DỊCH PHỤ PHÍ LIÊN QUAN */}
                     {relatedTxs.length > 0 && (
-                        <div className="bg-[#18181b] border border-white/[0.08] rounded-2xl p-3.5 space-y-2.5">
-                            <div className="text-[11px] font-black uppercase tracking-wider text-zinc-400 flex items-center justify-between border-b border-white/[0.06] pb-2">
+                        <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-3.5 space-y-2.5">
+                            <div className="text-[11px] font-black uppercase tracking-wider text-zinc-400 flex items-center justify-between border-b border-white/[0.08] pb-2">
                                 <span className="flex items-center gap-1.5">
                                     <i className="fas fa-money-bill-transfer text-amber-400"></i> Giao Dịch Phụ Phí Đã Gắn Đơn ({relatedTxs.length})
                                 </span>
                             </div>
                             <div className="space-y-1.5">
                                 {relatedTxs.map(t => (
-                                    <div key={t.id} className="bg-[#121214] border border-white/[0.04] p-2.5 rounded-xl flex items-center justify-between">
+                                    <div key={t.id} className="bg-[#121214] border border-white/[0.08] p-2.5 rounded-xl flex items-center justify-between">
                                         <div>
                                             <span className="font-bold text-white text-[11px]">{t.type}</span>
                                             <div className="text-[10px] text-zinc-400">{t.note}</div>
@@ -1215,7 +1215,7 @@ function AffiliateOrderDetailModal({ order, onClose, onEdit, prodItems, packings
                 </div>
 
                 {/* 3. MODAL FOOTER */}
-                <div className="p-3.5 sm:p-4 border-t border-white/[0.08] bg-[#18181b] flex items-center justify-between gap-2 shrink-0">
+                <div className="p-3.5 sm:p-4 border-t border-white/[0.08] bg-[#121214] flex items-center justify-between gap-2 shrink-0">
                     <div className="flex items-center gap-2">
                         {onEdit && (
                             <button

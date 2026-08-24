@@ -2692,38 +2692,34 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
                     <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar no-scrollbar py-0.5">
                         <button 
                             onClick={handleOpenAddTx} 
-                            className="h-9 px-3.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black rounded-xl text-[11px] uppercase tracking-wider flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
+                            className="w-9 h-9 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black rounded-xl flex items-center justify-center shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
                             title="Tạo Phiếu Thu / Chi Mới"
                         >
                             <i className="fas fa-plus text-xs"></i>
-                            <span>Tạo Phiếu</span>
                         </button>
 
                         <button 
                             onClick={() => setShowImportScanner(true)} 
-                            className="h-9 px-3 bg-sky-950/40 hover:bg-sky-900/50 text-sky-300 border border-sky-500/30 rounded-xl text-[11px] font-bold uppercase flex items-center gap-1.5 transition-all cursor-pointer shrink-0" 
+                            className="w-9 h-9 bg-sky-950/40 hover:bg-sky-900/50 text-sky-300 border border-sky-500/30 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0" 
                             title="Quét Sao Kê Bank"
                         >
-                            <i className="fas fa-file-invoice-dollar text-sky-400"></i>
-                            <span>Sao Kê Bank</span>
+                            <i className="fas fa-file-invoice-dollar text-sky-400 text-[13px]"></i>
                         </button>
                         
                         <button 
                             onClick={() => setShowShopeeWalletScanner(true)} 
-                            className="h-9 px-3 bg-orange-950/40 hover:bg-orange-900/50 text-orange-300 border border-orange-500/30 rounded-xl text-[11px] font-bold uppercase flex items-center gap-1.5 transition-all cursor-pointer shrink-0" 
+                            className="w-9 h-9 bg-orange-950/40 hover:bg-orange-900/50 text-orange-300 border border-orange-500/30 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0" 
                             title="Quét Báo Cáo Ví Shopee"
                         >
-                            <i className="fas fa-wallet text-orange-400"></i>
-                            <span>Ví Shopee</span>
+                            <i className="fas fa-wallet text-orange-400 text-[13px]"></i>
                         </button>
 
                         <button 
                             onClick={() => setShowReceiptScanner(true)} 
-                            className="h-9 px-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-xl text-[11px] font-bold uppercase flex items-center gap-1.5 transition-all cursor-pointer shrink-0" 
+                            className="w-9 h-9 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0" 
                             title="Đọc ảnh chụp bill bằng AI"
                         >
-                            <i className="fas fa-camera text-amber-400"></i>
-                            <span>Quét Bill AI</span>
+                            <i className="fas fa-camera text-amber-400 text-[13px]"></i>
                         </button>
                     </div>
                 ) : <div />}
@@ -2763,31 +2759,31 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
                 </div>
             </div>
 
-            {/* 3. SEGMENTED SUB-TABS */}
-            <div className="flex bg-[#0e0e12] p-1 rounded-2xl border border-zinc-800/80 gap-1 shadow-sm">
+            {/* 3. SEGMENTED SUB-TABS (CHUẨN DRIBBLE MINIMAL) */}
+            <div className="flex bg-[#121214] p-1 rounded-2xl border border-white/[0.08] gap-1 shadow-sm">
                 <button 
                     onClick={() => setActiveSubTab('CASHBOOK')} 
-                    className={`flex-1 py-2.5 text-[11px] font-bold uppercase rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                        activeSubTab === 'CASHBOOK' ? 'bg-amber-500 text-zinc-950 font-black shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
+                    className={`flex-1 py-2 text-[11px] font-extrabold uppercase rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        activeSubTab === 'CASHBOOK' ? 'bg-white text-zinc-950 shadow-md font-black' : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                 >
-                    <i className="fas fa-book"></i> Sổ Quỹ Thu Chi
+                    <i className="fas fa-book text-[11px]"></i> Sổ Quỹ Thu Chi
                 </button>
                 <button 
                     onClick={() => setActiveSubTab('SO_QUY')} 
-                    className={`flex-1 py-2.5 text-[11px] font-bold uppercase rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                        activeSubTab === 'SO_QUY' ? 'bg-sky-500 text-zinc-950 font-black shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
+                    className={`flex-1 py-2 text-[11px] font-extrabold uppercase rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        activeSubTab === 'SO_QUY' ? 'bg-white text-zinc-950 shadow-md font-black' : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                 >
-                    <i className="fas fa-university"></i> Danh Sách Quỹ
+                    <i className="fas fa-university text-[11px]"></i> Danh Sách Quỹ
                 </button>
                 <button 
                     onClick={() => setActiveSubTab('THONG_KE')} 
-                    className={`flex-1 py-2.5 text-[11px] font-bold uppercase rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                        activeSubTab === 'THONG_KE' ? 'bg-purple-500 text-white font-black shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
+                    className={`flex-1 py-2 text-[11px] font-extrabold uppercase rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        activeSubTab === 'THONG_KE' ? 'bg-white text-zinc-950 shadow-md font-black' : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                 >
-                    <i className="fas fa-chart-pie"></i> Báo Cáo Cơ Cấu
+                    <i className="fas fa-chart-pie text-[11px]"></i> Báo Cáo Cơ Cấu
                 </button>
             </div>
 
@@ -2795,16 +2791,16 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
             {activeSubTab === 'CASHBOOK' && (
                 <div className="space-y-2.5 animate-fade-in w-full">
                     {/* BỘ LỌC NHANH: TẤT CẢ / THU / CHI / CHUYỂN / ĐIỀU CHỈNH */}
-                    <div className="bg-[#121216] border border-zinc-800/80 p-2 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="bg-[#121214] border border-white/[0.08] p-2 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                         <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar no-scrollbar py-0.5">
                             <button 
                                 onClick={() => setFilterTxType('ALL')} 
                                 className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                                    filterTxType === 'ALL' ? 'bg-amber-500 text-zinc-950 shadow-sm' : 'bg-[#09090b] text-zinc-400 hover:text-white border border-zinc-800'
+                                    filterTxType === 'ALL' ? 'bg-white text-zinc-950 shadow-md font-black' : 'bg-[#121214] text-zinc-400 hover:text-white border border-white/[0.08]'
                                 }`}
                             >
                                 <span>Tất Cả</span>
-                                <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${filterTxType === 'ALL' ? 'bg-black/30 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-400'}`}>
+                                <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${filterTxType === 'ALL' ? 'bg-zinc-200 text-zinc-950 font-black' : 'bg-zinc-800 text-zinc-400'}`}>
                                     {basePeriodTxs.length}
                                 </span>
                             </button>
@@ -2812,12 +2808,12 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
                             <button 
                                 onClick={() => setFilterTxType('THU')} 
                                 className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                                    filterTxType === 'THU' ? 'bg-emerald-500 text-zinc-950 shadow-sm' : 'bg-emerald-950/20 text-emerald-400 hover:bg-emerald-950/40 border border-emerald-500/30'
+                                    filterTxType === 'THU' ? 'bg-[#22c55e] text-zinc-950 shadow-md font-black' : 'bg-[#121214] text-emerald-400 hover:bg-emerald-950/30 border border-emerald-500/20'
                                 }`}
                             >
                                 <i className="fas fa-arrow-down text-xs"></i>
                                 <span>Tiền Thu</span>
-                                <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${filterTxType === 'THU' ? 'bg-black/30 text-zinc-950 font-bold' : 'bg-emerald-900/50 text-emerald-300'}`}>
+                                <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${filterTxType === 'THU' ? 'bg-black/20 text-zinc-950 font-black' : 'bg-emerald-950 text-emerald-300'}`}>
                                     +{secureMoney(totalThu)}đ
                                 </span>
                             </button>
@@ -2825,12 +2821,12 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
                             <button 
                                 onClick={() => setFilterTxType('CHI')} 
                                 className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                                    filterTxType === 'CHI' ? 'bg-rose-500 text-white shadow-sm' : 'bg-rose-950/20 text-rose-400 hover:bg-rose-950/40 border border-rose-500/30'
+                                    filterTxType === 'CHI' ? 'bg-[#f43f5e] text-white shadow-md font-black' : 'bg-[#121214] text-rose-400 hover:bg-rose-950/30 border border-rose-500/20'
                                 }`}
                             >
                                 <i className="fas fa-arrow-up text-xs"></i>
                                 <span>Tiền Chi</span>
-                                <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${filterTxType === 'CHI' ? 'bg-black/30 text-white font-bold' : 'bg-rose-900/50 text-rose-300'}`}>
+                                <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${filterTxType === 'CHI' ? 'bg-black/20 text-white font-black' : 'bg-rose-950 text-rose-300'}`}>
                                     -{secureMoney(totalChi)}đ
                                 </span>
                             </button>
@@ -2838,12 +2834,12 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
                             <button 
                                 onClick={() => setFilterTxType('CHUYEN')} 
                                 className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                                    filterTxType === 'CHUYEN' ? 'bg-sky-500 text-zinc-950 shadow-sm' : 'bg-sky-950/20 text-sky-400 hover:bg-sky-950/40 border border-sky-500/30'
+                                    filterTxType === 'CHUYEN' ? 'bg-[#38bdf8] text-zinc-950 shadow-md font-black' : 'bg-[#121214] text-sky-400 hover:bg-sky-950/30 border border-sky-500/20'
                                 }`}
                             >
                                 <i className="fas fa-exchange-alt text-xs"></i>
                                 <span>Chuyển Quỹ</span>
-                                <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${filterTxType === 'CHUYEN' ? 'bg-black/30 text-zinc-950 font-bold' : 'bg-sky-900/50 text-sky-300'}`}>
+                                <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${filterTxType === 'CHUYEN' ? 'bg-black/20 text-zinc-950 font-black' : 'bg-sky-950 text-sky-300'}`}>
                                     {countChuyen}
                                 </span>
                             </button>

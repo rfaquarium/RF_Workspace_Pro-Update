@@ -112,7 +112,7 @@ const VariantGroupCard = React.memo(function VariantGroupCard({ group, setEditPr
                             {selectedVar.sku || 'CHƯA CÓ SKU'}
                         </span>
                         {group.items.length > 1 && (
-                            <span className="text-[9.5px] font-bold text-zinc-400 bg-white/[0.04] border border-white/[0.06] px-1.5 py-0.5 rounded">
+                            <span className="text-[9.5px] font-bold text-zinc-400 bg-white/[0.04] border border-white/[0.08] px-1.5 py-0.5 rounded">
                                 {group.items.length} phân loại
                             </span>
                         )}
@@ -138,14 +138,14 @@ const VariantGroupCard = React.memo(function VariantGroupCard({ group, setEditPr
                 </div>
 
                 {/* Right chevron */}
-                <div className="text-zinc-500 hover:text-zinc-300 w-7 h-7 rounded-lg flex items-center justify-center bg-white/[0.02] border border-white/[0.04] transition-all">
+                <div className="text-zinc-500 hover:text-zinc-300 w-7 h-7 rounded-lg flex items-center justify-center bg-white/[0.02] border border-white/[0.08] transition-all">
                     <i className={`fas fa-chevron-${expanded ? 'up' : 'down'} text-[11px]`}></i>
                 </div>
             </div>
 
             {/* Expanded details */}
             {expanded && (
-                <div className="px-3.5 pb-3.5 pt-2.5 border-t border-white/[0.06] bg-[#0c0c0e]/90 space-y-3 animate-fade-in">
+                <div className="px-3.5 pb-3.5 pt-2.5 border-t border-white/[0.08] bg-[#0c0c0e]/90 space-y-3 animate-fade-in">
                     {/* Variants selector strip */}
                     {group.items.length > 1 && (
                         <div className="space-y-1.5">
@@ -189,21 +189,21 @@ const VariantGroupCard = React.memo(function VariantGroupCard({ group, setEditPr
                     {/* Financials & Stock metrics */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
                         {currentRole !== 'CTV' && (
-                            <div className="bg-[#121215] border border-white/[0.06] rounded-xl p-2.5">
+                            <div className="bg-[#121215] border border-white/[0.08] rounded-xl p-2.5">
                                 <span className="text-[9.5px] font-bold text-zinc-400 uppercase tracking-wider block mb-0.5">Giá Vốn</span>
                                 <span className="text-[13px] font-mono font-bold text-zinc-300">
                                     {canViewCost ? <>{formatMoney(selectedVar.costPrice)}<span className="text-[10px] text-zinc-500">đ</span></> : '******'}
                                 </span>
                             </div>
                         )}
-                        <div className="bg-[#121215] border border-white/[0.06] rounded-xl p-2.5">
+                        <div className="bg-[#121215] border border-white/[0.08] rounded-xl p-2.5">
                             <span className="text-[9.5px] font-bold text-zinc-400 uppercase tracking-wider block mb-0.5">Giá Bán</span>
                             <span className="text-[14px] font-mono font-black text-emerald-400">
                                 {formatMoney(selectedVar.price)}<span className="text-[10px] text-emerald-500">đ</span>
                             </span>
                         </div>
                         {selectedVar.price > 0 && selectedVar.costPrice > 0 && canViewCost && currentRole !== 'CTV' && (
-                            <div className="bg-[#121215] border border-white/[0.06] rounded-xl p-2.5">
+                            <div className="bg-[#121215] border border-white/[0.08] rounded-xl p-2.5">
                                 <span className="text-[9.5px] font-bold text-zinc-400 uppercase tracking-wider block mb-0.5">Lợi Nhuận Gộp</span>
                                 <span className="text-[13px] font-mono font-black text-[#d4af37]">
                                     {formatMoney(selectedVar.price - selectedVar.costPrice)}đ <span className="text-[10px] text-emerald-400 font-bold">({((selectedVar.price - selectedVar.costPrice) / selectedVar.price * 100).toFixed(0)}%)</span>
@@ -211,7 +211,7 @@ const VariantGroupCard = React.memo(function VariantGroupCard({ group, setEditPr
                             </div>
                         )}
                         {currentRole !== 'CTV' && (
-                            <div className="bg-[#121215] border border-white/[0.06] rounded-xl p-2.5">
+                            <div className="bg-[#121215] border border-white/[0.08] rounded-xl p-2.5">
                                 <div className="flex justify-between items-center mb-0.5">
                                     <span className="text-[9.5px] font-bold text-zinc-400 uppercase tracking-wider">Tồn Kho</span>
                                     <span className="text-[9.5px] text-zinc-500 font-mono">Min {selectedVar.minStock || 0} / Max {selectedVar.maxStock || 0}</span>
@@ -224,7 +224,7 @@ const VariantGroupCard = React.memo(function VariantGroupCard({ group, setEditPr
                     </div>
 
                     {/* Action Bar */}
-                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/[0.06] flex-wrap">
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/[0.08] flex-wrap">
                         <div className="flex items-center gap-1.5 flex-wrap">
                             {(isGlassCategory || bomItems.length > 0 || String(selectedVar.category || '').toUpperCase() === 'LAYOUT') && (
                                 <button 
@@ -387,10 +387,10 @@ const VariantGroupCard = React.memo(function VariantGroupCard({ group, setEditPr
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                <div className="bg-[#09090b] border border-white/[0.06] rounded-xl overflow-hidden">
+                                <div className="bg-[#09090b] border border-white/[0.08] rounded-xl overflow-hidden">
                                     <table className="w-full text-left border-collapse">
                                         <thead>
-                                            <tr className="bg-white/[0.02] border-b border-white/[0.06] text-[10px] font-black text-zinc-400 uppercase tracking-wider">
+                                            <tr className="bg-white/[0.02] border-b border-white/[0.08] text-[10px] font-black text-zinc-400 uppercase tracking-wider">
                                                 <th className="py-2.5 px-3">Vật Tư</th>
                                                 <th className="py-2.5 px-3 text-center">Định Mức</th>
                                                 {canViewCost && <th className="py-2.5 px-3 text-right">Đơn Giá Vốn</th>}
@@ -693,7 +693,7 @@ function ProductEditModal({ prod, onClose, pushData, currentCat, data }) {
           </div>
 
           {/* Đơn vị tính & Quy đổi */}
-          <div className="p-3 bg-white/[0.02] rounded-xl border border-white/[0.06]">
+          <div className="p-3 bg-white/[0.02] rounded-xl border border-white/[0.08]">
               <div className="flex justify-between items-center mb-2">
                   <label className="text-[10px] font-bold text-zinc-400 block uppercase tracking-wider"><i className="fas fa-balance-scale mr-1 text-[#d4af37]"></i> ĐƠN VỊ TÍNH</label>
                   {!showConversion && (
@@ -725,7 +725,7 @@ function ProductEditModal({ prod, onClose, pushData, currentCat, data }) {
               </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 p-3 bg-white/[0.02] rounded-xl border border-white/[0.06]">
+          <div className="grid grid-cols-2 gap-3 p-3 bg-white/[0.02] rounded-xl border border-white/[0.08]">
               <div>
                   <label className="text-[10px] font-bold text-zinc-400 block mb-1 uppercase tracking-wider">TỒN NHỎ NHẤT (MIN)</label>
                   <input type="number" value={form.minStock} onChange={(e) => setForm({...form, minStock: e.target.value})} className="w-full bg-[#09090b] border border-white/[0.08] focus:border-[#d4af37]/60 rounded-xl px-3 py-2 text-white font-mono font-bold outline-none" placeholder="0" />
@@ -834,7 +834,7 @@ function AddVariantModal({ group, onClose, pushData, data }) {
           <button onClick={onClose} className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"><i className="fas fa-times"></i></button>
         </div>
 
-        <div className="bg-[#09090b] border border-white/[0.06] rounded-xl p-2.5 mb-3 text-xs text-zinc-400">
+        <div className="bg-[#09090b] border border-white/[0.08] rounded-xl p-2.5 mb-3 text-xs text-zinc-400">
           Mẫu gốc: <span className="font-bold text-white">{fullName}</span>
         </div>
 
@@ -943,7 +943,7 @@ function BulkEditPriceModal({ data, pushData, onClose }) {
             </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar border border-white/[0.06] rounded-xl bg-[#09090b]">
+        <div className="flex-1 overflow-y-auto custom-scrollbar border border-white/[0.08] rounded-xl bg-[#09090b]">
             <table className="w-full text-left border-collapse">
                 <thead className="sticky top-0 bg-[#16161c] z-10 border-b border-white/[0.08]">
                     <tr>
@@ -1142,21 +1142,21 @@ function InventoryListView({ data, pushData, isAdmin, triggerToast }) {
                       </div>
                   </div>
                   {showStockRules && (
-                      <div className="p-3.5 pt-2.5 border-t border-white/[0.06] bg-[#09090b] animate-fade-in">
+                      <div className="p-3.5 pt-2.5 border-t border-white/[0.08] bg-[#09090b] animate-fade-in">
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-[11px]">
-                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.06]">
+                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.08]">
                                   <div className="text-sky-400 font-bold uppercase text-[9.5px] mb-1"><i className="fas fa-cubes mr-1"></i> Bể Kính</div>
                                   <div className="font-mono text-zinc-300 font-semibold">BE202020, BE202020ND, TERA202025</div>
                               </div>
-                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.06]">
+                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.08]">
                                   <div className="text-amber-400 font-bold uppercase text-[9.5px] mb-1"><i className="fas fa-mountain-sun mr-1"></i> Layout</div>
                                   <div className="font-mono text-zinc-300 font-semibold">RUN-003-202020, CV-604040</div>
                               </div>
-                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.06]">
+                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.08]">
                                   <div className="text-emerald-400 font-bold uppercase text-[9.5px] mb-1"><i className="fas fa-boxes-stacked mr-1"></i> Vật Tư Sản Xuất</div>
                                   <div className="font-mono text-zinc-300 font-semibold">NLSX-BK-A300, VTSX-GANGTAY</div>
                               </div>
-                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.06]">
+                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.08]">
                                   <div className="text-[#d4af37] font-bold uppercase text-[9.5px] mb-1"><i className="fas fa-calendar-check mr-1"></i> Lịch Chốt Kho</div>
                                   <div className="text-zinc-300">Ngày <b className="text-white">01</b> (Chốt tháng) & <b className="text-white">15</b> (Giữa kỳ)</div>
                               </div>

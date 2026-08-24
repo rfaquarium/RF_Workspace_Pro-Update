@@ -375,11 +375,11 @@ const TimeFilter = React.memo(function TimeFilter({ filter, setFilter, start, se
         <div className="bg-[#121215] p-3 rounded-2xl border border-white/[0.08] shadow-sm mb-3"> 
             <div className="flex gap-1.5 overflow-x-auto custom-scrollbar pb-0.5"> 
                 {['Tất Cả', 'Hôm Nay', 'Tháng Này', 'Tuỳ Chỉnh'].map(f => ( 
-                    <button key={f} onClick={()=>setFilter(f)} className={`flex-shrink-0 px-3.5 py-1.5 text-[10.5px] font-bold uppercase tracking-wider rounded-xl transition-all shadow-sm ${filter===f ? 'bg-[#d4af37] text-zinc-950 font-black' : 'bg-[#18181c] text-zinc-400 border border-white/[0.06] hover:text-white'}`}>{f}</button> 
+                    <button key={f} onClick={()=>setFilter(f)} className={`flex-shrink-0 px-3.5 py-1.5 text-[10.5px] font-bold uppercase tracking-wider rounded-xl transition-all shadow-sm ${filter===f ? 'bg-[#d4af37] text-zinc-950 font-black' : 'bg-[#18181c] text-zinc-400 border border-white/[0.08] hover:text-white'}`}>{f}</button> 
                 ))} 
             </div> 
             {filter === 'Tuỳ Chỉnh' && ( 
-                <div className="flex flex-col gap-2 mt-2.5 pt-2.5 border-t border-white/[0.06] animate-fade-in"> 
+                <div className="flex flex-col gap-2 mt-2.5 pt-2.5 border-t border-white/[0.08] animate-fade-in"> 
                     <div className="flex gap-2">
                         <div className="flex-1"><label className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider block mb-1">Từ ngày</label><input type="date" className="rf-input-glass w-full" value={start} onChange={e=>setStart(e.target.value)} /></div> 
                         <div className="flex-1"><label className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider block mb-1">Đến ngày</label><input type="date" className="rf-input-glass w-full" value={end} onChange={e=>setEnd(e.target.value)} /></div> 

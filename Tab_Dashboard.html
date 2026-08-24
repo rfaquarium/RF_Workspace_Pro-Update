@@ -461,7 +461,7 @@ const ProductionStaffDispatchBoard = React.memo(function ProductionStaffDispatch
         {activeStaffConfig && (
           <button 
             onClick={() => setSelectedStaff(null)}
-            className="hidden sm:flex items-center gap-1.5 text-[10px] font-bold text-zinc-400 hover:text-zinc-200 bg-[#121214] hover:bg-[#18181b] px-2.5 py-1 rounded-lg border border-[#27272a] transition-all shrink-0 cursor-pointer"
+            className="hidden sm:flex items-center gap-1.5 text-[10px] font-bold text-zinc-400 hover:text-zinc-200 bg-[#121214] hover:bg-[#121214] px-2.5 py-1 rounded-lg border border-[#27272a] transition-all shrink-0 cursor-pointer"
             title="Thu gọn danh sách việc"
           >
             <i className="fas fa-chevron-up text-[9px] text-zinc-500"></i>
@@ -511,7 +511,7 @@ const ProductionStaffDispatchBoard = React.memo(function ProductionStaffDispatch
                   <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black font-mono transition-all border ${
                     count > 0 
                       ? (isSelected ? `${staff.theme.countActive} border-transparent shadow-sm` : `${staff.theme.badge} animate-pulse`) 
-                      : 'bg-white/[0.04] text-zinc-500 border-white/[0.06]'
+                      : 'bg-white/[0.04] text-zinc-500 border-white/[0.08]'
                   }`}>
                     {count} việc
                   </span>
@@ -591,7 +591,7 @@ const ProductionStaffDispatchBoard = React.memo(function ProductionStaffDispatch
                         <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded border ${activeStaffConfig.theme.badge}`}>
                           {activeStaffConfig.role}
                         </span>
-                        <span className="text-[9.5px] font-mono font-bold text-zinc-400 bg-[#18181b] px-1.5 py-0.5 rounded border border-[#27272a]">
+                        <span className="text-[9.5px] font-mono font-bold text-zinc-400 bg-[#121214] px-1.5 py-0.5 rounded border border-[#27272a]">
                           {isOrder ? (item.orderCode || item.id) : (item.orderId || 'Sản Xuất Tồn')}
                         </span>
                         {item.channel && (
@@ -889,7 +889,7 @@ const MonthlyPenaltyLedger = React.memo(function MonthlyPenaltyLedger({
           className={`w-full py-2 px-3 rounded-xl border text-[10.5px] font-bold flex items-center justify-between transition-all cursor-pointer active:scale-[0.99] ${
             isOpenDetails 
               ? 'bg-rose-500/10 border-rose-500/30 text-rose-300' 
-              : 'bg-[#121214] hover:bg-[#18181b] border-[#27272a] hover:border-zinc-700 text-zinc-300'
+              : 'bg-[#121214] hover:bg-[#121214] border-[#27272a] hover:border-zinc-700 text-zinc-300'
           }`}
         >
           <div className="flex items-center gap-2">
@@ -935,7 +935,7 @@ const MonthlyPenaltyLedger = React.memo(function MonthlyPenaltyLedger({
                         {rec.type}
                       </span>
                       {rec.orderCode && (
-                        <span className="text-[9px] font-mono font-bold text-zinc-400 bg-[#18181b] px-1.5 py-0.5 rounded border border-[#27272a]">
+                        <span className="text-[9px] font-mono font-bold text-zinc-400 bg-[#121214] px-1.5 py-0.5 rounded border border-[#27272a]">
                           Đơn: {rec.orderCode}
                         </span>
                       )}
@@ -963,7 +963,7 @@ const MonthlyPenaltyLedger = React.memo(function MonthlyPenaltyLedger({
                       <button 
                         onClick={() => handleForgivePenalty(rec)}
                         disabled={processingId === rec.id}
-                        className="w-6 h-6 flex items-center justify-center bg-[#18181b] hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 border border-[#27272a] hover:border-rose-500/40 rounded-lg transition-colors cursor-pointer"
+                        className="w-6 h-6 flex items-center justify-center bg-[#121214] hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 border border-[#27272a] hover:border-rose-500/40 rounded-lg transition-colors cursor-pointer"
                         title="Ân xá / Miễn trừ khoản phạt này"
                       >
                         <i className={`fas ${processingId === rec.id ? 'fa-spinner fa-spin' : 'fa-trash'} text-[9px]`}></i>
@@ -1187,7 +1187,7 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ prodIt
               setRemText('');
               setShowAddReminder(!showAddReminder);
             }} 
-            className="bg-[#121214] hover:bg-[#18181b] text-emerald-500 border border-[#27272a] hover:border-emerald-500/50 font-bold text-[10px] px-3 py-1.5 rounded flex items-center gap-1.5 uppercase tracking-wide transition-all"
+            className="bg-[#121214] hover:bg-[#121214] text-emerald-500 border border-[#27272a] hover:border-emerald-500/50 font-bold text-[10px] px-3 py-1.5 rounded flex items-center gap-1.5 uppercase tracking-wide transition-all"
           >
             <i className={`fas ${showAddReminder ? 'fa-times text-zinc-400' : 'fa-plus'}`}></i> {showAddReminder ? 'Đóng' : 'Báo Nhập'}
           </button>
@@ -1271,7 +1271,7 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ prodIt
                   </div>
                   <div className="flex gap-2">
                     {(isAdmin || isBoss || currentUser === req.phases.phase1.user) && (
-                        <button onClick={() => handleDeleteRequest(req)} disabled={processing} className="text-[10px] font-bold w-7 h-7 flex items-center justify-center bg-[#18181b] hover:bg-rose-500/10 text-zinc-400 hover:text-rose-500 border border-[#27272a] hover:border-rose-500/30 rounded transition-colors"><i className="fas fa-trash"></i></button>
+                        <button onClick={() => handleDeleteRequest(req)} disabled={processing} className="text-[10px] font-bold w-7 h-7 flex items-center justify-center bg-[#121214] hover:bg-rose-500/10 text-zinc-400 hover:text-rose-500 border border-[#27272a] hover:border-rose-500/30 rounded transition-colors"><i className="fas fa-trash"></i></button>
                     )}
                     {(isAdmin || isBoss) && (
                         <button onClick={() => handleMarkAsOrdered(req)} disabled={processing} className="text-[10px] font-bold px-3 h-7 bg-amber-500 hover:bg-amber-600 text-[#09090b] rounded uppercase tracking-wide">Xác nhận Đã Đặt</button>
@@ -1830,11 +1830,11 @@ const DashboardTab = React.memo(function DashboardTab({ reimbursements = [], ord
 
       {/* QUICK ACTIONS FRAME 2.0 - HALLMARK BENTO */}
       <div className="bg-[#101014] border border-white/[0.08] p-4 sm:p-5 rounded-2xl shadow-sm relative overflow-hidden group/container">
-          <div className="flex items-center justify-between mb-4 relative z-10 border-b border-white/[0.06] pb-3">
+          <div className="flex items-center justify-between mb-4 relative z-10 border-b border-white/[0.08] pb-3">
               <div className="flex items-center gap-2 text-[11px] font-black text-zinc-300 uppercase tracking-widest">
                   <i className="fas fa-th-large text-[#d4af37]"></i> Bảng Điều Khiển Nhanh
               </div>
-              <div className="text-[9.5px] font-bold text-zinc-400 bg-white/[0.04] px-2.5 py-0.5 rounded-full border border-white/[0.06]">
+              <div className="text-[9.5px] font-bold text-zinc-400 bg-white/[0.04] px-2.5 py-0.5 rounded-full border border-white/[0.08]">
                   Trạm Trung Tâm
               </div>
           </div>
@@ -2088,7 +2088,7 @@ const DashboardTab = React.memo(function DashboardTab({ reimbursements = [], ord
                       {log.amount > 0 && <span className="text-emerald-400 font-black text-[10px] bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">+{canSeeMoney ? log.amount.toLocaleString('vi-VN') + 'đ' : '******đ'}</span>}
                     </div>
                     <div className="flex items-center gap-2 mt-1.5 text-[10px] font-medium text-zinc-500">
-                      <span className="font-mono bg-[#18181b] px-1.5 rounded border border-[#27272a]">{log.time?.split(' ')[1]?.slice(0,5) || log.time?.slice(11,16)}</span>
+                      <span className="font-mono bg-[#121214] px-1.5 rounded border border-[#27272a]">{log.time?.split(' ')[1]?.slice(0,5) || log.time?.slice(11,16)}</span>
                       {log.user && <span>• <span className="text-zinc-400 font-bold">{log.user}</span></span>}
                       <span>•</span>
                       <div className={`text-[9px] font-bold px-2 py-0.5 rounded ${style.bg}`} style={{ color: style.color }}>{log.category}</div>

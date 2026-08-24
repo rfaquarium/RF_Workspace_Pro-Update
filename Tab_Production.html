@@ -602,7 +602,7 @@
                     </div>
 
                     {/* Quick Metrics Strip */}
-                    <div className="px-3.5 py-1.5 bg-[#09090b] border-b border-white/[0.06] flex items-center justify-between gap-2 text-[10.5px] shrink-0 font-mono">
+                    <div className="px-3.5 py-1.5 bg-[#09090b] border-b border-white/[0.08] flex items-center justify-between gap-2 text-[10.5px] shrink-0 font-mono">
                         <div className="flex items-center gap-1.5 text-zinc-400">
                             <span>Lượt:</span>
                             <strong className="text-zinc-100 font-bold">{filteredLogs.length}</strong>
@@ -619,7 +619,7 @@
                     </div>
 
                     {/* Compact Filter Ribbon */}
-                    <div className="p-2.5 bg-[#121215] border-b border-white/[0.06] flex flex-col gap-2 text-[11px] shrink-0">
+                    <div className="p-2.5 bg-[#121215] border-b border-white/[0.08] flex flex-col gap-2 text-[11px] shrink-0">
                         {/* Hàng 1: Search Box & Nút Sao Chép */}
                         <div className="flex items-center justify-between gap-2">
                             <div className="relative flex-1 min-w-0">
@@ -760,7 +760,7 @@
                                 return (
                                     <div 
                                         key={l.id || idx} 
-                                        className="bg-[#121215] hover:bg-[#16161c] border border-white/[0.04] hover:border-white/[0.12] px-2.5 py-1.5 rounded-xl flex items-center justify-between gap-2 text-[11px] transition-colors group select-none"
+                                        className="bg-[#121215] hover:bg-[#16161c] border border-white/[0.08] hover:border-white/[0.12] px-2.5 py-1.5 rounded-xl flex items-center justify-between gap-2 text-[11px] transition-colors group select-none"
                                     >
                                         {/* Cột trái: Thứ tự, Badge hành động, Tên thợ, Tên hàng/Mã đơn */}
                                         <div className="min-w-0 flex items-center gap-2 flex-1">
@@ -798,7 +798,7 @@
                                         {/* Cột phải: Tiền thưởng định mức, Ảnh bằng chứng, Thời gian */}
                                         <div className="flex items-center gap-2 shrink-0">
                                             {l.reward !== 0 && (
-                                                <span className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/[0.02] border border-white/[0.04] ${l.reward > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                <span className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/[0.02] border border-white/[0.08] ${l.reward > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                                     {l.reward > 0 ? '+' : ''}{Number(l.reward).toLocaleString('vi-VN')}đ
                                                 </span>
                                             )}
@@ -1000,7 +1000,7 @@
                 <div className="bg-[#121214] border border-amber-500/30 rounded-2xl w-full max-w-4xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden animate-scale-up" onClick={e => e.stopPropagation()}>
                     
                     {/* Header */}
-                    <div className="p-3 sm:px-4 sm:py-3.5 bg-[#18181b] border-b border-amber-500/20 flex items-center justify-between gap-2 shrink-0">
+                    <div className="p-3 sm:px-4 sm:py-3.5 bg-[#121214] border-b border-amber-500/20 flex items-center justify-between gap-2 shrink-0">
                         <div className="flex items-center gap-2.5 min-w-0">
                             <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 shadow-sm">
                                 <i className="fas fa-boxes-stacked text-xs sm:text-sm"></i>
@@ -1046,7 +1046,7 @@
                     <div className="p-2.5 sm:p-3 bg-[#0e0e11] border-b border-zinc-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 text-[11px] shrink-0">
                         <div className="flex items-center gap-2 flex-wrap">
                             {/* Phân hệ Bể Kính / Layout */}
-                            <div className="flex items-center gap-0.5 bg-[#18181b] p-0.5 sm:p-1 rounded-xl border border-zinc-800">
+                            <div className="flex items-center gap-0.5 bg-[#121214] p-0.5 sm:p-1 rounded-xl border border-zinc-800">
                                 {[
                                     { id: 'ALL', label: 'Tất Cả', icon: 'fa-layer-group' },
                                     { id: 'BE_KINH', label: 'Bể Kính', icon: 'fa-fish' },
@@ -1069,7 +1069,7 @@
                             </div>
 
                             {/* Bộ lọc mức tồn kho */}
-                            <div className="flex items-center gap-0.5 bg-[#18181b] p-0.5 sm:p-1 rounded-xl border border-zinc-800">
+                            <div className="flex items-center gap-0.5 bg-[#121214] p-0.5 sm:p-1 rounded-xl border border-zinc-800">
                                 {[
                                     { id: 'OUT', label: `Hết (${outCount})`, color: 'text-rose-400' },
                                     { id: 'LOW', label: `Thiếu (${lowCount})`, color: 'text-amber-400' },
@@ -1099,7 +1099,7 @@
                                 value={searchKeyword}
                                 onChange={e => setSearchKeyword(e.target.value)}
                                 placeholder="Tìm SKU, tên sản phẩm..."
-                                className="w-full bg-[#18181b] border border-zinc-700/80 rounded-xl pl-8 pr-7 py-1.5 text-[10.5px] sm:text-[11px] text-white font-bold outline-none focus:border-[#d4af37] transition-colors"
+                                className="w-full bg-[#121214] border border-zinc-700/80 rounded-xl pl-8 pr-7 py-1.5 text-[10.5px] sm:text-[11px] text-white font-bold outline-none focus:border-[#d4af37] transition-colors"
                             />
                             {searchKeyword && (
                                 <button onClick={() => setSearchKeyword('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white cursor-pointer">
@@ -1144,7 +1144,7 @@
                                                     ? 'bg-rose-950/15 border-rose-500/30 hover:border-rose-500/60' 
                                                     : isLow 
                                                         ? 'bg-amber-950/15 border-amber-500/30 hover:border-amber-500/60'
-                                                        : 'bg-[#18181b]/80 border-zinc-800 hover:border-zinc-700'
+                                                        : 'bg-[#121214]/80 border-zinc-800 hover:border-zinc-700'
                                             }`}
                                         >
                                             {/* Ảnh thu nhỏ & Thông tin */}
@@ -1300,7 +1300,7 @@
                             </div>
                         </div>
                     ) : (
-                        <div className="p-2.5 sm:px-4 sm:py-2.5 bg-[#18181b] border-t border-zinc-800 flex items-center justify-between text-[10px] sm:text-[11px] text-zinc-400 shrink-0">
+                        <div className="p-2.5 sm:px-4 sm:py-2.5 bg-[#121214] border-t border-zinc-800 flex items-center justify-between text-[10px] sm:text-[11px] text-zinc-400 shrink-0">
                             <div className="truncate">
                                 Hiển thị: <strong className="text-white">{filteredList.length}</strong> / {relevantProducts.length} mặt hàng
                             </div>
@@ -2226,7 +2226,7 @@
                                 </button>
                             </div>
 
-                            <div className="bg-[#18181b] p-3 rounded-xl border border-white/[0.08] space-y-2 text-[11px]">
+                            <div className="bg-[#121214] p-3 rounded-xl border border-white/[0.08] space-y-2 text-[11px]">
                                 <div className="flex justify-between items-start gap-2">
                                     <span className="text-zinc-400 shrink-0 font-medium">Sản phẩm:</span>
                                     <span className="font-black text-white text-right truncate">{item.name}</span>
@@ -2726,7 +2726,7 @@
                         <span className="text-[8.5px] font-bold text-zinc-400 uppercase tracking-wider">🛠️ Công Thợ</span>
                         <span className="text-[12px] font-mono font-black text-amber-400 mt-0.5">{formatMoney(totalLaborCost)}đ</span>
                     </div>
-                    <div className="bg-[#18181b] border border-emerald-500/30 px-2 py-1.5 rounded-lg flex flex-col justify-center shadow-[0_0_10px_rgba(16,185,129,0.08)]">
+                    <div className="bg-[#121214] border border-emerald-500/30 px-2 py-1.5 rounded-lg flex flex-col justify-center shadow-[0_0_10px_rgba(16,185,129,0.08)]">
                         <span className="text-[8.5px] font-bold text-emerald-400 uppercase tracking-wider">💰 Giá Vốn COGS</span>
                         <span className="text-[12.5px] font-mono font-black text-emerald-400 mt-0.5">{formatMoney(totalCOGS)}đ</span>
                     </div>
@@ -2857,7 +2857,7 @@
                 {/* NÚT THU GỌN Ở DƯỚI CÙNG */}
                 <button 
                     onClick={(e) => { e.stopPropagation(); onClose && onClose(); }}
-                    className="w-full py-1.5 bg-[#16161a] hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all active:scale-98 shadow-sm cursor-pointer"
+                    className="w-full py-1.5 bg-[#09090b] hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all active:scale-98 shadow-sm cursor-pointer"
                 >
                     <i className="fas fa-chevron-up text-[9px]"></i>
                     <span>Thu gọn bảng định mức</span>
@@ -3252,7 +3252,7 @@
                         {/* === KHU VỰC 2: HÌNH ẢNH & THÔNG TIN SẢN PHẨM & GHI CHÚ === */}
                         <div className="flex gap-3 w-full relative">
                             <div className="w-[60px] h-[60px] shrink-0 relative z-10">
-                                <div className="w-full h-full bg-[#09090b] rounded-lg border border-white/[0.04] overflow-hidden flex items-center justify-center relative shadow-sm">
+                                <div className="w-full h-full bg-[#09090b] rounded-lg border border-white/[0.08] overflow-hidden flex items-center justify-center relative shadow-sm">
                                     <div className="absolute top-0.5 left-0.5 w-3.5 h-3.5 bg-black/80 text-[#d4af37] font-black text-[8px] rounded-full flex items-center justify-center border border-[#333] z-10">{idx_num}</div>
                                     {productImage ? <img src={productImage} loading="lazy" className="w-full h-full object-cover opacity-90" alt="img" /> : <i className="fas fa-image text-[#444] text-xl"></i>}
                                 </div>
@@ -3347,7 +3347,7 @@
                     </div>
 
                     {isExpanded && (
-                        <div className={`px-2 pb-2 border-t border-white/[0.06] pt-2 flex flex-col gap-1 w-full animate-fade-in rounded-b-xl ${isItemDone ? 'bg-[#0a1410]' : 'bg-[#0e0e11]'}`}>
+                        <div className={`px-2 pb-2 border-t border-white/[0.08] pt-2 flex flex-col gap-1 w-full animate-fade-in rounded-b-xl ${isItemDone ? 'bg-[#0a1410]' : 'bg-[#0e0e11]'}`}>
                             {canApproveQC && _item.qc_status === 'Chờ duyệt khung' && (
                                 <div className="mb-2 p-2.5 bg-[#14141a] rounded-xl border border-indigo-500/40 relative flex items-center gap-2.5 shadow-sm">
                                     <div className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden border border-indigo-500/30 bg-black/40 cursor-pointer group" onClick={(e) => { e.stopPropagation(); setPreviewImg(_item.qc_front_photo); }}>
@@ -3616,7 +3616,7 @@
             <div className="mb-2.5">
                 <div onClick={() => setExpanded(!expanded)} className="rf-card bg-[#121214] border border-white/[0.08] hover:border-white/[0.14] rounded-2xl relative transition-all p-3 cursor-pointer flex items-center justify-between shadow-sm">
                     <div className="flex gap-3 items-center min-w-0">
-                        <div className="w-[50px] h-[50px] shrink-0 bg-[#09090b] rounded-xl border border-white/[0.04] overflow-hidden flex items-center justify-center relative shadow-sm">
+                        <div className="w-[50px] h-[50px] shrink-0 bg-[#09090b] rounded-xl border border-white/[0.08] overflow-hidden flex items-center justify-center relative shadow-sm">
                             {(localStorage.getItem('rf_role') === 'QUẢN LÝ SẢN XUẤT' || localStorage.getItem('rf_role') === 'QUẢN LÝ KHO VẬN' || localStorage.getItem('rf_role') === 'TỐI CAO') && toggleSelectProd && (
                                 <div className="absolute top-0 left-0 w-full h-full bg-black/60 z-20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                                     <input
@@ -4155,7 +4155,7 @@
                                 <span className="text-[13px] font-black text-white uppercase tracking-wider flex items-center gap-2">
                                     BẢNG BÁO CÁO SẢN LƯỢNG
                                 </span>
-                                <span className="text-[10px] text-zinc-400 font-bold bg-[#18181b] px-2.5 py-0.5 rounded-md border border-white/[0.08]">
+                                <span className="text-[10px] text-zinc-400 font-bold bg-[#121214] px-2.5 py-0.5 rounded-md border border-white/[0.08]">
                                     {filterTime === 'Chọn Tháng' ? (customMonth || 'Tháng Đã Chọn') : filterTime}
                                 </span>
                                 {allWorkersReport.length > 0 && (
@@ -4182,7 +4182,7 @@
                                 )}
                                 <button
                                     type="button"
-                                    className="px-2.5 py-1 rounded-lg bg-[#18181b] hover:bg-zinc-800 border border-white/[0.08] text-zinc-300 text-[11px] font-bold flex items-center gap-1.5 transition-all"
+                                    className="px-2.5 py-1 rounded-lg bg-[#121214] hover:bg-zinc-800 border border-white/[0.08] text-zinc-300 text-[11px] font-bold flex items-center gap-1.5 transition-all"
                                 >
                                     <i className={`fas fa-chart-bar text-[#d4af37]`}></i>
                                     <span>{showReportTable ? 'Thu gọn' : 'Xem chi tiết'}</span>
@@ -4197,7 +4197,7 @@
                                 <div className="overflow-x-auto hide-scrollbar rounded-xl border border-white/[0.08] mt-3">
                                     <table className="w-full text-left border-collapse min-w-[650px]">
                                         <thead>
-                                            <tr className="bg-[#18181b] text-zinc-300 text-[10px] uppercase font-black tracking-wider border-b border-white/[0.08]">
+                                            <tr className="bg-[#121214] text-zinc-300 text-[10px] uppercase font-black tracking-wider border-b border-white/[0.08]">
                                                 <th className="py-2.5 px-3">NHÂN SỰ</th>
                                                 <th className="py-2.5 px-2 text-center text-[#f59e0b]">Dựng Khung</th>
                                                 <th className="py-2.5 px-2 text-center text-[#10b981]">Gia Cố</th>
@@ -4247,7 +4247,7 @@
                                         </tbody>
                                         {allWorkersReport.length > 0 && (
                                             <tfoot>
-                                                <tr className="bg-[#18181b] text-white font-black text-[11px] border-t-2 border-white/[0.1]">
+                                                <tr className="bg-[#121214] text-white font-black text-[11px] border-t-2 border-white/[0.1]">
                                                     <td className="py-2.5 px-3 uppercase text-[#d4af37]">TỔNG CỘNG</td>
                                                     <td className="py-2.5 px-2 text-center text-[#f59e0b] font-mono">{allWorkersReport.reduce((sum, x) => sum + x.dungKhung, 0)}</td>
                                                     <td className="py-2.5 px-2 text-center text-[#10b981] font-mono">{allWorkersReport.reduce((sum, x) => sum + x.giaCo, 0)}</td>
@@ -4265,8 +4265,8 @@
                     </div>
                 )}
 
-                {/* BỘ CHUYỂN PHÂN HỆ: BỂ KÍNH VS KHUNG LAYOUT (ĐỒNG BỘ CHUẨN WORKBENCH) */}
-                <div className="flex gap-2 w-full max-w-sm mx-auto mb-3 bg-[#111] p-1.5 rounded-2xl border border-[#333] shadow-inner">
+                {/* BỘ CHUYỂN PHÂN HỆ: BỂ KÍNH VS KHUNG LAYOUT (CHUẨN DRIBBLE SEGMENTED PILL) */}
+                <div className="flex gap-2 w-full max-w-sm mx-auto mb-3 bg-[#121214] p-1.5 rounded-2xl border border-white/[0.08] shadow-sm">
                     {[
                         { id: 'Bể Kính', label: 'BỂ KÍNH', count: countBeKinh },
                         { id: 'Layout', label: 'LAYOUT', count: countLayout }
@@ -4274,18 +4274,18 @@
                         <button
                             key={t.id}
                             onClick={() => {
-                                setTypeTab(t.id);
+                                typeTab !== t.id && setTypeTab(t.id);
                                 if (typeof triggerToast === 'function') triggerToast(`Đã chuyển sang ${t.label}`, t.id === 'Bể Kính' ? 'fa-fish' : 'fa-cubes', 'info');
                             }}
-                            className={`flex-1 py-2 font-black text-[13px] rounded-xl transition-all duration-300 flex items-center justify-center gap-2 ${
+                            className={`flex-1 py-2 font-black text-[13px] rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${
                                 typeTab === t.id
-                                    ? 'bg-[#d4af37] text-black shadow-[0_0_15px_rgba(212,175,55,0.3)] scale-[1.02]'
-                                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5'
+                                    ? 'bg-white text-zinc-950 shadow-md scale-[1.01]'
+                                    : 'bg-transparent text-zinc-400 hover:text-white'
                             }`}
                         >
                             {t.label}
                             <span className={`px-2 py-0.5 rounded-lg text-[11px] font-mono ${
-                                typeTab === t.id ? 'bg-black/20 text-black font-black' : 'bg-white/10 text-gray-300'
+                                typeTab === t.id ? 'bg-zinc-200 text-zinc-950 font-black' : 'bg-white/10 text-zinc-300'
                             }`}>
                                 {t.count}
                             </span>
@@ -4299,7 +4299,7 @@
                         <button
                             type="button"
                             onClick={() => setShowAddSXTModal(true)}
-                            className="w-[42px] h-[42px] shrink-0 bg-[#d4af37] text-black font-black rounded-xl flex items-center justify-center hover:bg-[#b89628] active:scale-95 transition-all shadow-md"
+                            className="w-[42px] h-[42px] shrink-0 bg-[#d4af37] text-black font-black rounded-xl flex items-center justify-center hover:bg-[#b89628] active:scale-95 transition-all shadow-md cursor-pointer"
                             title="Tạo Lệnh SX Tồn"
                         >
                             <i className="fas fa-plus text-base"></i>
@@ -4311,13 +4311,12 @@
                         <button
                             type="button"
                             onClick={() => setShowOutOfStockModal(true)}
-                            className="h-[42px] px-3 shrink-0 bg-[#18181b] hover:bg-zinc-800 text-amber-400 border border-amber-500/40 rounded-xl flex items-center gap-1.5 font-black text-[11px] uppercase tracking-wider active:scale-95 transition-all shadow-md relative"
+                            className="w-[42px] h-[42px] shrink-0 bg-[#121214] hover:bg-zinc-800 text-amber-400 border border-amber-500/40 rounded-xl flex items-center justify-center active:scale-95 transition-all shadow-md relative cursor-pointer"
                             title="Xem danh sách Bể Kính & Layout hết/thiếu trong kho để tạo lệnh sản xuất"
                         >
                             <i className="fas fa-boxes-stacked text-sm text-amber-400"></i>
-                            <span className="hidden sm:inline">Hết Kho</span>
                             {outOfStockCount > 0 && (
-                                <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-mono text-[9px] font-black animate-pulse">
+                                <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-rose-600 text-white font-mono text-[9px] font-black shadow">
                                     {outOfStockCount}
                                 </span>
                             )}
@@ -4353,61 +4352,61 @@
                     )}
                 </div>
 
-                {/* BỘ LỌC KÊNH BÁN NHANH (ĐỒNG BỘ CHUẨN TAB ĐƠN HÀNG) */}
+                {/* BỘ LỌC KÊNH BÁN NHANH (CHUẨN DRIBBLE COLOR ACCENT) */}
                 <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar no-scrollbar mb-3 pb-1">
                     {[
                         {
                             id: 'ALL',
                             label: 'Tất Cả',
                             icon: 'fa-store',
-                            activeClass: 'bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/40 shadow-[0_0_10px_rgba(212,175,55,0.15)] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-200',
-                            activeIconClass: 'text-[#d4af37]',
+                            activeClass: 'bg-white text-zinc-950 shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                            activeIconClass: 'text-zinc-950',
                             inactiveIconClass: 'text-zinc-400'
                         },
                         {
                             id: 'SHOPEE',
                             label: 'Shopee',
                             icon: 'fa-shopping-bag',
-                            activeClass: 'bg-[#ea580c]/15 text-[#f97316] border-[#ea580c]/40 shadow-[0_0_10px_rgba(234,88,12,0.15)] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-[#f97316]',
-                            activeIconClass: 'text-[#f97316]',
+                            activeClass: 'bg-[#f97316] text-white shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#f97316]',
+                            activeIconClass: 'text-white',
                             inactiveIconClass: 'text-zinc-400'
                         },
                         {
                             id: 'EXPORT',
                             label: 'Xuất Khẩu',
                             icon: 'fa-globe-asia',
-                            activeClass: 'bg-[#059669]/15 text-[#10b981] border-[#059669]/40 shadow-[0_0_10px_rgba(16,185,129,0.15)] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-[#10b981]',
-                            activeIconClass: 'text-[#10b981]',
+                            activeClass: 'bg-[#10b981] text-zinc-950 shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#10b981]',
+                            activeIconClass: 'text-zinc-950',
                             inactiveIconClass: 'text-zinc-400'
                         },
                         {
                             id: 'TIKTOK',
                             label: 'TikTok',
                             icon: 'fa-video',
-                            activeClass: 'bg-[#0891b2]/15 text-[#06b6d4] border-[#0891b2]/40 shadow-[0_0_10px_rgba(8,145,178,0.15)] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-[#06b6d4]',
-                            activeIconClass: 'text-[#06b6d4]',
+                            activeClass: 'bg-[#06b6d4] text-zinc-950 shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#06b6d4]',
+                            activeIconClass: 'text-zinc-950',
                             inactiveIconClass: 'text-zinc-400'
                         },
                         {
                             id: 'BÁN LẺ',
                             label: 'Bán Lẻ',
                             icon: 'fa-box',
-                            activeClass: 'bg-[#2563eb]/15 text-[#60a5fa] border-[#2563eb]/40 shadow-[0_0_10px_rgba(37,99,235,0.15)] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-[#60a5fa]',
-                            activeIconClass: 'text-[#60a5fa]',
+                            activeClass: 'bg-[#60a5fa] text-zinc-950 shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#60a5fa]',
+                            activeIconClass: 'text-zinc-950',
                             inactiveIconClass: 'text-zinc-400'
                         },
                         {
                             id: 'CTV',
                             label: 'CTV',
                             icon: 'fa-handshake',
-                            activeClass: 'bg-[#a855f7]/15 text-[#c084fc] border-[#a855f7]/40 shadow-[0_0_10px_rgba(168,85,247,0.15)] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-[#c084fc]',
-                            activeIconClass: 'text-[#c084fc]',
+                            activeClass: 'bg-[#c084fc] text-zinc-950 shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#c084fc]',
+                            activeIconClass: 'text-zinc-950',
                             inactiveIconClass: 'text-zinc-400'
                         }
                     ].map(ch => {
@@ -4416,7 +4415,7 @@
                             <button
                                 key={ch.id}
                                 onClick={() => setFilterChannel(ch.id)}
-                                className={`shrink-0 px-3.5 py-2 rounded-xl text-[11px] transition-all duration-200 flex items-center gap-2 active:scale-95 ${isActive ? ch.activeClass : ch.inactiveClass}`}
+                                className={`shrink-0 px-3.5 py-2 rounded-xl text-[11px] transition-all duration-200 flex items-center gap-2 active:scale-95 cursor-pointer ${isActive ? ch.activeClass : ch.inactiveClass}`}
                             >
                                 <i className={`fas ${ch.icon} ${isActive ? ch.activeIconClass : ch.inactiveIconClass}`}></i>
                                 <span>{ch.label}</span>
@@ -4425,7 +4424,7 @@
                     })}
                 </div>
 
-                {/* BỘ LỌC TRẠNG THÁI (ĐỒNG BỘ CHUẨN TAB ĐƠN HÀNG) */}
+                {/* BỘ LỌC TRẠNG THÁI SẢN XUẤT (CHUẨN DRIBBLE ACCENT) */}
                 <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar no-scrollbar mb-4 pb-1">
                     {[
                         {
@@ -4433,50 +4432,50 @@
                             label: 'Chờ Sản Xuất',
                             count: counts['CHỜ SẢN XUẤT'],
                             icon: 'fa-tools',
-                            activeClass: 'bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/40 shadow-[0_0_10px_rgba(212,175,55,0.15)] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-200',
-                            activeBadgeClass: 'bg-[#d4af37] text-black font-black',
-                            inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.06]'
+                            activeClass: 'bg-amber-400 text-zinc-950 shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                            activeBadgeClass: 'bg-black text-amber-400 font-black',
+                            inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
                         },
                         {
                             id: 'KIỂM ĐỊNH',
                             label: 'Kiểm Định',
                             count: counts['KIỂM ĐỊNH'],
                             icon: 'fa-clipboard-check',
-                            activeClass: 'bg-[#a855f7]/15 text-[#c084fc] border-[#a855f7]/40 shadow-[0_0_10px_rgba(168,85,247,0.15)] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-200',
-                            activeBadgeClass: 'bg-[#a855f7] text-white font-black',
-                            inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.06]'
+                            activeClass: 'bg-purple-500 text-white shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                            activeBadgeClass: 'bg-black/30 text-white font-black',
+                            inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
                         },
                         {
                             id: 'ĐÃ XONG',
                             label: 'Đã Xong',
                             count: counts['ĐÃ XONG'],
                             icon: 'fa-check-double',
-                            activeClass: 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]/40 shadow-[0_0_10px_rgba(16,185,129,0.15)] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-200',
-                            activeBadgeClass: 'bg-[#10b981] text-white font-black',
-                            inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.06]'
+                            activeClass: 'bg-emerald-500 text-zinc-950 shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                            activeBadgeClass: 'bg-black text-emerald-300 font-black',
+                            inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
                         },
                         {
                             id: 'ĐÃ HUỶ',
                             label: 'Đã Huỷ',
                             count: counts['ĐÃ HUỶ'],
                             icon: 'fa-ban',
-                            activeClass: 'bg-rose-500/15 text-rose-400 border-rose-500/40 shadow-[0_0_10px_rgba(244,63,94,0.15)] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-200',
-                            activeBadgeClass: 'bg-rose-500 text-white font-black',
-                            inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.06]'
+                            activeClass: 'bg-rose-500 text-white shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                            activeBadgeClass: 'bg-black/30 text-white font-black',
+                            inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
                         },
                         {
                             id: 'TẤT CẢ',
                             label: 'Tất Cả',
                             count: counts['TẤT CẢ'],
                             icon: 'fa-layer-group',
-                            activeClass: 'bg-zinc-800 text-zinc-100 border-white/[0.2] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-200',
-                            activeBadgeClass: 'bg-zinc-700 text-white font-black',
-                            inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.06]'
+                            activeClass: 'bg-zinc-200 text-zinc-950 shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                            activeBadgeClass: 'bg-zinc-400 text-zinc-950 font-black',
+                            inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
                         }
                     ].map(t => {
                         const isActive = statusTab === t.id;
@@ -4484,7 +4483,7 @@
                             <button
                                 key={t.id}
                                 onClick={() => setStatusTab(t.id)}
-                                className={`shrink-0 px-3.5 py-2 rounded-xl text-[11px] transition-all duration-200 flex items-center gap-2 active:scale-95 ${isActive ? t.activeClass : t.inactiveClass}`}
+                                className={`shrink-0 px-3.5 py-2 rounded-xl text-[11px] transition-all duration-200 flex items-center gap-2 active:scale-95 cursor-pointer ${isActive ? t.activeClass : t.inactiveClass}`}
                             >
                                 <i className={`fas ${t.icon} ${isActive ? '' : 'opacity-80'}`}></i>
                                 <span>{t.label}</span>
@@ -4495,6 +4494,7 @@
                         );
                     })}
                 </div>
+
 
                 {/* DANH SÁCH LỆNH SẢN XUẤT RESPONSIVE CHUẨN ĐỒNG BỘ MỌI THIẾT BỊ */}
                 <div className="w-full space-y-4 mt-1 pb-6">

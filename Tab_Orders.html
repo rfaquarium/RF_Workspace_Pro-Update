@@ -794,7 +794,7 @@
                         </button>
                     </div>
 
-                    <div className="bg-[#09090b] border border-white/[0.06] rounded-xl p-3.5 space-y-2.5 text-[11px] leading-relaxed text-zinc-300">
+                    <div className="bg-[#09090b] border border-white/[0.08] rounded-xl p-3.5 space-y-2.5 text-[11px] leading-relaxed text-zinc-300">
                         <div className="flex items-center gap-2 text-amber-400 font-bold">
                             <i className="fas fa-bolt"></i>
                             <span>Cơ Chế Bóc Tách Tự Động:</span>
@@ -820,7 +820,7 @@
                                     key={item.days}
                                     type="button"
                                     onClick={() => setCutoffDays(item.days)}
-                                    className={`py-2.5 px-2 rounded-xl text-[11px] font-bold border transition-all active:scale-95 text-center ${cutoffDays === item.days ? 'bg-[#d4af37]/20 border-[#d4af37] text-[#d4af37] shadow-sm font-black' : 'bg-[#18181b] border-white/[0.08] text-zinc-400 hover:text-white'}`}
+                                    className={`py-2.5 px-2 rounded-xl text-[11px] font-bold border transition-all active:scale-95 text-center ${cutoffDays === item.days ? 'bg-[#d4af37]/20 border-[#d4af37] text-[#d4af37] shadow-sm font-black' : 'bg-[#121214] border-white/[0.08] text-zinc-400 hover:text-white'}`}
                                 >
                                     {item.label}
                                 </button>
@@ -1419,60 +1419,60 @@
                 label: 'Chờ Sản Xuất',
                 count: stats.pending,
                 icon: 'fa-tools',
-                activeClass: 'bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 shadow-[0_0_10px_rgba(212,175,55,0.15)] font-bold',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-200 hover:bg-white/[0.02]',
-                activeBadgeClass: 'bg-[#d4af37] text-black font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.06]'
+                activeClass: 'bg-amber-400 text-zinc-950 shadow-md font-black',
+                inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                activeBadgeClass: 'bg-black text-amber-400 font-black',
+                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
             },
             {
                 id: 'Chờ Mã Vận Đơn',
                 label: 'Chờ Mã Vận Đơn',
                 count: stats.waitMVD || 0,
                 icon: 'fa-barcode',
-                activeClass: 'bg-[#f97316]/15 text-[#fb923c] border-[#f97316]/30 shadow-[0_0_10px_rgba(249,115,22,0.15)] font-bold',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-200 hover:bg-white/[0.02]',
-                activeBadgeClass: 'bg-[#f97316] text-white font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.06]'
+                activeClass: 'bg-orange-500 text-white shadow-md font-black',
+                inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                activeBadgeClass: 'bg-black/30 text-white font-black',
+                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
             },
             {
                 id: 'Chờ Phụ Kiện',
                 label: 'Chờ Phụ Kiện',
                 count: stats.waitAcc,
                 icon: 'fa-puzzle-piece',
-                activeClass: 'bg-[#06b6d4]/15 text-[#22d3ee] border-[#06b6d4]/30 shadow-[0_0_10px_rgba(6,182,212,0.15)] font-bold',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-200 hover:bg-white/[0.02]',
-                activeBadgeClass: 'bg-[#06b6d4] text-black font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.06]'
+                activeClass: 'bg-cyan-400 text-zinc-950 shadow-md font-black',
+                inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                activeBadgeClass: 'bg-black text-cyan-400 font-black',
+                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
             },
             {
                 id: 'Sẵn Sàng Đóng Gói',
                 label: 'Sẵn Sàng Đóng Gói',
                 count: stats.ready,
                 icon: 'fa-box-open',
-                activeClass: 'bg-[#a855f7]/15 text-[#c084fc] border-[#a855f7]/30 shadow-[0_0_10px_rgba(168,85,247,0.15)] font-bold',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-200 hover:bg-white/[0.02]',
-                activeBadgeClass: 'bg-[#a855f7] text-white font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.06]'
+                activeClass: 'bg-purple-500 text-white shadow-md font-black',
+                inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                activeBadgeClass: 'bg-black/30 text-white font-black',
+                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
             },
             {
                 id: 'Chờ Bàn Giao',
                 label: 'Chờ Bàn Giao',
                 count: stats.shipping,
                 icon: 'fa-truck-loading',
-                activeClass: 'bg-[#3b82f6]/15 text-[#60a5fa] border-[#3b82f6]/30 shadow-[0_0_10px_rgba(59,130,246,0.15)] font-bold',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-200 hover:bg-white/[0.02]',
-                activeBadgeClass: 'bg-[#3b82f6] text-white font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.06]'
+                activeClass: 'bg-blue-500 text-white shadow-md font-black',
+                inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                activeBadgeClass: 'bg-black/30 text-white font-black',
+                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
             },
             {
                 id: 'Đã Bàn Giao',
                 label: 'Đã Bàn Giao',
                 count: stats.done,
                 icon: 'fa-check-double',
-                activeClass: 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]/30 shadow-[0_0_10px_rgba(16,185,129,0.15)] font-bold',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-200 hover:bg-white/[0.02]',
-                activeBadgeClass: 'bg-[#10b981] text-white font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.06]'
+                activeClass: 'bg-emerald-500 text-zinc-950 shadow-md font-black',
+                inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                activeBadgeClass: 'bg-black text-emerald-300 font-black',
+                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
             },
             {
                 id: 'Đơn Huỷ',
@@ -1480,9 +1480,9 @@
                 count: stats.cancel,
                 icon: 'fa-ban',
                 activeClass: 'bg-[#f43f5e]/15 text-[#fb7185] border-[#f43f5e]/30 shadow-[0_0_10px_rgba(244,63,94,0.15)] font-bold',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-200 hover:bg-white/[0.02]',
+                inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.08] hover:border-white/[0.12] hover:text-zinc-200 hover:bg-white/[0.02]',
                 activeBadgeClass: 'bg-[#f43f5e] text-white font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.06]'
+                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.08]'
             },
             {
                 id: 'Hàng Hoàn',
@@ -1490,9 +1490,9 @@
                 count: stats.returns,
                 icon: 'fa-undo-alt',
                 activeClass: 'bg-[#f97316]/15 text-[#fb923c] border-[#f97316]/30 shadow-[0_0_10px_rgba(249,115,22,0.15)] font-bold',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-200 hover:bg-white/[0.02]',
+                inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.08] hover:border-white/[0.12] hover:text-zinc-200 hover:bg-white/[0.02]',
                 activeBadgeClass: 'bg-[#f97316] text-white font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.06]'
+                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.08]'
             },
             {
                 id: 'Hoàn Thành',
@@ -1500,9 +1500,9 @@
                 count: stats.completed,
                 icon: 'fa-certificate',
                 activeClass: 'bg-[#14b8a6]/15 text-[#2dd4bf] border-[#14b8a6]/30 shadow-[0_0_10px_rgba(20,184,166,0.15)] font-bold',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-200 hover:bg-white/[0.02]',
+                inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.08] hover:border-white/[0.12] hover:text-zinc-200 hover:bg-white/[0.02]',
                 activeBadgeClass: 'bg-[#14b8a6] text-white font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.06]'
+                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.08]'
             }
         ], [stats]);
 
@@ -2219,75 +2219,67 @@
                 {/* HÀNG NÚT THAO TÁC & TÌM KIẾM */}
                 <div className="flex flex-col gap-2.5 mb-3">
                     <div className="flex items-center justify-between gap-2 overflow-x-auto custom-scrollbar no-scrollbar py-0.5">
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5 shrink-0">
                             {(isAdmin || isCTV) && (
                                 <button
                                     onClick={() => setAddingMode(true)}
-                                    className="h-9 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 text-amber-300 font-black text-[11px] uppercase tracking-wider flex items-center gap-1.5 border border-amber-500/40 shadow-sm transition-all duration-200 active:scale-95 cursor-pointer"
-                                    title="Thêm Đơn Mới"
+                                    className="w-9 h-9 rounded-xl bg-gradient-to-r from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 text-amber-300 flex items-center justify-center border border-amber-500/40 shadow-sm transition-all duration-200 active:scale-95 cursor-pointer shrink-0"
+                                    title="Tạo Đơn Hàng Mới"
                                 >
-                                    <i className="fas fa-plus text-amber-400"></i>
-                                    <span className="hidden sm:inline">Tạo Đơn</span>
+                                    <i className="fas fa-plus text-amber-400 text-[13px]"></i>
                                 </button>
                             )}
                             {isAdmin && (
                                 <>
                                     <button
                                         onClick={() => window.dispatchEvent(new CustomEvent('openBulkImport'))}
-                                        className="h-9 px-3 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 font-bold text-[11px] uppercase tracking-wider flex items-center gap-1.5 border border-emerald-500/40 transition-all duration-200 active:scale-95 cursor-pointer"
+                                        className="w-9 h-9 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 flex items-center justify-center border border-emerald-500/40 transition-all duration-200 active:scale-95 cursor-pointer shrink-0"
                                         title="Nhập File Excel Order.all"
                                     >
-                                        <i className="fas fa-file-excel text-emerald-400"></i>
-                                        <span className="hidden sm:inline">Nhập Excel</span>
+                                        <i className="fas fa-file-excel text-emerald-400 text-[13px]"></i>
                                     </button>
                                     <button
                                         onClick={() => setIsScanningReturn(true)}
-                                        className="h-9 px-3 rounded-xl bg-purple-950/60 hover:bg-purple-900/70 text-purple-300 font-black text-[11px] uppercase tracking-wider flex items-center gap-1.5 border border-purple-500/60 shadow-[0_0_12px_rgba(168,85,247,0.25)] transition-all duration-200 active:scale-95 cursor-pointer"
+                                        className="w-9 h-9 rounded-xl bg-purple-950/60 hover:bg-purple-900/70 text-purple-300 flex items-center justify-center border border-purple-500/60 shadow-[0_0_10px_rgba(168,85,247,0.2)] transition-all duration-200 active:scale-95 cursor-pointer shrink-0"
                                         title="Quét Đơn Hoàn (Đưa về Kho Hoàn)"
                                     >
-                                        <i className="fas fa-undo text-purple-400"></i>
-                                        <span>Quét Hoàn</span>
+                                        <i className="fas fa-undo text-purple-400 text-[13px]"></i>
                                     </button>
                                     <button
                                         onClick={() => setIsBulkFinanceOpen(true)}
-                                        className="h-9 px-3 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/50 text-cyan-300 font-bold text-[11px] uppercase tracking-wider flex items-center gap-1.5 border border-cyan-500/40 transition-all duration-200 active:scale-95 cursor-pointer"
+                                        className="w-9 h-9 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/50 text-cyan-300 flex items-center justify-center border border-cyan-500/40 transition-all duration-200 active:scale-95 cursor-pointer shrink-0"
                                         title="Đối Soát Doanh Thu Shopee / TikTok"
                                     >
-                                        <i className="fas fa-check-double text-cyan-400"></i>
-                                        <span className="hidden sm:inline">Đối Soát Sàn</span>
+                                        <i className="fas fa-check-double text-cyan-400 text-[13px]"></i>
                                     </button>
                                     <button
                                         onClick={handleSyncGHN}
                                         disabled={isSyncingGHN}
-                                        className="h-9 px-3 rounded-xl bg-amber-950/60 hover:bg-amber-900/70 text-amber-300 font-black text-[11px] uppercase tracking-wider flex items-center gap-1.5 border border-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.25)] transition-all duration-200 active:scale-95 cursor-pointer disabled:opacity-50"
+                                        className="w-9 h-9 rounded-xl bg-amber-950/60 hover:bg-amber-900/70 text-amber-300 flex items-center justify-center border border-amber-500/60 shadow-[0_0_10px_rgba(245,158,11,0.2)] transition-all duration-200 active:scale-95 cursor-pointer disabled:opacity-50 shrink-0"
                                         title="Đồng bộ trạng thái & Đối soát GHN tự động qua API"
                                     >
-                                        <i className={isSyncingGHN ? "fas fa-spinner fa-spin text-amber-400" : "fas fa-bolt text-amber-400"}></i>
-                                        <span>{isSyncingGHN ? "Đang đồng bộ..." : "Đối Soát GHN (API)"}</span>
+                                        <i className={isSyncingGHN ? "fas fa-spinner fa-spin text-amber-400 text-[13px]" : "fas fa-bolt text-amber-400 text-[13px]"}></i>
                                     </button>
                                     <button
                                         onClick={() => setIsScanningCancel(true)}
-                                        className="h-9 px-3 rounded-xl bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 font-bold text-[11px] uppercase tracking-wider flex items-center gap-1.5 border border-rose-500/40 transition-all duration-200 active:scale-95 cursor-pointer"
+                                        className="w-9 h-9 rounded-xl bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 flex items-center justify-center border border-rose-500/40 transition-all duration-200 active:scale-95 cursor-pointer shrink-0"
                                         title="Quét & Hủy Đơn Tự Động"
                                     >
-                                        <i className="fas fa-ban text-rose-400"></i>
-                                        <span className="hidden sm:inline">Quét Hủy</span>
+                                        <i className="fas fa-ban text-rose-400 text-[13px]"></i>
                                     </button>
                                     <button
                                         onClick={() => setShowRevenueStats(prev => !prev)}
-                                        className={`h-9 px-3 rounded-xl font-bold text-[11px] uppercase tracking-wider flex items-center gap-1.5 transition-all duration-200 active:scale-95 cursor-pointer ${showRevenueStats ? 'bg-fuchsia-950/60 text-fuchsia-300 border border-fuchsia-500/60 shadow-[0_0_12px_rgba(217,70,239,0.3)]' : 'bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 border border-white/[0.1]'}`}
+                                        className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 active:scale-95 cursor-pointer shrink-0 ${showRevenueStats ? 'bg-fuchsia-950/60 text-fuchsia-300 border border-fuchsia-500/60 shadow-[0_0_10px_rgba(217,70,239,0.3)]' : 'bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 border border-white/[0.1]'}`}
                                         title="Xem Thống Kê Doanh Thu"
                                     >
-                                        <i className="fas fa-chart-bar text-fuchsia-400"></i>
-                                        <span className="hidden md:inline">Thống Kê</span>
+                                        <i className="fas fa-chart-bar text-fuchsia-400 text-[13px]"></i>
                                     </button>
                                     <button
                                         onClick={() => setIsArchiveEngineOpen(true)}
-                                        className="h-9 px-3 rounded-xl bg-gradient-to-r from-amber-950/50 to-yellow-950/50 hover:from-amber-900/60 hover:to-yellow-900/60 text-amber-300 font-bold text-[11px] uppercase tracking-wider flex items-center gap-1.5 border border-amber-500/40 shadow-sm transition-all duration-200 active:scale-95 cursor-pointer"
+                                        className="w-9 h-9 rounded-xl bg-gradient-to-r from-amber-950/50 to-yellow-950/50 hover:from-amber-900/60 hover:to-yellow-900/60 text-amber-300 flex items-center justify-center border border-amber-500/40 shadow-sm transition-all duration-200 active:scale-95 cursor-pointer shrink-0"
                                         title="Quản lý Lưu Trữ Đơn Cũ (Orders_Archive) & Giải phóng RAM"
                                     >
-                                        <i className="fas fa-box-archive text-amber-400"></i>
-                                        <span className="hidden lg:inline">Lưu Trữ Đơn</span>
+                                        <i className="fas fa-box-archive text-amber-400 text-[13px]"></i>
                                     </button>
                                 </>
                             )}
@@ -2376,20 +2368,20 @@
                     </div>
                 </div>
 
-                {/* CẢNH BÁO URGENT TỰ ĐỘNG */}
+                {/* CẢNH BÁO URGENT TỰ ĐỘNG (TĨNH, KHÔNG NHẤP NHÁY) */}
                 {!isCTV && realTimeSummary.urgentAlerts.length > 0 && (
-                    <div className="bg-[#2a0808] border border-red-900/40 rounded-2xl p-3 mb-3 space-y-2 animate-pulse">
-                        <div className="flex items-center gap-2 text-red-400 font-black text-[10px] uppercase tracking-wider border-b border-red-950/60 pb-1.5">
-                            <i className="fas fa-exclamation-triangle text-red-500 text-sm"></i>
+                    <div className="bg-[#241212] border border-rose-900/40 rounded-2xl p-3 mb-3 space-y-2">
+                        <div className="flex items-center gap-2 text-rose-400 font-black text-[10px] uppercase tracking-wider border-b border-rose-950/60 pb-1.5">
+                            <i className="fas fa-exclamation-triangle text-rose-500 text-sm"></i>
                             <span>CẢNH BÁO: ĐƠN HỦY & HOÀN TRẢ</span>
                         </div>
                         <div className="max-h-[130px] overflow-y-auto custom-scrollbar space-y-1.5 pr-1">
                             {realTimeSummary.urgentAlerts.map(alertOrder => {
                                 const isHuy = String(alertOrder.status || '').toUpperCase().includes('HỦY') || String(alertOrder.status || '').toUpperCase() === 'HUỶ';
                                 return (
-                                    <div key={alertOrder.id} className="flex justify-between items-center bg-black/40 border border-red-950/50 px-2.5 py-1.5 rounded-xl text-[11px] font-bold">
+                                    <div key={alertOrder.id} className="flex justify-between items-center bg-black/40 border border-rose-950/50 px-2.5 py-1.5 rounded-xl text-[11px] font-bold">
                                         <div className="flex items-center gap-2 truncate">
-                                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${isHuy ? 'bg-red-600 text-white' : 'bg-orange-500 text-white'}`}>
+                                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${isHuy ? 'bg-rose-600 text-white' : 'bg-orange-500 text-white'}`}>
                                                 {isHuy ? 'HUỶ' : 'HOÀN'}
                                             </span>
                                             <span className="text-zinc-100 font-mono font-black tracking-wide truncate">{alertOrder.orderCode.split(' | ')[0]}</span>
@@ -2398,14 +2390,14 @@
                                             <button onClick={() => {
                                                 setSearchCode(alertOrder.orderCode.split(' | ')[0]);
                                                 setFilterStatus('Đơn Hủy');
-                                            }} className="text-[9px] bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded-lg transition-all font-black uppercase tracking-wider shrink-0 active:scale-95">
+                                            }} className="text-[9px] bg-rose-600 hover:bg-rose-500 text-white px-2.5 py-1 rounded-lg transition-all font-black uppercase tracking-wider shrink-0 active:scale-95 cursor-pointer">
                                                 Xem đơn
                                             </button>
                                         ) : (
                                             <button onClick={() => {
                                                 setSearchCode(alertOrder.orderCode.split(' | ')[0]);
                                                 setFilterStatus('Hàng Hoàn');
-                                            }} className="text-[9px] bg-orange-600 hover:bg-orange-500 text-white px-2.5 py-1 rounded-lg transition-all font-black uppercase tracking-wider shrink-0 active:scale-95">
+                                            }} className="text-[9px] bg-orange-600 hover:bg-orange-500 text-white px-2.5 py-1 rounded-lg transition-all font-black uppercase tracking-wider shrink-0 active:scale-95 cursor-pointer">
                                                 Kiểm hoàn
                                             </button>
                                         )}
@@ -2416,61 +2408,61 @@
                     </div>
                 )}
 
-                {/* BỘ LỌC KÊNH BÁN */}
+                {/* BỘ LỌC KÊNH BÁN (CHUẨN DRIBBLE COLOR ACCENT) */}
                 <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar no-scrollbar mb-3 pb-1">
                     {[
                         {
                             id: 'ALL',
                             label: 'Tất Cả',
                             icon: 'fa-store',
-                            activeClass: 'bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/40 shadow-[0_0_10px_rgba(212,175,55,0.15)] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-200',
-                            activeIconClass: 'text-[#d4af37]',
+                            activeClass: 'bg-white text-zinc-950 shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                            activeIconClass: 'text-zinc-950',
                             inactiveIconClass: 'text-zinc-400'
                         },
                         {
                             id: 'SHOPEE',
                             label: 'Shopee',
                             icon: 'fa-shopping-bag',
-                            activeClass: 'bg-[#ea580c]/15 text-[#f97316] border-[#ea580c]/40 shadow-[0_0_10px_rgba(234,88,12,0.15)] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-[#f97316]',
-                            activeIconClass: 'text-[#f97316]',
+                            activeClass: 'bg-[#f97316] text-white shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#f97316]',
+                            activeIconClass: 'text-white',
                             inactiveIconClass: 'text-zinc-400'
                         },
                         {
                             id: 'EXPORT',
                             label: 'Xuất Khẩu',
                             icon: 'fa-globe-asia',
-                            activeClass: 'bg-[#059669]/15 text-[#10b981] border-[#059669]/40 shadow-[0_0_10px_rgba(16,185,129,0.15)] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-[#10b981]',
-                            activeIconClass: 'text-[#10b981]',
+                            activeClass: 'bg-[#10b981] text-zinc-950 shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#10b981]',
+                            activeIconClass: 'text-zinc-950',
                             inactiveIconClass: 'text-zinc-400'
                         },
                         {
                             id: 'TIKTOK',
                             label: 'TikTok',
                             icon: 'fa-video',
-                            activeClass: 'bg-[#0891b2]/15 text-[#06b6d4] border-[#0891b2]/40 shadow-[0_0_10px_rgba(8,145,178,0.15)] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-[#06b6d4]',
-                            activeIconClass: 'text-[#06b6d4]',
+                            activeClass: 'bg-[#06b6d4] text-zinc-950 shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#06b6d4]',
+                            activeIconClass: 'text-zinc-950',
                             inactiveIconClass: 'text-zinc-400'
                         },
                         {
                             id: 'BÁN LẺ',
                             label: 'Bán Lẻ',
                             icon: 'fa-box',
-                            activeClass: 'bg-[#2563eb]/15 text-[#60a5fa] border-[#2563eb]/40 shadow-[0_0_10px_rgba(37,99,235,0.15)] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-[#60a5fa]',
-                            activeIconClass: 'text-[#60a5fa]',
+                            activeClass: 'bg-[#60a5fa] text-zinc-950 shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#60a5fa]',
+                            activeIconClass: 'text-zinc-950',
                             inactiveIconClass: 'text-zinc-400'
                         },
                         {
                             id: 'CTV',
                             label: 'CTV',
                             icon: 'fa-handshake',
-                            activeClass: 'bg-[#a855f7]/15 text-[#c084fc] border-[#a855f7]/40 shadow-[0_0_10px_rgba(168,85,247,0.15)] font-bold',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.06] hover:border-white/[0.12] hover:text-[#c084fc]',
-                            activeIconClass: 'text-[#c084fc]',
+                            activeClass: 'bg-[#c084fc] text-zinc-950 shadow-md font-black',
+                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#c084fc]',
+                            activeIconClass: 'text-zinc-950',
                             inactiveIconClass: 'text-zinc-400'
                         }
                     ].map(ch => {
@@ -2479,7 +2471,7 @@
                             <button
                                 key={ch.id}
                                 onClick={() => setFilterChannel(ch.id)}
-                                className={`shrink-0 px-3.5 py-2 rounded-xl text-[11px] transition-all duration-200 flex items-center gap-2 active:scale-95 ${isActive ? ch.activeClass : ch.inactiveClass}`}
+                                className={`shrink-0 px-3.5 py-2 rounded-xl text-[11px] transition-all duration-200 flex items-center gap-2 active:scale-95 cursor-pointer ${isActive ? ch.activeClass : ch.inactiveClass}`}
                             >
                                 <i className={`fas ${ch.icon} ${isActive ? ch.activeIconClass : ch.inactiveIconClass}`}></i>
                                 <span>{ch.label}</span>

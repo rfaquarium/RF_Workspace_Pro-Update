@@ -1416,157 +1416,129 @@
         };
 
         return (
-            <div className="w-full max-w-5xl mx-auto space-y-6 pb-12 animate-fade-in text-zinc-200">
-                {/* HERO BANNER */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#18181b] via-[#121214] to-[#09090b] border border-white/[0.08] p-6 sm:p-8 shadow-2xl">
-                    <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-[#d4af37]/10 rounded-full blur-3xl pointer-events-none"></div>
-                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                        <div className="space-y-2 max-w-2xl">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#d4af37]/10 border border-[#d4af37]/30 text-[#d4af37] text-[11px] font-black uppercase tracking-wider">
-                                <i className="fas fa-rocket text-[10px]"></i>
-                                <span>RF Workspace Pro Engine</span>
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37] animate-pulse"></span>
-                                <span className="text-white font-mono">v2.12.0</span>
-                            </div>
-                            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                                Nhật Ký Cập Nhật & Deploy
+            <div className="w-full max-w-4xl mx-auto space-y-4 pb-12 text-zinc-200">
+                {/* HEADER ĐƠN GIẢN */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#121214] p-4 rounded-xl border border-zinc-800">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-lg font-bold text-white tracking-wide">
+                                Nhật Ký Cập Nhật Hệ Thống
                             </h1>
-                            <p className="text-[13px] text-zinc-400 leading-relaxed">
-                                Theo dõi chi tiết từng phiên bản phát hành, các tính năng mới, chốt chặn vận hành, tối ưu hiệu năng và sửa lỗi của hệ thống.
-                            </p>
+                            <span className="px-2 py-0.5 rounded bg-[#d4af37]/10 text-[#d4af37] text-[11px] font-mono font-bold border border-[#d4af37]/30">
+                                Royal v2.10.6
+                            </span>
                         </div>
-
-                        <div className="flex items-center gap-2.5 shrink-0">
-                            <button 
-                                onClick={copyChangelogToClipboard}
-                                className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[12px] font-bold border border-white/10 flex items-center gap-2 shadow-sm active:scale-95 transition-all cursor-pointer"
-                            >
-                                <i className="fas fa-copy text-[12px]"></i>
-                                <span>Sao Chép Bản Ghi</span>
-                            </button>
-                            <button 
-                                onClick={() => {
-                                    if (typeof window !== 'undefined') {
-                                        window.dispatchEvent(new CustomEvent('triggerReloadData'));
-                                    }
-                                }}
-                                className="px-4 py-2.5 rounded-xl bg-[#d4af37] hover:bg-[#b89628] text-black text-[12px] font-black flex items-center gap-2 shadow-lg shadow-[#d4af37]/20 active:scale-95 transition-all cursor-pointer"
-                                title="Làm mới và đồng bộ dữ liệu mới nhất từ hệ thống"
-                            >
-                                <i className="fas fa-sync-alt text-[12px]"></i>
-                                <span>Làm Mới Dữ Liệu</span>
-                            </button>
-                        </div>
+                        <p className="text-[12px] text-zinc-400 mt-0.5">
+                            Theo dõi các tính năng mới, sửa lỗi và nâng cấp hiệu năng thực tế.
+                        </p>
                     </div>
 
-                    {/* BENTO STATS */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-white/[0.06]">
-                        <div className="bg-[#121214]/60 backdrop-blur p-3 rounded-xl border border-white/[0.05]">
-                            <div className="text-[10px] text-zinc-500 uppercase font-black tracking-wider">Phiên Bản</div>
-                            <div className="text-[16px] font-black text-white font-mono mt-0.5">Royal v2.10.6</div>
-                        </div>
-                        <div className="bg-[#121214]/60 backdrop-blur p-3 rounded-xl border border-white/[0.05]">
-                            <div className="text-[10px] text-zinc-500 uppercase font-black tracking-wider">Tốc Độ UI</div>
-                            <div className="text-[16px] font-black text-emerald-400 font-mono mt-0.5">&lt; 120ms (0ms Local)</div>
-                        </div>
-                        <div className="bg-[#121214]/60 backdrop-blur p-3 rounded-xl border border-white/[0.05]">
-                            <div className="text-[10px] text-zinc-500 uppercase font-black tracking-wider">Chốt Chặn</div>
-                            <div className="text-[16px] font-black text-[#d4af37] font-mono mt-0.5">4 Tầng Poka-Yoke</div>
-                        </div>
-                        <div className="bg-[#121214]/60 backdrop-blur p-3 rounded-xl border border-white/[0.05]">
-                            <div className="text-[10px] text-zinc-500 uppercase font-black tracking-wider">CSDL Cốt Lõi</div>
-                            <div className="text-[16px] font-black text-blue-400 font-mono mt-0.5">23 Bảng Relational</div>
-                        </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button 
+                            onClick={copyChangelogToClipboard}
+                            className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[12px] font-medium border border-zinc-700 flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                            <i className="fas fa-copy text-[11px]"></i>
+                            <span>Sao chép</span>
+                        </button>
+                        <button 
+                            onClick={() => {
+                                if (typeof window !== 'undefined') {
+                                    window.dispatchEvent(new CustomEvent('triggerReloadData'));
+                                }
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-[#d4af37] hover:bg-[#c49f2c] text-black text-[12px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                            <i className="fas fa-sync-alt text-[11px]"></i>
+                            <span>Đồng bộ</span>
+                        </button>
                     </div>
                 </div>
 
-                {/* CONTROLS & FILTER */}
-                <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center bg-[#121214] p-3 rounded-xl border border-white/[0.08]">
-                    <div className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar">
+                {/* BỘ LỌC & TÌM KIẾM TINH GỌN */}
+                <div className="flex flex-col sm:flex-row gap-2.5 justify-between items-stretch sm:items-center bg-[#121214] p-2.5 rounded-xl border border-zinc-800/80">
+                    <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar">
                         {allCategories.map(cat => (
                             <button
                                 key={cat}
                                 onClick={() => setFilterTag(cat)}
-                                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all cursor-pointer ${
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-all cursor-pointer ${
                                     filterTag === cat
-                                        ? 'bg-[#d4af37] text-black shadow-md'
-                                        : 'bg-zinc-800/60 text-zinc-400 hover:text-white hover:bg-zinc-700'
+                                        ? 'bg-zinc-200 text-black font-semibold'
+                                        : 'bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
                                 }`}
                             >
-                                {cat === 'ALL' ? 'Tất cả danh mục' : cat}
+                                {cat === 'ALL' ? 'Tất cả' : cat}
                             </button>
                         ))}
                     </div>
 
-                    <div className="relative w-full sm:w-64">
-                        <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-[11px]"></i>
+                    <div className="relative w-full sm:w-60">
+                        <i className="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 text-[11px]"></i>
                         <input
                             type="text"
-                            placeholder="Tìm kiếm nội dung cập nhật..."
+                            placeholder="Tìm nội dung..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
-                            className="w-full bg-[#18181b] border border-white/[0.08] text-white text-[12px] rounded-lg pl-8 pr-3 py-1.5 focus:outline-none focus:border-[#d4af37]"
+                            className="w-full bg-[#121214] border border-zinc-700 text-zinc-200 text-[12px] rounded-lg pl-7 pr-7 py-1 focus:outline-none focus:border-[#d4af37]"
                         />
                         {searchQuery && (
-                            <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white">
+                            <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300">
                                 <i className="fas fa-times text-[10px]"></i>
                             </button>
                         )}
                     </div>
                 </div>
 
-                {/* TIMELINE LIST */}
-                <div className="space-y-6">
+                {/* DANH SÁCH CẬP NHẬT ĐƠN GIẢN, DỄ ĐỌC */}
+                <div className="space-y-3">
                     {filteredReleases.length === 0 ? (
-                        <div className="p-12 text-center bg-[#121214] rounded-2xl border border-white/[0.08] text-zinc-500">
-                            <i className="fas fa-search text-3xl mb-3 opacity-40"></i>
-                            <p className="text-sm font-bold">Không tìm thấy nội dung cập nhật phù hợp</p>
+                        <div className="p-8 text-center bg-[#121214] rounded-xl border border-zinc-800 text-zinc-500">
+                            <p className="text-xs">Không tìm thấy nội dung cập nhật phù hợp.</p>
                         </div>
                     ) : (
                         filteredReleases.map((rel, rIdx) => (
                             <div 
                                 key={rel.version} 
-                                className={`relative rounded-2xl bg-[#121214] border transition-all duration-300 p-5 sm:p-6 shadow-xl ${
-                                    rel.isLatest ? 'border-[#d4af37]/40 ring-1 ring-[#d4af37]/20' : 'border-white/[0.08]'
+                                className={`rounded-xl bg-[#121214] border p-4 transition-all ${
+                                    rel.isLatest ? 'border-[#d4af37]/60 bg-[#151518]' : 'border-zinc-800/80'
                                 }`}
                             >
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-white/[0.06]">
-                                    <div className="flex items-center gap-3 flex-wrap">
-                                        <h3 className="text-lg font-black text-white font-mono">{rel.version}</h3>
+                                {/* TIÊU ĐỀ PHIÊN BẢN */}
+                                <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-zinc-800/60">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-bold text-white font-mono text-[14px]">{rel.version}</span>
                                         {rel.badge && (
-                                            <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border ${rel.badgeColor || 'bg-blue-500/20 text-blue-400 border-blue-500/30'}`}>
+                                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                                                 {rel.badge}
                                             </span>
                                         )}
-                                        <div className="flex items-center gap-1.5">
-                                            {rel.categories?.map(c => (
-                                                <span key={c} className="text-[10px] font-bold text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded border border-white/[0.05]">
-                                                    {c}
-                                                </span>
-                                            ))}
-                                        </div>
+                                        {rel.categories?.map(c => (
+                                            <span key={c} className="text-[10px] text-zinc-400 bg-zinc-800/70 px-1.5 py-0.5 rounded">
+                                                {c}
+                                            </span>
+                                        ))}
                                     </div>
-                                    <div className="text-[11px] text-zinc-400 font-mono flex items-center gap-1.5">
-                                        <i className="far fa-calendar-alt text-zinc-500"></i>
-                                        <span>Ngày phát hành: <b className="text-zinc-200">{rel.date}</b></span>
-                                    </div>
+                                    <span className="text-[11px] text-zinc-500 font-mono">
+                                        {rel.date}
+                                    </span>
                                 </div>
 
-                                <div className="py-3">
-                                    <h4 className="text-[14px] font-black text-zinc-100">{rel.title}</h4>
+                                {/* TÓM TẮT */}
+                                <div className="pt-2.5 pb-2">
+                                    <h4 className="text-[13px] font-bold text-zinc-100">{rel.title}</h4>
                                     <p className="text-[12px] text-zinc-400 mt-1 leading-relaxed">{rel.summary}</p>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 pt-3 border-t border-white/[0.04]">
+                                {/* DANH SÁCH CHI TIẾT */}
+                                <div className="space-y-1.5 pt-2 border-t border-zinc-800/40">
                                     {rel.items.map((it, iIdx) => (
-                                        <div key={iIdx} className="bg-[#18181b]/70 p-3.5 rounded-xl border border-white/[0.05] hover:border-white/[0.12] transition-all space-y-1.5">
-                                            <div className="flex items-center gap-2">
-                                                <div className={`w-6 h-6 rounded-lg bg-white/[0.04] flex items-center justify-center ${it.color || 'text-[#d4af37]'}`}>
-                                                    <i className={`fas ${it.icon} text-[12px]`}></i>
-                                                </div>
-                                                <h5 className="text-[12.5px] font-black text-white tracking-wide">{it.title}</h5>
+                                        <div key={iIdx} className="flex items-start gap-2 text-[12px]">
+                                            <i className="fas fa-check text-[#d4af37] text-[10px] mt-1 shrink-0"></i>
+                                            <div>
+                                                <span className="font-semibold text-zinc-200">{it.title}: </span>
+                                                <span className="text-zinc-400">{it.desc}</span>
                                             </div>
-                                            <p className="text-[11.5px] text-zinc-400 leading-relaxed pl-8">{it.desc}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -2384,7 +2356,7 @@
                 {isMenuOpen && <div className="lg:hidden fixed inset-0 bg-black/75 z-[200] backdrop-blur-md transition-opacity animate-fade-in" onClick={() => setIsMenuOpen(false)}></div>}
 
                 <aside className={`fixed lg:static inset-y-0 left-0 w-[290px] sm:w-[320px] lg:w-[240px] shrink-0 z-[210] transform transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] flex flex-col ${isMenuOpen ? 'translate-x-0 shadow-[0_0_50px_rgba(0,0,0,0.9)]' : '-translate-x-full lg:translate-x-0'} bg-[#101014] border-r border-white/[0.08]`}>
-                    <div className="p-4 sm:p-4.5 pt-[max(1.25rem,env(safe-area-inset-top))] border-b border-white/[0.06] flex justify-between items-center bg-[#141418]">
+                    <div className="p-4 sm:p-4.5 pt-[max(1.25rem,env(safe-area-inset-top))] border-b border-white/[0.08] flex justify-between items-center bg-[#141418]">
                         <div className="flex items-center gap-3">
                             {typeof RFLogo !== 'undefined' ? (
                                 <RFLogo className="w-8 h-8 drop-shadow-[0_0_10px_rgba(212,175,55,0.4)]" size={32} />
@@ -2440,7 +2412,7 @@
                             );
                         })}
 
-                        <div className="pt-3 border-t border-white/[0.06] mt-3 px-1">
+                        <div className="pt-3 border-t border-white/[0.08] mt-3 px-1">
                             <button 
                                 onClick={() => {
                                     setIsMenuOpen(false);
@@ -2469,7 +2441,7 @@
                         </div>
                     </div>
 
-                    <div className="p-3.5 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-white/[0.06] bg-[#141418] flex items-center gap-3">
+                    <div className="p-3.5 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-white/[0.08] bg-[#141418] flex items-center gap-3">
                         {typeof Avatar !== 'undefined' ? <Avatar name={currentUser} userConfigs={userConfigs} className="w-10 h-10 border border-white/10 shadow-sm rounded-full object-cover shrink-0" /> : <div className="w-10 h-10 rounded-full bg-zinc-800 shrink-0"></div>}
                         <div className="flex-1 min-w-0">
                             <div className="font-black text-[13px] truncate text-zinc-100">{currentUser.split(' ').pop()}</div>

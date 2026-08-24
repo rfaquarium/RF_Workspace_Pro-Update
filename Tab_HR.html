@@ -2497,14 +2497,14 @@
                                     <button
                                         type="button"
                                         onClick={() => setAttViewMode('CARDS')}
-                                        className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer ${attViewMode === 'CARDS' ? 'bg-[#00a8e8] text-white shadow-[0_0_12px_rgba(0,168,232,0.3)] scale-[1.02]' : 'bg-[#18181b] text-gray-400 hover:text-white border border-white/5'}`}
+                                        className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer ${attViewMode === 'CARDS' ? 'bg-[#00a8e8] text-white shadow-[0_0_12px_rgba(0,168,232,0.3)] scale-[1.02]' : 'bg-[#121214] text-gray-400 hover:text-white border border-white/5'}`}
                                     >
                                         <i className="fas fa-th-large"></i> Danh Sách Thẻ
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setAttViewMode('MATRIX')}
-                                        className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer ${attViewMode === 'MATRIX' ? 'bg-[#00a8e8] text-white shadow-[0_0_12px_rgba(0,168,232,0.3)] scale-[1.02]' : 'bg-[#18181b] text-gray-400 hover:text-white border border-white/5'}`}
+                                        className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer ${attViewMode === 'MATRIX' ? 'bg-[#00a8e8] text-white shadow-[0_0_12px_rgba(0,168,232,0.3)] scale-[1.02]' : 'bg-[#121214] text-gray-400 hover:text-white border border-white/5'}`}
                                     >
                                         <i className="fas fa-calendar-alt"></i> Ma Trận Lịch Tháng
                                     </button>
@@ -4846,7 +4846,7 @@
                                 <button
                                     type="button"
                                     onClick={() => handleSelectStatus('Nghỉ có phép')}
-                                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${status === 'Nghỉ có phép' ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 font-black shadow-[0_0_10px_rgba(6,182,212,0.2)]' : 'bg-[#18181b] border-[#27272a] text-gray-400 hover:text-white'}`}
+                                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${status === 'Nghỉ có phép' ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 font-black shadow-[0_0_10px_rgba(6,182,212,0.2)]' : 'bg-[#121214] border-[#27272a] text-gray-400 hover:text-white'}`}
                                 >
                                     <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
                                     <span>Nghỉ có phép (P)</span>
@@ -4854,7 +4854,7 @@
                                 <button
                                     type="button"
                                     onClick={() => handleSelectStatus('Nghỉ không phép')}
-                                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${status === 'Nghỉ không phép' ? 'bg-rose-500/20 border-rose-500 text-rose-300 font-black shadow-[0_0_10px_rgba(244,63,94,0.2)]' : 'bg-[#18181b] border-[#27272a] text-gray-400 hover:text-white'}`}
+                                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${status === 'Nghỉ không phép' ? 'bg-rose-500/20 border-rose-500 text-rose-300 font-black shadow-[0_0_10px_rgba(244,63,94,0.2)]' : 'bg-[#121214] border-[#27272a] text-gray-400 hover:text-white'}`}
                                 >
                                     <span className="w-2 h-2 rounded-full bg-rose-500"></span>
                                     <span>Nghỉ không phép (KP)</span>
@@ -4862,7 +4862,7 @@
                                 <button
                                     type="button"
                                     onClick={() => handleSelectStatus('Hoàn thành')}
-                                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${status === 'Hoàn thành' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-black shadow-[0_0_10px_rgba(16,185,129,0.2)]' : 'bg-[#18181b] border-[#27272a] text-gray-400 hover:text-white'}`}
+                                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${status === 'Hoàn thành' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-black shadow-[0_0_10px_rgba(16,185,129,0.2)]' : 'bg-[#121214] border-[#27272a] text-gray-400 hover:text-white'}`}
                                 >
                                     <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                                     <span>Đi làm đủ (8h)</span>
@@ -4870,7 +4870,7 @@
                                 <button
                                     type="button"
                                     onClick={() => handleSelectStatus('Đi muộn')}
-                                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${status === 'Đi muộn' ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-black shadow-[0_0_10px_rgba(245,158,11,0.2)]' : 'bg-[#18181b] border-[#27272a] text-gray-400 hover:text-white'}`}
+                                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${status === 'Đi muộn' ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-black shadow-[0_0_10px_rgba(245,158,11,0.2)]' : 'bg-[#121214] border-[#27272a] text-gray-400 hover:text-white'}`}
                                 >
                                     <span className="w-2 h-2 rounded-full bg-amber-400"></span>
                                     <span>Đi muộn (M)</span>

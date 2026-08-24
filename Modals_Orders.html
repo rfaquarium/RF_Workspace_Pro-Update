@@ -938,7 +938,7 @@
                                                             <i className="fas fa-link text-[10px]"></i> Liên kết SP:
                                                         </span>
                                                         <select
-                                                            className="bg-[#18181b] text-gray-200 text-[10px] font-medium border border-[#333] hover:border-[#3b82f6] focus:border-[#3b82f6] rounded-lg px-2 py-1 w-full outline-none transition-colors cursor-pointer"
+                                                            className="bg-[#121214] text-gray-200 text-[10px] font-medium border border-[#333] hover:border-[#3b82f6] focus:border-[#3b82f6] rounded-lg px-2 py-1 w-full outline-none transition-colors cursor-pointer"
                                                             value={it.matchedProd ? it.matchedProd.name : (it.name || '')}
                                                             onChange={(e) => handleItemLink(idx, i, e.target.value)}
                                                         >
@@ -1685,7 +1685,7 @@
                                                 <div>
                                                     <label className="text-[10px] font-bold text-gray-500 mb-1 flex items-center justify-between uppercase">
                                                         <span>Hạn Giao (Deadline)</span>
-                                                        <span className="text-[9px] text-[#d4af37] font-bold">(>5 ngày)</span>
+                                                        <span className="text-[9px] text-[#d4af37] font-bold">(&gt;5 ngày)</span>
                                                     </label>
                                                     <input type="datetime-local" value={deadline} onChange={e => setDeadline(e.target.value)} className="w-full p-2.5 bg-[#141414] border border-[#333] rounded-lg text-[12px] font-bold text-[#d4af37] outline-none focus:border-[#2563eb]" />
                                                 </div>
@@ -4037,7 +4037,7 @@
         }, [isReturn, isReadyPack, isPacking, isPackOwner, isPendingHandover, isDone, _order.isCarriedToWH, processing]);
 
         return (
-            <div className={`bg-[#121214] rounded-2xl relative overflow-hidden border p-3 transition-colors hover:border-white/[0.12] hover:bg-white/[0.02] ${isReturn ? 'border-amber-600/60' : 'border-white/[0.06]'} ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
+            <div className={`bg-[#121214] rounded-2xl relative overflow-hidden border p-3 transition-colors hover:border-white/[0.12] hover:bg-white/[0.02] ${isReturn ? 'border-amber-600/60' : 'border-white/[0.08]'} ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
                 {sosTarget && ReactDOM.createPortal(
                     <ReturnSosModal sosTarget={sosTarget} erpProducts={erpProducts} order={_order} packRecord={packRecord} onClose={() => setSosTarget(null)} pushDeltas={pushDeltas} triggerToast={triggerToast} setOptimisticOrder={setOptimisticOrder} prods={prods} accessories={accessories} />,
                     document.body
@@ -4096,12 +4096,12 @@
                                     <div className="space-y-2">
                                         {/* PHỤ KIỆN KHO */}
                                         {effectiveAccessories.map((a, i) => (
-                                            <div key={`modal_acc_${i}`} className="bg-[#11121a] border-l-4 border-slate-500 rounded-r-xl p-2.5 flex items-center justify-between gap-2 border border-slate-800/80">
+                                            <div key={`modal_acc_${i}`} className="bg-[#141417] rounded-xl p-2.5 flex items-center justify-between gap-2 border border-white/[0.08]">
                                                 <div className="flex flex-col min-w-0">
-                                                    <span className="font-bold text-xs text-slate-200 truncate">{a.name}</span>
-                                                    <span className="text-[10px] text-slate-400 font-medium mt-0.5">📦 Kho phụ kiện {a.hasProduction && '• Hàng SX'}</span>
+                                                    <span className="font-bold text-xs text-zinc-200 truncate">{a.name}</span>
+                                                    <span className="text-[10px] text-zinc-400 font-medium mt-0.5">📦 Kho phụ kiện {a.hasProduction && '• Hàng SX'}</span>
                                                 </div>
-                                                <span className="font-bold text-xs text-slate-300 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700/80 shrink-0 font-mono">
+                                                <span className="font-bold text-xs text-zinc-300 bg-zinc-900 px-2.5 py-1 rounded-lg border border-white/[0.08] shrink-0 font-mono">
                                                     x{a.quantity || 1}
                                                 </span>
                                             </div>
@@ -4109,12 +4109,12 @@
 
                                         {/* HÀNG SẢN XUẤT (BỂ KÍNH / LAYOUT) */}
                                         {effectiveProds.map((p, i) => (
-                                            <div key={`modal_prod_${i}`} className="bg-[#11121a] border-l-4 border-emerald-500 rounded-r-xl p-2.5 flex items-center justify-between gap-2 border border-slate-800/80">
+                                            <div key={`modal_prod_${i}`} className="bg-[#141417] rounded-xl p-2.5 flex items-center justify-between gap-2 border border-white/[0.08]">
                                                 <div className="flex flex-col min-w-0">
-                                                    <span className="font-bold text-xs text-emerald-400 truncate">{p.name}</span>
-                                                    <span className="text-[10px] text-slate-400 font-medium mt-0.5">🔨 Sản xuất xưởng • {p.note || 'Lấy từ tồn kho có sẵn'}</span>
+                                                    <span className="font-bold text-xs text-zinc-100 truncate">{p.name}</span>
+                                                    <span className="text-[10px] text-zinc-400 font-medium mt-0.5">🔨 Sản xuất xưởng • {p.note || 'Lấy từ tồn kho có sẵn'}</span>
                                                 </div>
-                                                <span className="font-bold text-xs text-slate-300 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700/80 shrink-0 font-mono">
+                                                <span className="font-bold text-xs text-zinc-300 bg-zinc-900 px-2.5 py-1 rounded-lg border border-white/[0.08] shrink-0 font-mono">
                                                     x1
                                                 </span>
                                             </div>
@@ -4639,7 +4639,7 @@
                                 const filteredAccs = accessories.filter(a => !prods.some(p => String(p.name || '').trim() === String(a.name || '').trim()));
                                 if (filteredAccs.length === 0) return null;
                                 return (
-                                    <div className="bg-[#09090b] border border-white/[0.04] rounded-xl p-2.5">
+                                    <div className="bg-[#09090b] border border-white/[0.08] rounded-xl p-2.5">
                                         <div className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 border-b border-[#333] pb-1">Phụ Kiện Đi Kèm</div>
                                         {filteredAccs.map((a, i) => {
                                             const aInfo = getProductInfo(a.name);
@@ -4673,7 +4673,7 @@
                                 );
                             })()}
                             {prods.length > 0 && (
-                                <div className="bg-[#09090b] border border-white/[0.04] rounded-xl p-2.5">
+                                <div className="bg-[#09090b] border border-white/[0.08] rounded-xl p-2.5">
                                     <div className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 border-b border-[#333] pb-1">Hàng Sản Xuất</div>
                                     {prods.map((p, i) => {
                                         const isProcessed = p.status === 'Hoàn Kho Đạt' || p.status === 'Hủy/Vỡ' || p.status === 'Đã tạo lệnh sửa';
@@ -4717,7 +4717,7 @@
                         </div>
                     ) : (
                         (effectiveAccessories.length > 0 || effectiveProds.length > 0) && (
-                            <div className="bg-[#09090b] border border-white/[0.04] rounded-xl p-2 space-y-1.5 mb-3">
+                            <div className="bg-[#09090b] border border-white/[0.08] rounded-xl p-2 space-y-1.5 mb-3">
                                 {effectiveAccessories.map((a, i) => {
                                     const accId = `acc_${_order.id}_${i}`;
                                     const isChecked = checkedItems.includes(accId);
@@ -4725,18 +4725,18 @@
                                     const requiredQty = Number(a.quantity || 1);
                                     const currentStock = Number(aInfo?.quantity || 0);
                                     return (
-                                        <div key={accId} className="flex items-center justify-between bg-[#121214] border-l-2 border-slate-600 border border-white/[0.06] rounded-r-xl p-2 group hover:border-white/[0.12] hover:bg-white/[0.02] transition-colors">
+                                        <div key={accId} className="flex items-center justify-between bg-[#141417] border border-white/[0.08] rounded-xl p-2 group hover:border-white/[0.12] hover:bg-white/[0.02] transition-colors">
                                             <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                                 {(aInfo?.image || aInfo?.realImage) ? (
-                                                    <img src={aInfo.image || aInfo.realImage} className="w-8 h-8 rounded shrink-0 object-cover border border-[#444] cursor-pointer" alt="img" loading="lazy" decoding="async" onClick={() => window.open(aInfo.image || aInfo.realImage, '_blank')} title="Xem ảnh gốc" />
+                                                    <img src={aInfo.image || aInfo.realImage} className="w-8 h-8 rounded-lg shrink-0 object-cover border border-white/[0.08] cursor-pointer" alt="img" loading="lazy" decoding="async" onClick={() => window.open(aInfo.image || aInfo.realImage, '_blank')} title="Xem ảnh gốc" />
                                                 ) : (
-                                                    <div className="w-8 h-8 shrink-0 rounded bg-[#1a1a1a] border border-[#333] flex items-center justify-center"><i className="fas fa-box text-gray-500 text-[10px]"></i></div>
+                                                    <div className="w-8 h-8 shrink-0 rounded-lg bg-zinc-900 border border-white/[0.08] flex items-center justify-center"><i className="fas fa-box text-zinc-500 text-[10px]"></i></div>
                                                 )}
                                                 <div className="flex flex-col min-w-0">
-                                                    <span className="truncate text-[11px] text-gray-400 font-bold">{a.name}</span>
+                                                    <span className="truncate text-[11px] text-zinc-200 font-bold">{a.name}</span>
                                                     {a.hasProduction && (
-                                                        <span className="text-[9px] text-[#3b82f6] font-black uppercase tracking-widest mt-0.5 flex items-center gap-1">
-                                                            <i className="fas fa-cogs"></i> Hàng Sản Xuất
+                                                        <span className="text-[9px] text-zinc-400 font-medium mt-0.5 flex items-center gap-1">
+                                                            <i className="fas fa-cogs text-sky-400"></i> Hàng Sản Xuất
                                                         </span>
                                                     )}
                                                 </div>
@@ -4746,17 +4746,17 @@
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleQuickImportAccessory(a.name, requiredQty - currentStock, aInfo?.costPrice || 0); }}
                                                         disabled={importingAcc === a.name}
-                                                        className="text-[10px] bg-red-900/40 hover:bg-red-800 text-red-200 border border-red-500/50 px-2 py-0.5 rounded transition-all flex items-center gap-1 shadow-sm active:scale-95 whitespace-nowrap"
+                                                        className="text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-white/[0.1] px-2 py-0.5 rounded-lg transition-all flex items-center gap-1 shadow-sm active:scale-95 whitespace-nowrap cursor-pointer"
                                                         title="Thiếu tồn kho! Bấm để tạo phiếu nhập kho tự động."
                                                     >
                                                         {importingAcc === a.name ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-download"></i>}
                                                         Nhập Thiếu ({requiredQty - currentStock})
                                                     </button>
                                                 )}
-                                                <b className="text-[#d4af37] bg-[#0a0a0a] border border-[#333] px-1.5 py-0.5 rounded text-[10px] shadow-inner">x{a.quantity || 1}{getUnit(a.name)}</b>
+                                                <span className="text-zinc-300 bg-zinc-900 border border-white/[0.08] px-2 py-0.5 rounded-md text-[10px] font-mono font-bold">x{a.quantity || 1}{getUnit(a.name)}</span>
 
                                                 {(isReadyPack || isPendingHandover || isDone) && (
-                                                    <i className="fas fa-check-circle text-[#10b981] shadow-[0_0_8px_rgba(16,185,129,0.3)] rounded-full"></i>
+                                                    <i className="fas fa-check-circle text-emerald-400 text-[11px]"></i>
                                                 )}
                                             </div>
                                         </div>
@@ -4768,7 +4768,7 @@
                                     const productId = p.id || `${_order.id}_${i}`;
                                     const pInfo = getProductInfo(p.name);
 
-                                    // Logic kiểm tra sản phẩm đã đạt KCS / hoàn thành chưa (chỉ coi là Từ Kho nếu có cờ fulfilledFromStock hoặc tồn kho thực tế > 0)
+                                    // Logic kiểm tra sản phẩm đã đạt KCS / hoàn thành chưa
                                     const prodList = erpProducts || erpData?.Products || [];
                                     const normName = (s) => String(s || '').trim().toLowerCase().replace(/[\u2010-\u2015\u2212-]/g, '-').replace(/\s+/g, ' ');
                                     const targetNorm = normName(p.name);
@@ -4800,66 +4800,59 @@
                                     return (
                                         <div
                                             key={`prod_${_order.id}_${p.id || i}`}
-                                            className={`flex items-center justify-between border-l-2 border-emerald-500 border rounded-r-xl p-2 group transition-colors ${(isItemDone || isReadyPack)
-                                                ? 'bg-[#10b981]/15 border-[#10b981]/40 shadow-[0_0_10px_rgba(16,185,129,0.1)]'
-                                                : showStockWarning
-                                                    ? 'bg-rose-950/20 border-rose-500/40 shadow-[0_0_10px_rgba(225,29,72,0.15)]'
-                                                    : 'bg-[#121214] border-white/[0.06] hover:border-white/[0.12]'
-                                                }`}
+                                            className="flex items-center justify-between bg-[#141417] border border-white/[0.08] rounded-xl p-2 group hover:border-white/[0.12] transition-colors"
                                         >
                                             <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                                 {(pInfo?.image || pInfo?.realImage) ? (
-                                                    <img src={pInfo.image || pInfo.realImage} className="w-8 h-8 rounded shrink-0 object-cover border border-[#444] cursor-pointer" alt="img" onClick={() => window.open(pInfo.image || pInfo.realImage, '_blank')} title="Xem ảnh gốc" />
+                                                    <img src={pInfo.image || pInfo.realImage} className="w-8 h-8 rounded-lg shrink-0 object-cover border border-white/[0.08] cursor-pointer" alt="img" onClick={() => window.open(pInfo.image || pInfo.realImage, '_blank')} title="Xem ảnh gốc" />
                                                 ) : (
-                                                    <div className="w-8 h-8 shrink-0 rounded bg-[#1a1a1a] border border-[#333] flex items-center justify-center"><i className="fas fa-hammer text-gray-500 text-[10px]"></i></div>
+                                                    <div className="w-8 h-8 shrink-0 rounded-lg bg-zinc-900 border border-white/[0.08] flex items-center justify-center"><i className="fas fa-cube text-zinc-500 text-[10px]"></i></div>
                                                 )}
                                                 <div className="flex flex-col min-w-0">
                                                     <div className="flex items-center gap-1.5 min-w-0">
-                                                        {(isItemDone || isReadyPack) && <i className="fas fa-check-circle text-[#10b981] text-[11px] shrink-0"></i>}
-                                                        {showStockWarning && <i className="fas fa-exclamation-triangle text-rose-500 text-[11px] shrink-0 animate-pulse"></i>}
-                                                        <span className={`truncate text-[11px] font-black ${(isItemDone || isReadyPack) ? 'text-[#10b981] drop-shadow-sm' : showStockWarning ? 'text-rose-400' : 'text-gray-300'}`}>{p.name}</span>
+                                                        <span className="truncate text-[11px] font-bold text-zinc-100">{p.name}</span>
                                                     </div>
                                                     {displayNote && (
-                                                        <span className="truncate text-[9px] text-[#a78bfa] font-medium mt-0.5 italic flex items-center gap-1">
-                                                            <i className="fas fa-info-circle shrink-0 text-[10px]"></i> {displayNote}
+                                                        <span className="truncate text-[9px] text-zinc-400 font-medium mt-0.5 flex items-center gap-1">
+                                                            <i className="fas fa-info-circle shrink-0 text-[10px] text-zinc-500"></i> {displayNote}
                                                         </span>
                                                     )}
 
-                                                    {/* Dòng trạng thái sản xuất riêng biệt - KHÔNG ghi đè note */}
+                                                    {/* Dòng trạng thái sản xuất tinh gọn */}
                                                     {(isDone || effectiveStatus === 'Đã Bàn Giao' || effectiveStatus === 'Đối Soát Thành Công' || effectiveStatus === 'Hoàn Thành' || _order.isReconciled) ? (
-                                                        <span className="text-[9px] text-emerald-400 font-black uppercase tracking-widest mt-0.5 flex items-center gap-1">
+                                                        <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider mt-0.5 flex items-center gap-1">
                                                             <i className="fas fa-check-double"></i> {effectiveStatus === 'Đối Soát Thành Công' ? 'ĐỐI SOÁT THÀNH CÔNG' : 'ĐÃ BÀN GIAO'}
                                                         </span>
                                                     ) : isPendingHandover || effectiveStatus === 'Chờ Bàn Giao' || hasDonePack ? (
-                                                        <span className="text-[9px] text-sky-400 font-black uppercase tracking-widest mt-0.5 flex items-center gap-1">
+                                                        <span className="text-[9px] text-sky-400 font-bold uppercase tracking-wider mt-0.5 flex items-center gap-1">
                                                             <i className="fas fa-box-check"></i> ĐÃ ĐÓNG GÓI - CHỜ BÀN GIAO
                                                         </span>
                                                     ) : (isItemDone || isReadyPack) ? (
                                                         !isStockFulfilled ? (
-                                                            <span className="text-[9px] text-[#10b981] font-black uppercase tracking-widest mt-0.5 flex items-center gap-1">
+                                                            <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider mt-0.5 flex items-center gap-1">
                                                                 <i className="fas fa-check-circle"></i> SẴN SÀNG ĐÓNG GÓI
                                                             </span>
                                                         ) : (
-                                                            <span className="text-[9px] text-[#10b981] font-black uppercase tracking-widest mt-0.5 flex items-center gap-1">
+                                                            <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider mt-0.5 flex items-center gap-1">
                                                                 <i className="fas fa-box"></i> XUẤT TỪ KHO CÓ SẴN
                                                             </span>
                                                         )
                                                     ) : showStockWarning ? (
-                                                        <span className="text-[9px] text-rose-400 font-black uppercase tracking-widest mt-0.5 flex items-center gap-1">
-                                                            <i className="fas fa-exclamation-triangle"></i> HẾT KHO (TỒN: {currentStockQty}) - CHỜ SẢN XUẤT
+                                                        <span className="text-[9px] text-zinc-400 font-medium uppercase tracking-wider mt-0.5 flex items-center gap-1">
+                                                            <i className="fas fa-clock text-amber-400"></i> Hết kho (Tồn: {currentStockQty}) • Chờ sản xuất
                                                         </span>
                                                     ) : (
-                                                        <span className="text-[9px] text-amber-400/80 font-bold uppercase tracking-widest mt-0.5 flex items-center gap-1">
-                                                            <i className="fas fa-clock"></i> CHỜ SẢN XUẤT
+                                                        <span className="text-[9px] text-zinc-400 font-medium uppercase tracking-wider mt-0.5 flex items-center gap-1">
+                                                            <i className="fas fa-clock text-amber-400"></i> Chờ sản xuất
                                                         </span>
                                                     )}
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0 pl-2">
-                                                <b className="text-[#d4af37] bg-[#0a0a0a] border border-[#333] px-1.5 py-0.5 rounded text-[10px] shadow-inner">x1{getUnit(p.name)}</b>
+                                                <span className="text-zinc-300 bg-zinc-900 border border-white/[0.08] px-2 py-0.5 rounded-md text-[10px] font-mono font-bold">x1{getUnit(p.name)}</span>
 
                                                 {(isReadyPack || isPendingHandover || isDone) && (
-                                                    <i className="fas fa-check-circle text-[#10b981] shadow-[0_0_8px_rgba(16,185,129,0.3)] rounded-full"></i>
+                                                    <i className="fas fa-check-circle text-emerald-400 text-[11px]"></i>
                                                 )}
                                             </div>
                                         </div>
@@ -4873,7 +4866,7 @@
                         const hasStaff = prods.some(p => p.phases?.phase1?.user || p.phases?.phase2?.user) || Boolean(packUser) || Boolean(whUser);
                         if (!hasStaff || (!isDone && !isPendingHandover && !isReadyPack)) return null;
                         return (
-                            <div className="bg-[#09090b] border border-white/[0.04] rounded-xl p-2.5 mb-3 flex flex-col gap-1.5 text-[10px]">
+                            <div className="bg-[#09090b] border border-white/[0.08] rounded-xl p-2.5 mb-3 flex flex-col gap-1.5 text-[10px]">
                                 {prods.map((p, pIdx) => {
                                     const phase1Name = p.phases?.phase1?.name || (p.type === 'Bể Kính' ? 'Cắt Dán' : 'Dựng Khung');
                                     const phase2Name = p.phases?.phase2?.name || (p.type === 'Bể Kính' ? 'Gọt Keo' : 'Gia Cố');
@@ -4903,18 +4896,18 @@
 
                     {isDone && canEdit && (
                         <div className="mb-3">
-                            <button onClick={() => setShowReconcile(!showReconcile)} className="w-full py-2.5 bg-[#8b5cf6]/10 text-[#8b5cf6] border border-[#8b5cf6]/30 hover:bg-[#8b5cf6]/20 font-black text-[10px] uppercase rounded-xl transition-colors shadow-sm">
+                            <button onClick={() => setShowReconcile(!showReconcile)} className="w-full py-2.5 bg-[#d4af37]/10 text-[#d4af37] border border-[#d4af37]/30 hover:bg-[#d4af37]/20 font-black text-[10px] uppercase rounded-xl transition-colors shadow-sm">
                                 <i className="fas fa-check-double mr-1.5"></i> ĐỐI SOÁT THÀNH CÔNG
                             </button>
                             {showReconcile && (
                                 <div className="bg-[#0a0a0a] border border-[#333] rounded-xl p-3 animate-fade-in flex flex-col gap-2 mt-2 shadow-inner">
                                     <div>
                                         <label className="text-[9px] text-gray-500 font-bold uppercase block mb-1">Số tiền thực nhận (VNĐ)</label>
-                                        <input type="number" value={recForm.amount} onChange={e => setRecForm({ ...recForm, amount: e.target.value })} className="w-full bg-[#141414] border border-[#333] text-[#34d399] font-black p-2 rounded-lg text-sm outline-none focus:border-[#8b5cf6]" placeholder="Nhập số tiền..." />
+                                        <input type="number" value={recForm.amount} onChange={e => setRecForm({ ...recForm, amount: e.target.value })} className="w-full bg-[#141414] border border-[#333] text-[#34d399] font-black p-2 rounded-lg text-sm outline-none focus:border-[#d4af37]" placeholder="Nhập số tiền..." />
                                     </div>
                                     <div>
                                         <label className="text-[9px] text-gray-500 font-bold uppercase block mb-1">Tài khoản tiền vào</label>
-                                        <select value={recForm.accountId} onChange={e => setRecForm({ ...recForm, accountId: e.target.value })} className="w-full bg-[#141414] border border-[#333] text-gray-300 font-bold p-2 rounded-lg text-[11px] outline-none focus:border-[#8b5cf6]" disabled={!recForm.createTx}>
+                                        <select value={recForm.accountId} onChange={e => setRecForm({ ...recForm, accountId: e.target.value })} className="w-full bg-[#141414] border border-[#333] text-gray-300 font-bold p-2 rounded-lg text-[11px] outline-none focus:border-[#d4af37]" disabled={!recForm.createTx}>
                                             {accountsData.map(a => <option key={a.id} value={a.id}>{a.accountName || a.name}</option>)}
                                         </select>
                                     </div>
@@ -4959,7 +4952,7 @@
                                                 setShowReconcile(false);
                                                 pushDeltas({ orders: [newOrder] }, 'Đã chuyển trạng thái Hoàn Thành (Không sinh phiếu thu)!', 'fa-check-double').catch(() => { });
                                             }
-                                        }} className="flex-[2] py-2 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white font-black text-[10px] rounded-lg shadow-sm">
+                                        }} className="flex-[2] py-2 bg-[#d4af37] hover:bg-[#7c3aed] text-white font-black text-[10px] rounded-lg shadow-sm">
                                             {recForm.createTx && Number(recForm.amount) > 0 ? 'XÁC NHẬN & TẠO PHIẾU' : 'CHỈ ĐỔI TRẠNG THÁI'}
                                         </button>
                                     </div>
@@ -5506,7 +5499,7 @@
                 </div>
                 {manualMatchIndex !== null && (
                     <div className="fixed inset-0 z-[10005] bg-black/85 flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                        <div className="bg-[#18181b] w-full max-w-sm rounded-2xl border border-[#333] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+                        <div className="bg-[#121214] w-full max-w-sm rounded-2xl border border-[#333] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
                             {/* Header */}
                             <div className="p-4 border-b border-[#27272a] bg-[#202023] flex justify-between items-center shrink-0">
                                 <span className="font-black text-[12px] text-purple-400 uppercase tracking-widest">Chọn Hàng Hoá Khớp Kho</span>
@@ -5899,7 +5892,7 @@
 
         return (
             <div className="fixed inset-0 z-[999] bg-black/85 flex flex-col items-center justify-center p-4 backdrop-blur-md animate-fade-in" onClick={onClose}>
-                <div className="bg-[#18181b] w-full max-w-lg rounded-[24px] border border-[#333] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up" onClick={e => e.stopPropagation()}>
+                <div className="bg-[#121214] w-full max-w-lg rounded-[24px] border border-[#333] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up" onClick={e => e.stopPropagation()}>
                     {/* Header */}
                     <div className="p-4 border-b border-[#27272a] bg-gradient-to-r from-orange-900/40 to-[#18181b] flex justify-between items-center shrink-0">
                         <div className="flex items-center gap-2">
@@ -5929,7 +5922,7 @@
                                         type="text"
                                         value={customerName} 
                                         onChange={e => setCustomerName(e.target.value)} 
-                                        className="w-full bg-[#18181b] border border-[#333] rounded-lg px-2.5 py-1.5 text-[11.5px] font-bold text-white outline-none focus:border-orange-500" 
+                                        className="w-full bg-[#121214] border border-[#333] rounded-lg px-2.5 py-1.5 text-[11.5px] font-bold text-white outline-none focus:border-orange-500" 
                                         placeholder="Nhập tên người nhận"
                                     />
                                 </div>
@@ -5939,14 +5932,14 @@
                                         type="text"
                                         value={customerPhone} 
                                         onChange={e => setCustomerPhone(e.target.value)} 
-                                        className="w-full bg-[#18181b] border border-[#333] rounded-lg px-2.5 py-1.5 text-[11.5px] font-bold text-white outline-none focus:border-orange-500" 
+                                        className="w-full bg-[#121214] border border-[#333] rounded-lg px-2.5 py-1.5 text-[11.5px] font-bold text-white outline-none focus:border-orange-500" 
                                         placeholder="VD: 0987654321"
                                     />
                                 </div>
                             </div>
                             <div>
                                 <label className="text-[9px] text-gray-500 font-bold block mb-1">Địa chỉ giao hàng GHN</label>
-                                <input value={finalAddress} onChange={e => setFinalAddress(e.target.value)} className="w-full bg-[#18181b] border border-[#333] rounded-lg px-2.5 py-2 text-[11px] font-bold text-white outline-none focus:border-orange-500" />
+                                <input value={finalAddress} onChange={e => setFinalAddress(e.target.value)} className="w-full bg-[#121214] border border-[#333] rounded-lg px-2.5 py-2 text-[11px] font-bold text-white outline-none focus:border-orange-500" />
                             </div>
                         </div>
 
@@ -5993,13 +5986,13 @@
                                 </div>
                                 <div className="col-span-2 bg-[#121214] border border-orange-500/30 rounded-xl p-3">
                                     <label className="text-[10px] text-orange-400 font-black uppercase tracking-wider flex items-center gap-1.5 mb-1.5"><i className="fas fa-shipping-fast text-orange-500"></i> Gói cước GHN</label>
-                                    <select value={selectedService} onChange={e => setSelectedService(e.target.value)} className="w-full bg-[#18181b] border border-orange-500/40 rounded-lg px-3 py-2.5 text-[12px] font-bold text-white outline-none focus:border-orange-500">
+                                    <select value={selectedService} onChange={e => setSelectedService(e.target.value)} className="w-full bg-[#121214] border border-orange-500/40 rounded-lg px-3 py-2.5 text-[12px] font-bold text-white outline-none focus:border-orange-500">
                                         {availableServices.length > 0 ? availableServices.map(s => <option key={s.service_type_id || s.service_id} value={s.service_type_id || s.service_id}>{s.short_name || 'Giao Hàng Nhanh'}</option>) : <option value="2">Giao Hàng Chuẩn (Mặc định)</option>}
                                     </select>
                                 </div>
                                 <div className="col-span-2 bg-[#121214] border border-orange-500/30 rounded-xl p-3">
                                     <label className="text-[10px] text-orange-400 font-black uppercase tracking-wider flex items-center gap-1.5 mb-1.5"><i className="fas fa-calendar-check text-orange-500"></i> Ca lấy hàng</label>
-                                    <select value={selectedShift} onChange={e => setSelectedShift(e.target.value)} className="w-full bg-[#18181b] border border-orange-500/40 rounded-lg px-3 py-2.5 text-[12px] font-bold text-white outline-none focus:border-orange-500">
+                                    <select value={selectedShift} onChange={e => setSelectedShift(e.target.value)} className="w-full bg-[#121214] border border-orange-500/40 rounded-lg px-3 py-2.5 text-[12px] font-bold text-white outline-none focus:border-orange-500">
                                         {shifts.length > 0 ? shifts.map((s, idx) => <option key={s.id + '_' + idx} value={String(s.id)}>{s.title || `Ca #${s.id}`}</option>) : <option value="">Tự động theo lịch GHN</option>}
                                     </select>
                                 </div>
@@ -6032,7 +6025,7 @@
                     </div>
 
                     {/* Footer */}
-                    <div className="p-4 border-t border-[#27272a] bg-[#18181b] shrink-0">
+                    <div className="p-4 border-t border-[#27272a] bg-[#121214] shrink-0">
                         <button onClick={handleCreate} disabled={submitting} className="w-full py-3.5 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white font-black rounded-xl shadow-lg shadow-orange-950/30 active:scale-95 transition-all text-center uppercase tracking-wider flex items-center justify-center gap-2">
                             {submitting ? <><i className="fas fa-spinner fa-spin"></i> ĐANG ĐẨY ĐƠN GHN...</> : <><i className="fas fa-paper-plane"></i> XÁC NHẬN TẠO ĐƠN GHN</>}
                         </button>

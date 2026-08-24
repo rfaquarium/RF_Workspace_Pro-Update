@@ -1080,58 +1080,68 @@ function getAppData(pin) {
   if (!auth || !auth.valid) { return { isAuthFailed: true, error: "AUTH_FAILED" }; }
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (!ss.getSheetByName('Trainings')) {
-      var trainingsSheet = ss.insertSheet('Trainings');
-      trainingsSheet.appendRow(SCHEMA.Trainings);
-      trainingsSheet.setFrozenRows(1);
+    
+    // TỐI ƯU HIỆU NĂNG: Chỉ chạy khởi tạo Sheet & Migration duy nhất 1 lần thay vì chạy đè Lock mỗi request
+    var scriptProps = PropertiesService.getScriptProperties();
+    var isMigrated = scriptProps.getProperty('MIGRATION_V2_10_6_DONE');
+    if (!isMigrated) {
+      try {
+        if (!ss.getSheetByName('Trainings')) {
+          var trainingsSheet = ss.insertSheet('Trainings');
+          trainingsSheet.appendRow(SCHEMA.Trainings);
+          trainingsSheet.setFrozenRows(1);
+        }
+        if (!ss.getSheetByName('Models3D')) {
+          var models3DSheet = ss.insertSheet('Models3D');
+          models3DSheet.appendRow(SCHEMA.Models3D);
+          models3DSheet.setFrozenRows(1);
+        }
+        if (!ss.getSheetByName('CTV_Finance')) {
+          var ctvSheet = ss.insertSheet('CTV_Finance');
+          ctvSheet.appendRow(['id', 'date', 'type', 'amount', 'note', 'user', 'status']);
+          ctvSheet.getRange("A1:G1").setFontWeight("bold").setBackground("#d4af37");
+          ctvSheet.setFrozenRows(1);
+        }
+        if (!ss.getSheetByName('Config_GiaLayout')) {
+          var configLayoutSheet = ss.insertSheet('Config_GiaLayout');
+          configLayoutSheet.appendRow(['Size_Max', 'Do_Chi_Tiet', 'He_So_Gia', 'Phi_Gui_Xuong', 'Phi_Gan_Reu']);
+          configLayoutSheet.getRange("A1:E1").setFontWeight("bold").setBackground("#d4af37");
+          configLayoutSheet.setFrozenRows(1);
+          const defaultLayoutData = [
+            [30, 'Đơn giản', 740000, 10000, 10000],
+            [30, 'Chi tiết cao', 860000, 10000, 10000],
+            [50, 'Đơn giản', 540000, 15000, 20000],
+            [50, 'Chi tiết cao', 660000, 15000, 20000],
+            [70, 'Đơn giản', 560000, 30000, 25000],
+            [70, 'Chi tiết cao', 680000, 30000, 30000],
+            [90, 'Đơn giản', 490000, 40000, 45000],
+            [90, 'Chi tiết cao', 630000, 45000, 50000],
+            [120, 'Đơn giản', 490000, 45000, 65000],
+            [120, 'Chi tiết cao', 660000, 50000, 65000]
+          ];
+          defaultLayoutData.forEach(function (row) { configLayoutSheet.appendRow(row); });
+        }
+        if (!ss.getSheetByName('Reimbursements')) {
+          var reimbSheet = ss.insertSheet('Reimbursements');
+          reimbSheet.appendRow(SCHEMA.Reimbursements);
+          reimbSheet.getRange("A1:G1").setFontWeight("bold").setBackground("#d4af37");
+          reimbSheet.setFrozenRows(1);
+        }
+        if (!ss.getSheetByName('BOM_Config')) {
+          var bomSheet = ss.insertSheet('BOM_Config');
+          bomSheet.appendRow(SCHEMA_ERP.BOM_Config);
+          bomSheet.getRange("A1:E1").setFontWeight("bold").setBackground("#d4af37");
+        }
+        repairKPIProgressSheetHeaders();
+        api_migrateXuFromBonusPenaltyToThongKeTichLuyXu();
+        api_repairAndRestoreTasksFromXuSheet();
+        api_repairSupplierNegativeDebts();
+        api_repairAdjustmentTransactions();
+        scriptProps.setProperty('MIGRATION_V2_10_6_DONE', 'true');
+      } catch (mErr) {
+        console.error('Lỗi khi chạy migration ngầm một lần:', mErr);
+      }
     }
-    if (!ss.getSheetByName('Models3D')) {
-      var models3DSheet = ss.insertSheet('Models3D');
-      models3DSheet.appendRow(SCHEMA.Models3D);
-      models3DSheet.setFrozenRows(1);
-    }
-    if (!ss.getSheetByName('CTV_Finance')) {
-      var ctvSheet = ss.insertSheet('CTV_Finance');
-      ctvSheet.appendRow(['id', 'date', 'type', 'amount', 'note', 'user', 'status']);
-      ctvSheet.getRange("A1:G1").setFontWeight("bold").setBackground("#d4af37");
-      ctvSheet.setFrozenRows(1);
-    }
-    if (!ss.getSheetByName('Config_GiaLayout')) {
-      var configLayoutSheet = ss.insertSheet('Config_GiaLayout');
-      configLayoutSheet.appendRow(['Size_Max', 'Do_Chi_Tiet', 'He_So_Gia', 'Phi_Gui_Xuong', 'Phi_Gan_Reu']);
-      configLayoutSheet.getRange("A1:E1").setFontWeight("bold").setBackground("#d4af37");
-      configLayoutSheet.setFrozenRows(1);
-      // Điền sẵn data mẫu
-      const defaultLayoutData = [
-        [30, 'Đơn giản', 740000, 10000, 10000],
-        [30, 'Chi tiết cao', 860000, 10000, 10000],
-        [50, 'Đơn giản', 540000, 15000, 20000],
-        [50, 'Chi tiết cao', 660000, 15000, 20000],
-        [70, 'Đơn giản', 560000, 30000, 25000],
-        [70, 'Chi tiết cao', 680000, 30000, 30000],
-        [90, 'Đơn giản', 490000, 40000, 45000],
-        [90, 'Chi tiết cao', 630000, 45000, 50000],
-        [120, 'Đơn giản', 490000, 45000, 65000],
-        [120, 'Chi tiết cao', 660000, 50000, 65000]
-      ];
-      defaultLayoutData.forEach(function (row) { configLayoutSheet.appendRow(row); });
-    }
-    if (!ss.getSheetByName('Reimbursements')) {
-      var reimbSheet = ss.insertSheet('Reimbursements');
-      reimbSheet.appendRow(SCHEMA.Reimbursements);
-      reimbSheet.getRange("A1:G1").setFontWeight("bold").setBackground("#d4af37");
-      reimbSheet.setFrozenRows(1);
-    }
-    if (!ss.getSheetByName('BOM_Config')) {
-      var bomSheet = ss.insertSheet('BOM_Config');
-      bomSheet.appendRow(SCHEMA_ERP.BOM_Config);
-      bomSheet.getRange("A1:E1").setFontWeight("bold").setBackground("#d4af37");
-    }
-    repairKPIProgressSheetHeaders();
-    try { api_migrateXuFromBonusPenaltyToThongKeTichLuyXu(); } catch (e) { console.error('Lỗi auto migrate Xu:', e); }
-    try { api_repairAndRestoreTasksFromXuSheet(); } catch (e) { console.error('Lỗi auto repair Tasks:', e); }
-    try { api_repairSupplierNegativeDebts(); } catch (e) { console.error('Lỗi auto repair Supplier Debt:', e); }
-    try { api_repairAdjustmentTransactions(); } catch (e) { console.error('Lỗi auto repair Adj Tx:', e); }
 
     // 1. TẠO MỐC THỜI GIAN CẮT DỮ LIỆU (MẶC ĐỊNH LÀ NGÀY 1 THÁNG TRƯỚC) CHO HR & ERP
     var today = new Date();

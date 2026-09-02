@@ -178,7 +178,7 @@ function StockHistoryModal({ product, onClose, importExport, products, pushDelta
                     <div className="flex-1 bg-[#09090b] border border-white/[0.08] rounded-2xl p-3 text-center shadow-inner">
                         <div className="text-[8.5px] text-zinc-400 font-black uppercase tracking-widest mb-1">Tồn Hiện Tại</div>
                         <div className="text-[16px] font-mono font-black text-emerald-400 leading-none mt-0.5">
-                            {product.quantity || 0} <span className="text-[10px] text-zinc-400 font-bold uppercase">{product.unit || 'Cái'}</span>
+                            {formatStockQty(product.quantity)} <span className="text-[10px] text-zinc-400 font-bold uppercase">{product.unit || 'Cái'}</span>
                         </div>
                     </div>
                 </div>
@@ -214,14 +214,16 @@ function StockHistoryModal({ product, onClose, importExport, products, pushDelta
                                             </button>
                                         )}
                                     </div>
-                                    <div className="text-[11.5px] font-bold text-zinc-300 leading-tight group-hover:text-white transition-colors line-clamp-2">{L.note || L.target}</div>
+                                    <div className="text-[11.5px] font-bold text-zinc-300 leading-tight group-hover:text-white transition-colors line-clamp-2" title={L.note || L.target}>
+                                        {cleanStockLogNote(L.note, L.target)}
+                                    </div>
                                 </div>
                                 <div className="flex flex-col items-end shrink-0">
                                     <div className={`text-[14.5px] font-mono font-black ${L.type==='Nhập' || L.type==='Cân Tăng' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                        {L.type==='Nhập' || L.type==='Cân Tăng' ? '+' : '-'}{L.changedQty} <span className="text-[9px] font-bold uppercase opacity-70 font-sans">{product.unit || 'Cái'}</span>
+                                        {L.type==='Nhập' || L.type==='Cân Tăng' ? '+' : '-'}{formatStockQty(L.changedQty)} <span className="text-[9px] font-bold uppercase opacity-70 font-sans">{product.unit || 'Cái'}</span>
                                     </div>
                                     <div className="text-[9.5px] text-zinc-400 font-bold mt-1 bg-white/[0.04] px-2 py-0.5 rounded-lg border border-white/[0.06] font-mono">
-                                        Tồn: <span className="text-zinc-200 font-bold">{L.balanceAfter}</span>
+                                        Tồn: <span className="text-zinc-200 font-bold">{formatStockQty(L.balanceAfter)}</span>
                                     </div>
                                 </div>
                             </div>

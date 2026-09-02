@@ -1166,4 +1166,73 @@ function canUserDo(actionCode, role, user) {
 
   return false;
 }
+
+/**
+ * Làm tròn số lượng tồn kho tối đa 3 chữ số thập phân (loại bỏ số 0 dư thừa)
+ */
+function formatStockQty(val) {
+  if (val === undefined || val === null || val === '') return '0';
+  const num = Number(val);
+  if (isNaN(num)) return '0';
+  const rounded = Math.round(num * 1000) / 1000;
+  return Number(rounded.toFixed(3)).toLocaleString('vi-VN', { maximumFractionDigits: 3 });
+}
+
+/**
+ * Làm sạch và tối ưu hiển thị thẻ ghi chú lịch sử kho
+ */
+function cleanStockLogNote(rawNote, target) {
+  if (!rawNote && !target) return 'Giao dịch kho';
+  let text = String(rawNote || target || '').trim();
+
+  // 1. Xử lý chuỗi JSON Kiểm Kho
+  if (text.startsWith('{') && text.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(text);
+      const label = parsed.statusLabel || (parsed.status === 'BALANCED' ? 'Đã cân bằng kho' : parsed.status) || 'Cân bằng kho';
+      const user = parsed.createdBy || parsed.user || '';
+      const note = parsed.userNote || parsed.note || '';
+      let res = `${label}`;
+      if (note) res += `: ${note}`;
+      if (user) res += ` (${user})`;
+      return res;
+    } catch (e) {}
+  }
+
+  // 2. Xử lý chuỗi Trừ vật tư BOM
+  if (text.includes('Trừ vật tư') || text.includes('vật tư BOM') || text.startsWith('IE_BOM_')) {
+    let orderCode = '';
+    let prodName = '';
+
+    const orderMatch = text.match(/đơn\s+([A-Za-z0-9_\-]+)/i) || text.match(/ORD_[A-Za-z0-9_\-]+/i);
+    if (orderMatch) {
+      orderCode = orderMatch[1] || orderMatch[0];
+    }
+
+    const nameMatch = text.match(/Lệnh:\s*[^-\n\)]+-\s*([^\)\n]+)/i) || text.match(/\(Lệnh:[^\-]+\-\s*([^\)]+)\)/i);
+    if (nameMatch) {
+      prodName = nameMatch[1].trim();
+    } else {
+      const parts = text.split('-');
+      if (parts.length > 1) {
+        prodName = parts[1].replace(/\).*/, '').trim();
+      }
+    }
+
+    if (prodName && orderCode) {
+      return `Trừ vật tư lệnh sản xuất ${prodName} đơn ${orderCode}`;
+    } else if (prodName) {
+      return `Trừ vật tư lệnh sản xuất ${prodName}`;
+    } else if (orderCode) {
+      return `Trừ vật tư lệnh sản xuất đơn ${orderCode}`;
+    }
+  }
+
+  // 3. Xử lý nhập kho thành phẩm sản xuất
+  if (text.includes('Nhập kho thành phẩm sản xuất:')) {
+    return text.replace('Nhập kho thành phẩm sản xuất:', 'Nhập TP sản xuất:').trim();
+  }
+
+  return text;
+}
 </script>

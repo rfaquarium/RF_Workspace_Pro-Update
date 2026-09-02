@@ -36,15 +36,6 @@ const getSubCategoryIcon = (name = '') => {
     return 'fa-layer-group';
 };
 
-// Helper làm tròn tồn kho chuẩn xác tối đa 3 số thập phân (loại bỏ số 0 dư thừa)
-const formatStockQty = (val) => {
-    if (val === undefined || val === null || val === '') return '0';
-    const num = Number(val);
-    if (isNaN(num)) return '0';
-    const rounded = Math.round(num * 1000) / 1000;
-    return Number(rounded.toFixed(3)).toLocaleString('vi-VN', { maximumFractionDigits: 3 });
-};
-
 // =========================================================================
 // 1. COMPONENT: THẺ SẢN PHẨM & PHÂN LOẠI (VariantGroupCard)
 // =========================================================================

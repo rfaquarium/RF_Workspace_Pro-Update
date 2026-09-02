@@ -1235,4 +1235,28 @@ function cleanStockLogNote(rawNote, target) {
 
   return text;
 }
+
+// =========================================================================
+// ⚡ HÀM BẮN THÔNG BÁO ĐẨY ĐƠN HỎA TỐC QUA NTFY (NTFY.SH)
+// =========================================================================
+const NTFY_TOPIC = 'rf_workspace_urgent';
+
+async function sendNtfyUrgentAlert(orderCode, productName, channel) {
+  try {
+    const payload = 'Mã đơn: ' + (orderCode || '') + '\nSản phẩm: ' + (productName || 'Hàng xưởng') + '\nKênh bán: ' + (channel || 'Sàn TMĐT') + '\n👉 Yêu cầu thợ xưởng ưu tiên làm ngay!';
+    const ntfyUrl = ['https:', '', 'ntfy.sh', NTFY_TOPIC].join('/');
+    await fetch(ntfyUrl, {
+      method: 'POST',
+      headers: {
+        'Title': '🔥 ĐƠN HỎA TỐC — ƯU TIÊN LÀM NGAY!',
+        'Priority': 'urgent',
+        'Tags': 'rotating_light,fire,package'
+      },
+      body: payload
+    });
+    console.log('✅ Đã phát thông báo ntfy thành công cho đơn:', orderCode);
+  } catch (err) {
+    console.warn('⚠️ Lỗi gửi ntfy:', err);
+  }
+}
 </script>

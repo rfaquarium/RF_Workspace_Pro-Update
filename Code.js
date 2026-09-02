@@ -20,9 +20,9 @@ function AAA_RUN_STANDARDIZE_SKU() {
 }
 
 var SCHEMA = {
-  Orders: ['id', 'orderCode', 'channel', 'customer', 'createdAt', 'deadline', 'date', 'status', 'accessories', 'hasProduction', 'isCarriedToWH', 'updatedBy', 'revenue', 'phone', 'address', 'note', 'prePaid', 'cod', 'costTotal', 'responsibleUser', 'discount', 'shippingMethod', 'sizeCoefficient', 'cogs', 'feeFixed', 'feeService', 'feePayment', 'feeAffiliate', 'shopVoucher', 'tax', 'reconciledAt', 'isReconciled'],
-  Orders_Archive: ['id', 'orderCode', 'channel', 'customer', 'createdAt', 'deadline', 'date', 'status', 'accessories', 'hasProduction', 'isCarriedToWH', 'updatedBy', 'revenue', 'phone', 'address', 'note', 'prePaid', 'cod', 'costTotal', 'responsibleUser', 'discount', 'shippingMethod', 'sizeCoefficient', 'cogs', 'feeFixed', 'feeService', 'feePayment', 'feeAffiliate', 'shopVoucher', 'tax', 'reconciledAt', 'isReconciled'],
-  Production: ['id', 'orderId', 'type', 'name', 'note', 'status', 'deadline', 'fulfilledFromStock', 'p1_name', 'p1_status', 'p1_user', 'p1_start', 'p1_endTime', 'p1_photo', 'p1_reward_vnd', 'p2_name', 'p2_status', 'p2_user', 'p2_start', 'p2_endTime', 'p2_photo', 'p2_reward_vnd', 'qc_front_photo', 'qc_side_photo', 'qc_status', 'qc_note', 'serialCode', 'usedByOrderCode', 'usedAt'],
+  Orders: ['id', 'orderCode', 'channel', 'customer', 'createdAt', 'deadline', 'date', 'status', 'accessories', 'hasProduction', 'isCarriedToWH', 'updatedBy', 'revenue', 'phone', 'address', 'note', 'prePaid', 'cod', 'costTotal', 'responsibleUser', 'discount', 'shippingMethod', 'sizeCoefficient', 'cogs', 'feeFixed', 'feeService', 'feePayment', 'feeAffiliate', 'shopVoucher', 'tax', 'reconciledAt', 'isReconciled', 'isUrgent', 'urgentAt'],
+  Orders_Archive: ['id', 'orderCode', 'channel', 'customer', 'createdAt', 'deadline', 'date', 'status', 'accessories', 'hasProduction', 'isCarriedToWH', 'updatedBy', 'revenue', 'phone', 'address', 'note', 'prePaid', 'cod', 'costTotal', 'responsibleUser', 'discount', 'shippingMethod', 'sizeCoefficient', 'cogs', 'feeFixed', 'feeService', 'feePayment', 'feeAffiliate', 'shopVoucher', 'tax', 'reconciledAt', 'isReconciled', 'isUrgent', 'urgentAt'],
+  Production: ['id', 'orderId', 'type', 'name', 'note', 'status', 'deadline', 'fulfilledFromStock', 'p1_name', 'p1_status', 'p1_user', 'p1_start', 'p1_endTime', 'p1_photo', 'p1_reward_vnd', 'p2_name', 'p2_status', 'p2_user', 'p2_start', 'p2_endTime', 'p2_photo', 'p2_reward_vnd', 'qc_front_photo', 'qc_side_photo', 'qc_status', 'qc_note', 'serialCode', 'usedByOrderCode', 'usedAt', 'isUrgent', 'urgentAt'],
   Packings: ['id', 'orderId', 'user', 'start', 'end', 'endTime', 'status', 'photo', 'reward_vnd', 'photoBefore'],
   Attendance: ['id', 'user', 'date', 'morningIn', 'morningOut', 'afternoonIn', 'afternoonOut', 'leaveType', 'leaveReportAt', 'shift', 'timeIn', 'timeOut', 'totalHours', 'status', 'penalty', 'isEdited', 'leaveStart', 'leaveEnd', 'note'],
   Documents: ['id', 'category', 'title', 'description', 'link', 'createdAt', 'createdBy', 'attachments', 'testLink', 'readBy'],
@@ -251,6 +251,15 @@ function handleApiRequest(payload) {
       var auth = validatePin(pin);
       if (auth && auth.valid) {
         response = api_sendUrgentOrderPush(payload.orderCode, payload.message, pin);
+      } else {
+        response.message = 'Xác thực thất bại!';
+      }
+    }
+    else if (action === 'toggleOrderUrgent') {
+      var pin = payload.pin;
+      var auth = validatePin(pin);
+      if (auth && auth.valid) {
+        response = api_toggleOrderUrgent(payload.orderId, payload.isUrgent, pin);
       } else {
         response.message = 'Xác thực thất bại!';
       }
@@ -2301,7 +2310,9 @@ function formatOrder(o) {
     "shopVoucher": Number(o.shopVoucher || 0), 
     "tax": Number(o.tax || 0), 
     "reconciledAt": o.reconciledAt || '', 
-    "isReconciled": o.isReconciled || '' 
+    "isReconciled": o.isReconciled || '',
+    "isUrgent": o.isUrgent === true || String(o.isUrgent).toUpperCase() === 'TRUE',
+    "urgentAt": o.urgentAt || ''
   }; 
 }
 function formatProd(p) { 
@@ -2344,7 +2355,9 @@ function formatProd(p) {
     "qc_note": p.qc_note || '',
     "serialCode": p.serialCode || '',
     "usedByOrderCode": p.usedByOrderCode || '',
-    "usedAt": p.usedAt || ''
+    "usedAt": p.usedAt || '',
+    "isUrgent": p.isUrgent === true || String(p.isUrgent).toUpperCase() === 'TRUE',
+    "urgentAt": p.urgentAt || ''
   }; 
 }
 function formatPacking(p) { return { "id": p.id, "orderId": p.orderId, "user": p.user || '', "start": p.start || '', "end": p.end || '', "endTime": p.endTime || '', "status": p.status || '', "photo": p.photo || '', "photoBefore": p.photoBefore || '', "reward_vnd": p.reward_vnd || 0 }; }
@@ -13038,9 +13051,106 @@ function api_assignStockItemToOrder(prodId, orderCode, serialCode) {
   }
 }
 
-// Cache buster: 1787591552301
-// Cache buster: 1787591802145
-// Cache buster: 1787592134673
-// Cache buster: 1787592152071
-// Cache buster: 1788254800000
-// Cache buster: 1788365000000
+/**
+ * ⚡ BẬT/TẮT TRẠNG THÁI "ĐƠN HỎA TỐC / ƯU TIÊN LÀM NGAY" ĐỒNG BỘ 2 CHIỀU (ORDERS 🔁 PRODUCTION)
+ */
+function api_toggleOrderUrgent(orderId, isUrgent, pin) {
+  if (!orderId) return { success: false, message: 'Thiếu mã đơn hàng!' };
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var nowIso = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+    var urgentFlag = isUrgent === true || String(isUrgent).toUpperCase() === 'TRUE';
+    var urgentTime = urgentFlag ? nowIso : '';
+
+    // 1. Cập nhật trong bảng Orders
+    var oSheet = ss.getSheetByName('Orders');
+    var matchedOrderCode = '';
+    var updatedOrder = null;
+    if (oSheet) {
+      var oData = oSheet.getDataRange().getValues();
+      if (oData.length > 1) {
+        var oHeaders = oData[0];
+        var idCol = oHeaders.indexOf('id');
+        var codeCol = oHeaders.indexOf('orderCode');
+        var urgCol = oHeaders.indexOf('isUrgent');
+        var urgAtCol = oHeaders.indexOf('urgentAt');
+
+        if (urgCol === -1) {
+          oSheet.getRange(1, oHeaders.length + 1).setValue('isUrgent');
+          urgCol = oHeaders.length;
+          oHeaders.push('isUrgent');
+        }
+        if (urgAtCol === -1) {
+          oSheet.getRange(1, oHeaders.length + 1).setValue('urgentAt');
+          urgAtCol = oHeaders.length;
+          oHeaders.push('urgentAt');
+        }
+
+        for (var i = 1; i < oData.length; i++) {
+          var rowId = String(oData[i][idCol] || '').trim();
+          var rowCode = codeCol !== -1 ? String(oData[i][codeCol] || '').trim() : '';
+          if (rowId === String(orderId).trim() || (rowCode && rowCode === String(orderId).trim())) {
+            matchedOrderCode = rowCode || rowId;
+            oSheet.getRange(i + 1, urgCol + 1).setValue(urgentFlag ? 'TRUE' : 'FALSE');
+            oSheet.getRange(i + 1, urgAtCol + 1).setValue(urgentTime);
+            updatedOrder = { id: rowId, orderCode: rowCode, isUrgent: urgentFlag, urgentAt: urgentTime };
+            break;
+          }
+        }
+      }
+    }
+
+    // 2. Cập nhật đồng bộ các lệnh sản xuất trong bảng Production
+    var pSheet = ss.getSheetByName('Production');
+    var updatedProds = [];
+    if (pSheet) {
+      var pData = pSheet.getDataRange().getValues();
+      if (pData.length > 1) {
+        var pHeaders = pData[0];
+        var pIdCol = pHeaders.indexOf('id');
+        var pOrderIdCol = pHeaders.indexOf('orderId');
+        var pUrgCol = pHeaders.indexOf('isUrgent');
+        var pUrgAtCol = pHeaders.indexOf('urgentAt');
+
+        if (pUrgCol === -1) {
+          pSheet.getRange(1, pHeaders.length + 1).setValue('isUrgent');
+          pUrgCol = pHeaders.length;
+          pHeaders.push('isUrgent');
+        }
+        if (pUrgAtCol === -1) {
+          pSheet.getRange(1, pHeaders.length + 1).setValue('urgentAt');
+          pUrgAtCol = pHeaders.length;
+          pHeaders.push('urgentAt');
+        }
+
+        for (var j = 1; j < pData.length; j++) {
+          var pOrdId = String(pData[j][pOrderIdCol] || '').trim();
+          if (pOrdId === String(orderId).trim() || (matchedOrderCode && pOrdId === matchedOrderCode)) {
+            pSheet.getRange(j + 1, pUrgCol + 1).setValue(urgentFlag ? 'TRUE' : 'FALSE');
+            pSheet.getRange(j + 1, pUrgAtCol + 1).setValue(urgentTime);
+            updatedProds.push({ id: pData[j][pIdCol], orderId: pOrdId, isUrgent: urgentFlag, urgentAt: urgentTime });
+          }
+        }
+      }
+    }
+
+    return {
+      success: true,
+      orderId: orderId,
+      orderCode: matchedOrderCode || orderId,
+      isUrgent: urgentFlag,
+      urgentAt: urgentTime,
+      updatedOrder: updatedOrder,
+      updatedProdsCount: updatedProds.length,
+      message: urgentFlag ? 'Đã bật chế độ ƯU TIÊN LÀM NGAY!' : 'Đã tắt chế độ hỏa tốc.'
+    };
+  } catch (err) {
+    return { success: false, message: 'Lỗi bật/tắt hỏa tốc: ' + err.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Cache buster: 1788366000000

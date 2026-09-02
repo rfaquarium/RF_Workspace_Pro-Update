@@ -3422,6 +3422,56 @@
         }, [preview3DUrl]);
 
         const _item = optimisticItem || item;
+        const isUrgent = typeof _item.isUrgent !== 'undefined'
+            ? (_item.isUrgent === true || String(_item.isUrgent).toUpperCase() === 'TRUE')
+            : (order?.isUrgent === true || String(order?.isUrgent).toUpperCase() === 'TRUE');
+
+        const handleToggleUrgent = async (e) => {
+            e?.stopPropagation();
+            const nextUrgent = !isUrgent;
+            const nowIso = typeof getLocalISODate === 'function' ? getLocalISODate().replace('T', ' ') : new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+            const updatedItem = {
+                ..._item,
+                isUrgent: nextUrgent,
+                urgentAt: nextUrgent ? nowIso : ''
+            };
+            setOptimisticItem(updatedItem);
+
+            // Tìm order tương ứng để đồng bộ 2 chiều
+            const targetOrderId = String(_item.orderId || '').trim();
+            const matchedOrder = (orders || []).find(o => String(o.id).trim() === targetOrderId || String(o.orderCode).trim() === targetOrderId);
+
+            if (matchedOrder) {
+                matchedOrder.isUrgent = nextUrgent;
+                matchedOrder.urgentAt = nextUrgent ? nowIso : '';
+            }
+
+            const delta = {
+                production: [updatedItem]
+            };
+
+            if (matchedOrder) {
+                delta.orders = [{
+                    ...matchedOrder,
+                    isUrgent: nextUrgent,
+                    urgentAt: nextUrgent ? nowIso : ''
+                }];
+            }
+
+            const toastMsg = nextUrgent ? 'ĐÃ BẬT LỆNH HỎA TỐC / ƯU TIÊN LÀM NGAY!' : 'Đã tắt chế độ ưu tiên.';
+            const toastIcon = nextUrgent ? 'fa-bolt' : 'fa-info-circle';
+
+            try {
+                await pushDeltas(delta, toastMsg, toastIcon);
+                if (nextUrgent && typeof sendNtfyUrgentAlert === 'function') {
+                    sendNtfyUrgentAlert(matchedOrder ? (matchedOrder.orderCode || matchedOrder.id) : targetOrderId, _item.name, matchedOrder?.channel);
+                }
+            } catch (err) {
+                console.warn('Lỗi push urgent delta:', err);
+            }
+        };
+
         const wrappedPushDeltas = (payload, msg, icon) => {
             if (payload.prodItems && payload.prodItems[0]) { setOptimisticItem(payload.prodItems[0]); }
             return pushDeltas(payload, msg, icon).catch(() => triggerToast("Đang đồng bộ ngầm...", "fa-wifi", "warning"));
@@ -3567,19 +3617,34 @@
 
         return (
             <React.Fragment>
-                <div className={`rf-card relative transition-all duration-200 rounded-2xl overflow-hidden bg-[#121214] ${isItemDone
-                        ? 'border border-emerald-500/30 hover:border-emerald-500/50'
-                        : isRejected
-                            ? 'border border-rose-500/50 hover:border-rose-500/70 shadow-lg'
-                            : isReadyForInspection
-                                ? 'border border-indigo-500/40 hover:border-indigo-500/60 shadow-lg'
-                                : isAnyInProgress
-                                    ? 'border border-blue-500/40 hover:border-blue-500/60 shadow-lg'
-                                    : isPhase2Pending
-                                        ? 'border border-emerald-500/40 hover:border-emerald-500/60 shadow-lg'
-                                        : 'border border-white/[0.08] hover:border-white/[0.14] shadow-sm'
+                <div className={`rf-card relative transition-all duration-200 rounded-2xl overflow-hidden bg-[#121214] ${
+                        isUrgent
+                            ? 'border-2 border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.35)] animate-pulse'
+                            : isItemDone
+                            ? 'border border-emerald-500/30 hover:border-emerald-500/50'
+                            : isRejected
+                                ? 'border border-rose-500/50 hover:border-rose-500/70 shadow-lg'
+                                : isReadyForInspection
+                                    ? 'border border-indigo-500/40 hover:border-indigo-500/60 shadow-lg'
+                                    : isAnyInProgress
+                                        ? 'border border-blue-500/40 hover:border-blue-500/60 shadow-lg'
+                                        : isPhase2Pending
+                                            ? 'border border-emerald-500/40 hover:border-emerald-500/60 shadow-lg'
+                                            : 'border border-white/[0.08] hover:border-white/[0.14] shadow-sm'
                     }`}>
                     <div className="flex flex-col w-full cursor-pointer relative p-3" onClick={() => setIsExpanded(!isExpanded)}>
+
+                        {/* HUY HIỆU HỎA TỐC / ƯU TIÊN LÀM NGAY NỔI BẬT (BẤM ĐỂ TẮT) */}
+                        {isUrgent && (
+                            <div 
+                                onClick={handleToggleUrgent}
+                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-rose-500/20 border border-rose-500/50 text-rose-400 text-[12px] font-black uppercase tracking-wider mb-2 animate-bounce w-fit cursor-pointer hover:bg-rose-500/30 transition-colors shadow-sm"
+                                title="Đang bật HỎA TỐC — Bấm vào đây hoặc nút ⚡ để tắt ưu tiên"
+                            >
+                                <span>🔥 ƯU TIÊN LÀM NGAY</span>
+                                <span className="text-[10px] text-rose-300/80 font-normal ml-1">(Bấm để tắt)</span>
+                            </div>
+                        )}
 
                         {/* === KHU VỰC 1: HEADER TRÊN CÙNG (GIỐNG TAB ĐƠN HÀNG) === */}
                         <div className="flex items-center justify-between gap-2 mb-2.5 w-full">
@@ -3666,6 +3731,20 @@
 
                             {/* Right: CỤM NÚT THAO TÁC CỐ ĐỊNH (ACTION BUTTON STRIP) */}
                             <div className="flex items-center gap-1 shrink-0 z-30" onClick={e => e.stopPropagation()}>
+                                {/* NÚT BẬT/TẮT HỎA TỐC ⚡ (1-CHẠM ĐỒNG BỘ 2 CHIỀU) */}
+                                <button
+                                    type="button"
+                                    onClick={handleToggleUrgent}
+                                    className={`w-6 h-6 rounded flex items-center justify-center transition-all shadow-sm active:scale-95 cursor-pointer border ${
+                                        isUrgent
+                                            ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.6)] bg-amber-400/20 border-amber-400/40'
+                                            : 'text-zinc-500 hover:text-amber-400 bg-black/40 border-white/10'
+                                    }`}
+                                    title={isUrgent ? "Đang bật HỎA TỐC (Bấm để tắt)" : "Bật HỎA TỐC / Ưu tiên làm ngay"}
+                                >
+                                    <i className="fas fa-bolt text-[10px]"></i>
+                                </button>
+
                                 {/* NÚT THẢ XUỐNG XEM ĐỊNH MỨC VẬT TƯ (BOM) & GIÁ VỐN */}
                                 <button
                                     onClick={(e) => {
@@ -5317,8 +5396,12 @@
                             };
 
                             const sortedList = [...list].sort((a, b) => {
-                                const oA = (orders || []).find(x => x.id === a.orderId) || {};
-                                const oB = (orders || []).find(x => x.id === b.orderId) || {};
+                                const oA = (orders || []).find(x => x.id === a.orderId || x.orderCode === a.orderId) || {};
+                                const oB = (orders || []).find(x => x.id === b.orderId || x.orderCode === b.orderId) || {};
+
+                                const aUrgent = a.isUrgent === true || String(a.isUrgent).toUpperCase() === 'TRUE' || oA.isUrgent === true || String(oA.isUrgent).toUpperCase() === 'TRUE';
+                                const bUrgent = b.isUrgent === true || String(b.isUrgent).toUpperCase() === 'TRUE' || oB.isUrgent === true || String(oB.isUrgent).toUpperCase() === 'TRUE';
+                                if (aUrgent !== bUrgent) return bUrgent ? 1 : -1;
 
                                 const pA = getChannelPrio(normalizeProductionChannel(oA.channel));
                                 const pB = getChannelPrio(normalizeProductionChannel(oB.channel));
@@ -5342,16 +5425,24 @@
 
                             const channelGroups = [];
                             sortedList.forEach(item => {
-                                const order = (orders || []).find(o => o.id === item.orderId) || {};
+                                const order = (orders || []).find(o => o.id === item.orderId || o.orderCode === item.orderId) || {};
+                                const isItemUrgent = item.isUrgent === true || String(item.isUrgent).toUpperCase() === 'TRUE' || order.isUrgent === true || String(order.isUrgent).toUpperCase() === 'TRUE';
                                 const groupKey = normalizeProductionChannel(order.channel || (item.orderId === 'SẢN XUẤT TỒN' ? 'SẢN XUẤT TỒN' : ''));
 
                                 const pA = getChannelPrio(groupKey);
                                 let group = channelGroups.find(g => g.groupKey === groupKey);
                                 if (!group) {
-                                    group = { groupKey, items: [], priority: pA };
+                                    group = { groupKey, items: [], priority: pA, hasUrgent: false };
                                     channelGroups.push(group);
                                 }
+                                if (isItemUrgent) group.hasUrgent = true;
                                 group.items.push(item);
+                            });
+
+                            // Đưa nhóm kênh có chứa đơn hỏa tốc lên đầu tiên
+                            channelGroups.sort((a, b) => {
+                                if (a.hasUrgent !== b.hasUrgent) return b.hasUrgent ? 1 : -1;
+                                return a.priority - b.priority;
                             });
 
                             return channelGroups.map((channelGroup) => {

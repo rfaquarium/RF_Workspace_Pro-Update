@@ -937,6 +937,7 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
             const rawDate = String(log.date || log.createdAt || '').slice(0, 10) || 'Chưa rõ ngày';
             if (!groups[rawDate]) groups[rawDate] = [];
             groups[rawDate].push(log);
+        });
         return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
     }, [filteredLogs]);
 

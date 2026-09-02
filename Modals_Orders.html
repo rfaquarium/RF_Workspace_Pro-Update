@@ -5209,6 +5209,105 @@
             }
         };
 
+        const isUrgent = _order.isUrgent === true || String(_order.isUrgent).toUpperCase() === 'TRUE';
+
+        const handleToggleUrgent = async (e) => {
+            e?.stopPropagation();
+            const nextUrgent = !isUrgent;
+            const nowIso = typeof getLocalISODate === 'function' ? getLocalISODate().replace('T', ' ') : new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+            const updatedOrder = {
+                ..._order,
+                isUrgent: nextUrgent,
+                urgentAt: nextUrgent ? nowIso : ''
+            };
+            setOptimisticOrder(updatedOrder);
+
+            // Đồng bộ các lệnh sản xuất tương ứng của đơn này
+            const myOrderCode = String(_order.orderCode || '').trim();
+            const myOrderId = String(_order.id || '').trim();
+
+            const relatedProds = (erpData?.Production || prodItems || []).filter(p => {
+                const pOrdId = String(p.orderId || '').trim();
+                return pOrdId === myOrderId || pOrdId === myOrderCode || (myOrderCode && pOrdId.includes(myOrderCode));
+            });
+
+            const updatedProds = relatedProds.map(p => ({
+                ...p,
+                isUrgent: nextUrgent,
+                urgentAt: nextUrgent ? nowIso : ''
+            }));
+
+            const delta = {
+                orders: [updatedOrder],
+                production: updatedProds
+            };
+
+            const toastMsg = nextUrgent ? 'ĐÃ BẬT ĐƠN HỎA TỐC / ƯU TIÊN LÀM NGAY!' : 'Đã tắt chế độ ưu tiên.';
+            const toastIcon = nextUrgent ? 'fa-bolt' : 'fa-info-circle';
+
+            try {
+                await pushDeltas(delta, toastMsg, toastIcon);
+                if (nextUrgent && typeof sendNtfyUrgentAlert === 'function') {
+                    const firstProdName = effectiveProds?.[0]?.name || prods?.[0]?.name || '';
+                    sendNtfyUrgentAlert(_order.orderCode || _order.id, firstProdName, _order.channel);
+                }
+            } catch (err) {
+                console.warn('Lỗi push urgent delta:', err);
+            }
+        };
+
+        const getProducerOrigin = React.useCallback((pItem) => {
+            if (!pItem) return null;
+            const cleanU = (u) => {
+                if (!u) return '';
+                const s = String(u).trim();
+                if (s.toLowerCase().includes('kho hàng') || s === 'Hàng') return '';
+                return s;
+            };
+
+            const p1 = cleanU(pItem.phases?.phase1?.user || pItem.p1_user);
+            const p2 = cleanU(pItem.phases?.phase2?.user || pItem.p2_user);
+            const sCode = pItem.serialCode || '';
+
+            if (p1 || p2 || sCode) {
+                return {
+                    p1User: p1,
+                    p2User: p2,
+                    p1Name: pItem.phases?.phase1?.name || (pItem.type === 'Bể Kính' ? 'Cắt Dán' : 'Dựng Khung'),
+                    p2Name: pItem.phases?.phase2?.name || (pItem.type === 'Bể Kính' ? 'Gọt Keo' : 'Gia Cố'),
+                    isStock: Boolean(pItem.fulfilledFromStock),
+                    serialCode: sCode,
+                    photo: pItem.phases?.phase1?.photo || pItem.p1_photo || pItem.qc_front_photo || ''
+                };
+            }
+
+            // Kiểm tra xem đơn hàng này đã được gán hiện vật nào trong CSDL Production chưa
+            const allProdList = erpData?.Production || prodItems || [];
+            const myOrderCode = String(_order.orderCode || _order.id || '').trim();
+            const pName = String(pItem.name || '').trim().toLowerCase();
+
+            const assignedMatch = allProdList.find(past => {
+                if (!past) return false;
+                const pastUsed = String(past.usedByOrderCode || '').trim();
+                return pastUsed && (pastUsed === myOrderCode || myOrderCode.includes(pastUsed)) && String(past.name || '').trim().toLowerCase() === pName;
+            });
+
+            if (assignedMatch) {
+                return {
+                    p1User: cleanU(assignedMatch.phases?.phase1?.user || assignedMatch.p1_user),
+                    p2User: cleanU(assignedMatch.phases?.phase2?.user || assignedMatch.p2_user),
+                    p1Name: assignedMatch.phases?.phase1?.name || (assignedMatch.type === 'Bể Kính' ? 'Cắt Dán' : 'Dựng Khung'),
+                    p2Name: assignedMatch.phases?.phase2?.name || (assignedMatch.type === 'Bể Kính' ? 'Gọt Keo' : 'Gia Cố'),
+                    isStock: true,
+                    serialCode: assignedMatch.serialCode || '',
+                    photo: assignedMatch.qc_front_photo || assignedMatch.phases?.phase2?.photo || assignedMatch.phases?.phase1?.photo || ''
+                };
+            }
+
+            return null;
+        }, [erpData?.Production, prodItems, _order.orderCode, _order.id]);
+
         const chameleonConfig = React.useMemo(() => {
             // Hàng hoàn không render badge ở giữa thẻ nữa theo yêu cầu
             if (isReturn) {
@@ -5287,59 +5386,14 @@
             return null;
         }, [isReturn, isReadyPack, isPacking, isPackOwner, isPendingHandover, isDone, _order.isCarriedToWH, processing, effectiveProds, getProducerOrigin]);
 
-        const getProducerOrigin = React.useCallback((pItem) => {
-            if (!pItem) return null;
-            const cleanU = (u) => {
-                if (!u) return '';
-                const s = String(u).trim();
-                if (s.toLowerCase().includes('kho hàng') || s === 'Hàng') return '';
-                return s;
-            };
-
-            const p1 = cleanU(pItem.phases?.phase1?.user || pItem.p1_user);
-            const p2 = cleanU(pItem.phases?.phase2?.user || pItem.p2_user);
-            const sCode = pItem.serialCode || '';
-
-            if (p1 || p2 || sCode) {
-                return {
-                    p1User: p1,
-                    p2User: p2,
-                    p1Name: pItem.phases?.phase1?.name || (pItem.type === 'Bể Kính' ? 'Cắt Dán' : 'Dựng Khung'),
-                    p2Name: pItem.phases?.phase2?.name || (pItem.type === 'Bể Kính' ? 'Gọt Keo' : 'Gia Cố'),
-                    isStock: Boolean(pItem.fulfilledFromStock),
-                    serialCode: sCode,
-                    photo: pItem.phases?.phase1?.photo || pItem.p1_photo || pItem.qc_front_photo || ''
-                };
-            }
-
-            // Kiểm tra xem đơn hàng này đã được gán hiện vật nào trong CSDL Production chưa
-            const allProdList = erpData?.Production || prodItems || [];
-            const myOrderCode = String(_order.orderCode || _order.id || '').trim();
-            const pName = String(pItem.name || '').trim().toLowerCase();
-
-            const assignedMatch = allProdList.find(past => {
-                if (!past) return false;
-                const pastUsed = String(past.usedByOrderCode || '').trim();
-                return pastUsed && (pastUsed === myOrderCode || myOrderCode.includes(pastUsed)) && String(past.name || '').trim().toLowerCase() === pName;
-            });
-
-            if (assignedMatch) {
-                return {
-                    p1User: cleanU(assignedMatch.phases?.phase1?.user || assignedMatch.p1_user),
-                    p2User: cleanU(assignedMatch.phases?.phase2?.user || assignedMatch.p2_user),
-                    p1Name: assignedMatch.phases?.phase1?.name || (assignedMatch.type === 'Bể Kính' ? 'Cắt Dán' : 'Dựng Khung'),
-                    p2Name: assignedMatch.phases?.phase2?.name || (assignedMatch.type === 'Bể Kính' ? 'Gọt Keo' : 'Gia Cố'),
-                    isStock: true,
-                    serialCode: assignedMatch.serialCode || '',
-                    photo: assignedMatch.qc_front_photo || assignedMatch.phases?.phase2?.photo || assignedMatch.phases?.phase1?.photo || ''
-                };
-            }
-
-            return null;
-        }, [erpData?.Production, prodItems, _order.orderCode, _order.id]);
-
         return (
-            <div className={`bg-[#121214] rounded-2xl relative overflow-hidden border p-3 transition-colors hover:border-white/[0.12] hover:bg-white/[0.02] ${isReturn ? 'border-amber-600/60' : 'border-white/[0.08]'} ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
+            <div className={`bg-[#121214] rounded-2xl relative overflow-hidden transition-all ${
+                isUrgent 
+                    ? 'border-2 border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.35)] animate-pulse' 
+                    : isReturn 
+                    ? 'border border-amber-600/60' 
+                    : 'border border-white/[0.08]'
+            } p-3 hover:border-white/[0.12] hover:bg-white/[0.02] ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
                 {sosTarget && ReactDOM.createPortal(
                     <ReturnSosModal sosTarget={sosTarget} erpProducts={erpProducts} order={_order} packRecord={packRecord} onClose={() => setSosTarget(null)} pushDeltas={pushDeltas} triggerToast={triggerToast} setOptimisticOrder={setOptimisticOrder} prods={prods} accessories={accessories} />,
                     document.body
@@ -5578,6 +5632,19 @@
                 <div className="absolute top-2 right-2 flex items-center gap-1 z-30">
                     {/* CỤM NÚT PHỤ (ICON PILLS SIÊU NHỎ) */}
                     <div className="flex items-center gap-0.5 bg-black/40 p-0.5 rounded-lg border border-white/10 backdrop-blur-sm">
+                        {/* NÚT BẬT/TẮT HỎA TỐC ⚡ (1-CHẠM) */}
+                        <button
+                            type="button"
+                            onClick={handleToggleUrgent}
+                            title={isUrgent ? "Đang bật HỎA TỐC (Bấm để tắt)" : "Bật HỎA TỐC / Ưu tiên làm ngay"}
+                            className={`w-6 h-6 rounded flex items-center justify-center transition-all cursor-pointer ${
+                                isUrgent 
+                                    ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.6)] bg-amber-400/20' 
+                                    : 'text-zinc-500 hover:text-amber-400'
+                            }`}
+                        >
+                            <i className="fas fa-bolt text-[10px]"></i>
+                        </button>
                         {currentRole === 'KẾ TOÁN' && (isReturn || String(_order.status).includes('Hoàn')) && (
                             <button onClick={fetchAppealEvidence} title="Lấy Hồ Sơ Khiếu Nại" className="w-6 h-6 text-[#cf1322] hover:bg-[#cf1322]/20 rounded flex items-center justify-center transition-colors"><i className={isFetchingAppeal ? "fas fa-spinner fa-spin text-[9px]" : "fas fa-file-download text-[9px]"}></i></button>
                         )}
@@ -5668,6 +5735,16 @@
                 )}
 
                 <div className={`pl-6 ${titlePadding} mb-3 min-h-[3rem]`}>
+                    {isUrgent && (
+                        <div 
+                            onClick={handleToggleUrgent}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-rose-500/20 border border-rose-500/50 text-rose-400 text-[12px] font-black uppercase tracking-wider mb-2 animate-bounce cursor-pointer hover:bg-rose-500/30 transition-colors shadow-sm"
+                            title="Đang bật HỎA TỐC — Bấm vào đây hoặc nút ⚡ để tắt ưu tiên"
+                        >
+                            <span>🔥 ƯU TIÊN LÀM NGAY</span>
+                            <span className="text-[10px] text-rose-300/80 font-normal ml-1">(Bấm để tắt)</span>
+                        </div>
+                    )}
                     <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
                         <div className={`flex items-center text-[8px] font-black rounded border uppercase tracking-wider shadow-sm overflow-hidden ${typeof getChannelBadge === 'function' ? getChannelBadge(_order.channel) : 'bg-gray-800 text-gray-300 border-gray-600'}`}>
                             <span className="px-1.5 py-0.5">{_order.channel || 'OFFLINE'}</span>
@@ -7535,6 +7612,117 @@
 
         const safeDateFull = typeof getLocalISODate === 'function' ? getLocalISODate().replace('T', ' ') : new Date().toISOString().slice(0, 16).replace('T', ' ');
 
+        // -------------------------------------------------------------
+        // HÀM CHUẨN HÓA, RÚT GỌN VÀ ĐỒNG BỘ MÀU SẮC TRẠNG THÁI ORDER.ALL (SCOPED IN MODAL)
+        // -------------------------------------------------------------
+        const normalizeStatus = (status) => {
+            if (!status) return '';
+            return String(status).trim().toLowerCase().normalize("NFC");
+        };
+
+        const shortenStatusText = (status) => {
+            if (!status) return '';
+            const norm = String(status).trim().normalize("NFC");
+
+            // Rút gọn câu dài Shopee: "Người mua xác nhận đã nhận được hàng, tuy nhiên Người mua vẫn có thể gửi yêu cầu Trả hàng/Hoàn tiền tới ngày YYYY-MM-DD"
+            const dateMatch = norm.match(/(?:tới ngày|đến ngày|trước ngày)\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{4})/i);
+            if (dateMatch && norm.toLowerCase().includes('người mua xác nhận đã nhận được hàng')) {
+                const rawDate = dateMatch[1];
+                const parts = rawDate.split(/[-/]/);
+                let ddmm = '';
+                if (parts.length === 3) {
+                    if (parts[0].length === 4) {
+                        // YYYY-MM-DD -> DD/MM
+                        ddmm = `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}`;
+                    } else {
+                        // DD-MM-YYYY -> DD/MM
+                        ddmm = `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}`;
+                    }
+                }
+                return ddmm ? `Đã nhận (Hạn khiếu nại: ${ddmm})` : 'Đã nhận hàng';
+            }
+
+            if (norm.toLowerCase().includes('người mua xác nhận đã nhận được hàng')) {
+                return 'Đã nhận hàng';
+            }
+
+            if (norm.toLowerCase().includes('đã chấp thuận yêu cầu')) {
+                return 'Đã chấp thuận hoàn';
+            }
+
+            return norm;
+        };
+
+        const getStatusBadgeStyle = (fileStatus, mappedStatus) => {
+            const s1 = normalizeStatus(fileStatus);
+            const s2 = normalizeStatus(mappedStatus);
+            const combined = `${s1} ${s2}`;
+
+            // 1. Nhóm Hoàn Thành ("hoàn thành", "đã giao") ➡️ Xanh lục
+            if (
+                combined.includes('hoàn thành') ||
+                combined.includes('đã giao') ||
+                combined.includes('giao thành công') ||
+                combined.includes('đối soát') ||
+                combined.includes('đã nhận') ||
+                combined.includes('completed') ||
+                combined.includes('delivered')
+            ) {
+                return {
+                    badgeClass: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+                    dotClass: 'bg-emerald-400'
+                };
+            }
+
+            // 2. Nhóm Đã Hủy ("đã hủy", "hủy đơn") ➡️ Đỏ hồng
+            if (
+                combined.includes('hủy') ||
+                combined.includes('huỷ') ||
+                combined.includes('cancelled') ||
+                combined.includes('canceled')
+            ) {
+                return {
+                    badgeClass: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+                    dotClass: 'bg-rose-400'
+                };
+            }
+
+            // 3. Nhóm Hoàn Hàng / Khiếu Nại ("đã chấp thuận yêu cầu", "trả hàng", "hoàn tiền") ➡️ Vàng cam
+            if (
+                combined.includes('chấp thuận yêu cầu') ||
+                combined.includes('trả hàng') ||
+                combined.includes('hoàn tiền') ||
+                combined.includes('hàng hoàn') ||
+                combined.includes('khiếu nại') ||
+                combined.includes('returned') ||
+                combined.includes('refund')
+            ) {
+                return {
+                    badgeClass: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+                    dotClass: 'bg-amber-400'
+                };
+            }
+
+            // 4. Nhóm Đang Vận Chuyển / Đang Giao ➡️ Xanh dương
+            if (
+                combined.includes('vận chuyển') ||
+                combined.includes('đang giao') ||
+                combined.includes('shipping') ||
+                combined.includes('transit')
+            ) {
+                return {
+                    badgeClass: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
+                    dotClass: 'bg-sky-400'
+                };
+            }
+
+            // Fallback mặc định: Xanh lục thay vì xám xịt
+            return {
+                badgeClass: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+                dotClass: 'bg-emerald-400'
+            };
+        };
+
         const processExcel = (rows) => {
             if (rows.length < 2) return;
             setIsProcessing(true);
@@ -7579,117 +7767,6 @@
 
             if (!walletAcc) newAccounts.push({ id: 'ACC_SHOPEE_' + Date.now(), accountName: finalWalletName, balance: 0 });
             if (!bankAcc) newAccounts.push({ id: 'ACC_BANK_' + Date.now(), accountName: finalBankName, balance: 0 });
-
-            // -------------------------------------------------------------
-            // HÀM CHUẨN HÓA, RÚT GỌN VÀ ĐỒNG BỘ MÀU SẮC TRẠNG THÁI ORDER.ALL
-            // -------------------------------------------------------------
-            const normalizeStatus = (status) => {
-                if (!status) return '';
-                return String(status).trim().toLowerCase().normalize("NFC");
-            };
-
-            const shortenStatusText = (status) => {
-                if (!status) return '';
-                const norm = String(status).trim().normalize("NFC");
-
-                // Rút gọn câu dài Shopee: "Người mua xác nhận đã nhận được hàng, tuy nhiên Người mua vẫn có thể gửi yêu cầu Trả hàng/Hoàn tiền tới ngày YYYY-MM-DD"
-                const dateMatch = norm.match(/(?:tới ngày|đến ngày|trước ngày)\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{4})/i);
-                if (dateMatch && norm.toLowerCase().includes('người mua xác nhận đã nhận được hàng')) {
-                    const rawDate = dateMatch[1];
-                    const parts = rawDate.split(/[-/]/);
-                    let ddmm = '';
-                    if (parts.length === 3) {
-                        if (parts[0].length === 4) {
-                            // YYYY-MM-DD -> DD/MM
-                            ddmm = `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}`;
-                        } else {
-                            // DD-MM-YYYY -> DD/MM
-                            ddmm = `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}`;
-                        }
-                    }
-                    return ddmm ? `Đã nhận (Hạn khiếu nại: ${ddmm})` : 'Đã nhận hàng';
-                }
-
-                if (norm.toLowerCase().includes('người mua xác nhận đã nhận được hàng')) {
-                    return 'Đã nhận hàng';
-                }
-
-                if (norm.toLowerCase().includes('đã chấp thuận yêu cầu')) {
-                    return 'Đã chấp thuận hoàn';
-                }
-
-                return norm;
-            };
-
-            const getStatusBadgeStyle = (fileStatus, mappedStatus) => {
-                const s1 = normalizeStatus(fileStatus);
-                const s2 = normalizeStatus(mappedStatus);
-                const combined = `${s1} ${s2}`;
-
-                // 1. Nhóm Hoàn Thành ("hoàn thành", "đã giao") ➡️ Xanh lục
-                if (
-                    combined.includes('hoàn thành') ||
-                    combined.includes('đã giao') ||
-                    combined.includes('giao thành công') ||
-                    combined.includes('đối soát') ||
-                    combined.includes('đã nhận') ||
-                    combined.includes('completed') ||
-                    combined.includes('delivered')
-                ) {
-                    return {
-                        badgeClass: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-                        dotClass: 'bg-emerald-400'
-                    };
-                }
-
-                // 2. Nhóm Đã Hủy ("đã hủy", "hủy đơn") ➡️ Đỏ hồng
-                if (
-                    combined.includes('hủy') ||
-                    combined.includes('huỷ') ||
-                    combined.includes('cancelled') ||
-                    combined.includes('canceled')
-                ) {
-                    return {
-                        badgeClass: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
-                        dotClass: 'bg-rose-400'
-                    };
-                }
-
-                // 3. Nhóm Hoàn Hàng / Khiếu Nại ("đã chấp thuận yêu cầu", "trả hàng", "hoàn tiền") ➡️ Vàng cam
-                if (
-                    combined.includes('chấp thuận yêu cầu') ||
-                    combined.includes('trả hàng') ||
-                    combined.includes('hoàn tiền') ||
-                    combined.includes('hàng hoàn') ||
-                    combined.includes('khiếu nại') ||
-                    combined.includes('returned') ||
-                    combined.includes('refund')
-                ) {
-                    return {
-                        badgeClass: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-                        dotClass: 'bg-amber-400'
-                    };
-                }
-
-                // 4. Nhóm Đang Vận Chuyển / Đang Giao ➡️ Xanh dương
-                if (
-                    combined.includes('vận chuyển') ||
-                    combined.includes('đang giao') ||
-                    combined.includes('shipping') ||
-                    combined.includes('transit')
-                ) {
-                    return {
-                        badgeClass: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
-                        dotClass: 'bg-sky-400'
-                    };
-                }
-
-                // Fallback mặc định: Xanh lục thay vì xám xịt
-                return {
-                    badgeClass: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-                    dotClass: 'bg-emerald-400'
-                };
-            };
 
             // Hàm so khớp trạng thái tuyệt đối theo Exact Match Rule (ưu tiên trạng thái Trả hàng/Hoàn tiền)
             const mapFileOrderStatus = (rawStatus, rawReturnStatus, currentStatus) => {

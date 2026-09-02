@@ -754,11 +754,71 @@
 
         const RELEASES = [
             {
+                version: 'Royal v2.36.1',
+                date: '03/09/2026',
+                isLatest: true,
+                badge: 'SỬA LỖI PHẠM VI BIẾN ĐỐI SOÁT',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Khắc Phục Lỗi Hiển Thị Khối Giao Diện: shortenStatusText is not defined (BulkFinanceModal)',
+                summary: 'Đưa các hàm chuẩn hóa trạng thái normalizeStatus, shortenStatusText và getStatusBadgeStyle từ phạm vi cục bộ processExcel ra cấp component BulkFinanceModal, giúp bảng xem trước đối soát file doanh thu hiển thị mượt mà không bị lỗi giao diện.',
+                categories: ['Đối Soát', 'Tài Chính', 'Hotfix', 'UI/UX'],
+                items: [
+                    {
+                        icon: 'fa-table',
+                        color: 'text-emerald-400',
+                        title: 'Nâng Phạm Vi Biến Cho Bảng Xem Trước File Doanh Thu',
+                        desc: 'Khắc phục hoàn toàn lỗi ReferenceError khi render bảng preview đối soát file Shopee (Order.all / Income).'
+                    },
+                    {
+                        icon: 'fa-hand-pointer',
+                        color: 'text-amber-400',
+                        title: 'Chạm Trực Tiếp Huy Hiệu Để Dừng/Tắt Hỏa Tốc',
+                        desc: 'Bổ sung sự kiện onClick trên chính huy hiệu 🔥 ƯU TIÊN LÀM NGAY (Bấm để tắt) giúp thao tác dừng lệnh khẩn cấp tức thì.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.36.0',
+                date: '03/09/2026',
+                isLatest: false,
+                badge: 'ĐƠN HỎA TỐC & KHẮC PHỤC CRASH',
+                badgeColor: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
+                title: 'Hệ Thống Đơn Hỏa Tốc / Ưu Tiên Làm Ngay 2 Chiều (Kèm NTFY) & Sửa Lỗi Crash Khởi Tạo',
+                summary: 'Khắc phục triệt để lỗi màn hình đỏ khởi tạo OrderCardV2 và lỗi cú pháp Tab_ImportExport, đồng thời kích hoạt tính năng Đơn Hỏa Tốc đồng bộ 2 chiều giữa Đơn Hàng và Sản Xuất: ghim thẻ lên đỉnh #1, viền đỏ nhịp đập, huy hiệu phát sáng và bắn thông báo đẩy tức thì qua NTFY.',
+                categories: ['Sản Xuất', 'Đơn Hàng', 'Hỏa Tốc', 'NTFY', 'Hotfix', 'UI/UX'],
+                items: [
+                    {
+                        icon: 'fa-bolt',
+                        color: 'text-amber-400',
+                        title: 'Nút ⚡ 1-Chạm Bật/Tắt Hỏa Tốc Trên Từng Thẻ (Đơn Hàng & Sản Xuất)',
+                        desc: 'Bổ sung nút icon Tia sét ⚡ cạnh cụm thao tác trên từng thẻ. Bấm trên Đơn hàng tự động đồng bộ sang tất cả lệnh sản xuất của đơn đó và ngược lại, hỗ trợ tắt/bật linh hoạt.'
+                    },
+                    {
+                        icon: 'fa-fire',
+                        color: 'text-rose-400',
+                        title: 'Ghim Đỉnh #1, Viền Đỏ Nhịp Đập & Huy Hiệu 🔥 ƯU TIÊN LÀM NGAY',
+                        desc: 'Tự động ghim đơn/lệnh hỏa tốc lên vị trí đầu tiên của danh sách, áp dụng viền đỏ rực animate-pulse kèm huy hiệu nảy animate-bounce đập ngay vào mắt thợ xưởng.'
+                    },
+                    {
+                        icon: 'fa-bell',
+                        color: 'text-yellow-400',
+                        title: 'Tích Hợp Bắn Thông Báo Đẩy Qua NTFY (rf_workspace_urgent)',
+                        desc: 'Tự động phát thông báo khẩn cấp đến điện thoại Ban quản lý và thợ xưởng với độ ưu tiên urgent khi đơn được kích hoạt hỏa tốc.'
+                    },
+                    {
+                        icon: 'fa-shield-check',
+                        color: 'text-emerald-400',
+                        title: 'Backend Concurrency LockService & Hotfix Crash Khởi Tạo',
+                        desc: 'Bổ sung trường isUrgent, urgentAt vào Schema Orders và Production; viết RPC api_toggleOrderUrgent bọc LockService 15s; hoán đổi getProducerOrigin triệt tiêu lỗi TDZ ReferenceError.'
+                    }
+                ]
+            },
+            {
                 version: 'Royal v2.35.3',
                 date: '01/09/2026',
-                isLatest: true,
+                isLatest: false,
                 badge: 'MINH BẠCH CHI PHÍ KHÁC & CƯỚC VC',
-                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                badgeColor: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
                 title: 'Bổ Sung Chi Phí Khác / Cước Vận Chuyển Trong Phiếu Nhập Kho & Chi Tiết Chứng Từ',
                 summary: 'Khắc phục hoàn toàn tình trạng lệch số tiền giữa tổng tiền hàng và tổng thanh toán: Hiển thị minh bạch dòng Cước vận chuyển / Chi phí khác trên cả Bản in Hoá đơn (K58/K80/PNG/Sao chép) lẫn Bảng chi tiết danh sách phiếu nhập kho.',
                 categories: ['Kho Hàng', 'Chứng Từ Kho', 'Chi Phí Khác', 'In Ấn', 'Kế Toán'],
@@ -4077,7 +4137,7 @@
                                 Nhật Ký Cập Nhật Hệ Thống
                             </h1>
                             <span className="px-2 py-0.5 rounded bg-[#d4af37]/10 text-[#d4af37] text-[11px] font-mono font-bold border border-[#d4af37]/30">
-                                Royal v2.10.6
+                                Royal v2.36.1
                             </span>
                         </div>
                         <p className="text-[12px] text-zinc-400 mt-0.5">
@@ -5392,7 +5452,7 @@
                                     <div className="w-5 flex justify-center text-[#d4af37] text-[13px]"><i className="fas fa-rocket"></i></div>
                                     <span>Bản Cập Nhật</span>
                                 </div>
-                                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 font-black px-1.5 py-0.5 rounded border border-emerald-500/30">v2.35.3</span>
+                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.36.1</span>
                             </button>
                         </div>
                     </div>

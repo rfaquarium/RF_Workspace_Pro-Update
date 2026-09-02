@@ -4,6 +4,48 @@ Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến tr
 
 ---
 
+## [v2.36.1] - 2026-09-03
+
+### 🛠️ Sửa Lỗi Phạm Vi Biến Bảng Đối Soát Doanh Thu (`shortenStatusText is not defined`) & Tối Ưu UX Dừng Hỏa Tốc
+- **Khắc Phục Lỗi Hiển Thị Khối Giao Diện `ReferenceError: shortenStatusText is not defined` (`Modals_Orders.html`)**:
+  - **Nguyên nhân**: Các hàm `normalizeStatus`, `shortenStatusText`, `getStatusBadgeStyle` được khai báo cục bộ bên trong hàm xử lý file `processExcel`. Khi React render modal `BulkFinanceModal`, bảng xem trước giao dịch (`previewLogs.map`) gọi `shortenStatusText` bị lỗi biến ngoài phạm vi (out of scope), kích hoạt Error Boundary gây màn hình vàng "Đã xảy ra lỗi hiển thị khối giao diện".
+  - **Khắc phục**: Nâng các hàm này lên cấp component `BulkFinanceModal` để cả logic xử lý file Excel lẫn JSX rendering bảng xem trước đều truy cập an toàn 100%.
+- **Tối Ưu UX Thao Tác Dừng/Tắt Hỏa Tốc (`Modals_Orders.html` & `Tab_Production.html`)**:
+  - Thêm sự kiện `onClick={handleToggleUrgent}` trực tiếp trên huy hiệu `🔥 ƯU TIÊN LÀM NGAY (Bấm để tắt)`.
+  - Giúp quản lý và thợ xưởng có thể dừng chế độ hỏa tốc ngay lập tức chỉ bằng 1 chạm vào huy hiệu to rõ ràng, không cần tìm nút nhỏ `⚡`.
+
+---
+
+## [v2.36.0] - 2026-09-03
+
+### 🔥 Hệ Thống "Đơn Hỏa Tốc / Ưu Tiên Làm Ngay" Đồng Bộ 2 Chiều (Kèm NTFY) & Sửa Lỗi Crash Khởi Tạo
+- **Khắc Phục Dứt Điểm Sự Cố Màn Hình Đỏ / Crash Khởi Tạo (`Modals_Orders.html` & `Tab_ImportExport.html`)**:
+  - **Sửa Lỗi TDZ `ReferenceError: Cannot access 'getProducerOrigin' before initialization`**: Hoán đổi vị trí khai báo hàm `getProducerOrigin` lên trước hook `chameleonConfig` trong `OrderCardV2`.
+  - **Sửa Lỗi Cú Pháp Phase 2 Babel `Unexpected token (2495:0)`**: Bổ sung dấu ngoặc đóng `});` của vòng lặp `filteredLogs.forEach` tại hàm `dateGroups` trong `Tab_ImportExport.html`, loại bỏ triệt để lỗi biên dịch Babel khi tải trễ Deferred Tabs.
+- **Triển Khai Tính Năng Đơn Hỏa Tốc / Ưu Tiên Làm Ngay 1-Chạm (`Tab_Orders.html` & `Tab_Production.html`)**:
+  - **Nút Bấm Icon Tia Sét `⚡` 1-Chạm Trên Từng Thẻ**:
+    - Bố trí nút `⚡` trên thẻ Đơn hàng (`OrderCardV2`) và thẻ Sản xuất (`WorkerCardV2`) cạnh cụm nút thao tác (camera, sửa, xóa). Tuyệt đối không thêm nút vào thanh công cụ Action Toolbar để bảo vệ giao diện sạch sẽ.
+    - Icon khi tắt: Xám/vàng mờ `text-zinc-500 hover:text-amber-400`.
+    - Icon khi bật: Vàng neon phát sáng rực rỡ `text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.6)] bg-amber-400/20`.
+  - **Ghim Lên Đỉnh Danh Sách (Pin to Top #1)**:
+    - Khi bật hỏa tốc, đơn hàng tự động nhảy lên vị trí số 1 tại Tab Đơn Hàng (bất kể thứ tự ngày tạo).
+    - Tại Tab Sản Xuất, lệnh sản xuất hỏa tốc và nhóm kênh tương ứng tự động nhảy lên vị trí đầu tiên của hàng đợi (Khâu 1, Khâu 2, Đóng gói).
+  - **Viền Đỏ Rực Nhịp Đập & Huy Hiệu Nảy Bắt Mắt**:
+    - Thẻ được bao bọc bởi viền nhịp đập: `border-2 border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.35)] animate-pulse`.
+    - Đầu thẻ hiển thị huy hiệu: `<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-rose-500/20 border border-rose-500/50 text-rose-400 text-[12px] font-black uppercase tracking-wider mb-2 animate-bounce"><span>🔥 ƯU TIÊN LÀM NGAY</span></div>`.
+  - **Đồng Bộ 2 Chiều Optimistic UI & Database**:
+    - Bấm trên Đơn hàng ➔ Lệnh sản xuất bên Tab Sản xuất tự động bật hỏa tốc.
+    - Bấm trên Sản xuất ➔ Thẻ đơn hàng bên Tab Đơn hàng tự động bật hỏa tốc.
+    - Bấm lại lần 2 để tắt chế độ ưu tiên.
+  - **Tích Hợp Bắn Thông Báo Đẩy Qua NTFY (ntfy.sh)**:
+    - Khi `isUrgent` bật sang `true`, tự động kích hoạt hàm `sendNtfyUrgentAlert` bắn tin nhắn đến topic `rf_workspace_urgent` với `Priority: urgent` và tag `rotating_light,fire,package`.
+- **Cập Nhật CSDL & Backend Concurrency (`Code.js`)**:
+  - Bổ sung trường `isUrgent` và `urgentAt` vào schema `Orders`, `Orders_Archive`, `Production`.
+  - Cập nhật hàm chuẩn hóa `formatOrder` và `formatProd`.
+  - Viết RPC `api_toggleOrderUrgent(orderId, isUrgent, pin)` bọc trong `LockService.getScriptLock().waitLock(15000)` chống ghi đè dữ liệu đồng thời.
+
+---
+
 ## [v2.35.6] - 2026-09-02
 
 ### 💎 Tối Ưu Giao Diện Modal Đối Soát File Đơn Hàng (Order.all / Income)

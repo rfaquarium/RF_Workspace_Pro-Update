@@ -1,5 +1,5 @@
 <script type="text/babel">
-function Viewer3DTab({ models3D, pushDeltas, erpProducts = [] }) {
+function Viewer3DTab({ models3D, pushDeltas, erpProducts = [], userRole: propUserRole, currentUser: propCurrentUser, hasPerm: propHasPerm }) {
     const [formName, setFormName] = React.useState('');
     const [formUrl, setFormUrl] = React.useState('');
     const [formMaterials, setFormMaterials] = React.useState('');
@@ -13,6 +13,20 @@ function Viewer3DTab({ models3D, pushDeltas, erpProducts = [] }) {
     const [showMaterials, setShowMaterials] = React.useState(false);
     const [modelLoading, setModelLoading] = React.useState(false);
     const viewerRef = React.useRef(null);
+
+    const currentRole = propUserRole || localStorage.getItem('rf_role') || '';
+    const currentUser = propCurrentUser || localStorage.getItem('rf_user') || '';
+    const isBoss = localStorage.getItem('rf_boss') === 'true' || currentRole === 'TỐI CAO' || currentUser.includes('Tiến');
+
+    const hasPerm = React.useCallback((actionCode) => {
+        if (isBoss || currentRole === 'TỐI CAO') return true;
+        if (typeof propHasPerm === 'function') return propHasPerm(actionCode);
+        if (typeof canUserDo === 'function') return canUserDo(actionCode, currentRole, currentUser);
+        return isBoss;
+    }, [propHasPerm, currentRole, currentUser, isBoss]);
+
+    const canManage3D = hasPerm('VIEWER3D_MANAGE'); // Chỉ Tiến
+    const canExportRender = hasPerm('VIEWER3D_EXPORT_RENDER'); // Tiến, Tân, Dương, Hương, Kiên
 
     React.useEffect(() => {
         if (typeof window.ensureModelViewerLoaded === 'function') {
@@ -155,79 +169,81 @@ function Viewer3DTab({ models3D, pushDeltas, erpProducts = [] }) {
 
             <div className="flex flex-col md:flex-row gap-4">
                 {/* Form Add New */}
-                <div className="w-full md:w-80 shrink-0 bg-[#141414]/90 backdrop-blur-xl rounded-2xl border border-white/5 p-4 flex flex-col shadow-xl h-max">
-                    <label className="text-[10px] font-black text-[#3b82f6] block mb-3 uppercase tracking-widest border-b border-[#3b82f6]/20 pb-2">
-                        {editingModelId ? 'Cập Nhật Mẫu' : 'Thêm Mẫu Mới'}
-                    </label>
-                    <div className="space-y-3">
-                        <input 
-                            type="text" 
-                            value={formName} 
-                            onChange={(e) => setFormName(e.target.value)} 
-                            placeholder="Tên mẫu (VD: Bể Hang ver 2)"
-                            className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-white text-[11px] outline-none focus:border-[#3b82f6] transition-colors"
-                        />
-                        <input 
-                            type="text" 
-                            value={formUrl} 
-                            onChange={(e) => setFormUrl(e.target.value)} 
-                            placeholder="Link raw GitHub .glb"
-                            className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-white text-[11px] outline-none focus:border-[#3b82f6] transition-colors"
-                        />
-                        <div className="relative">
+                {canManage3D && (
+                    <div className="w-full md:w-80 shrink-0 bg-[#141414]/90 backdrop-blur-xl rounded-2xl border border-white/5 p-4 flex flex-col shadow-xl h-max">
+                        <label className="text-[10px] font-black text-[#3b82f6] block mb-3 uppercase tracking-widest border-b border-[#3b82f6]/20 pb-2">
+                            {editingModelId ? 'Cập Nhật Mẫu' : 'Thêm Mẫu Mới'}
+                        </label>
+                        <div className="space-y-3">
                             <input 
                                 type="text" 
-                                value={searchProd} 
-                                onChange={(e) => { setSearchProd(e.target.value); setShowDropdown(true); }} 
-                                onFocus={() => setShowDropdown(true)}
-                                placeholder="Tìm hàng hoá liên kết..."
+                                value={formName} 
+                                onChange={(e) => setFormName(e.target.value)} 
+                                placeholder="Tên mẫu (VD: Bể Hang ver 2)"
                                 className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-white text-[11px] outline-none focus:border-[#3b82f6] transition-colors"
                             />
-                            {showDropdown && searchProd && (
-                                <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-white/10 rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl custom-scrollbar">
-                                    {filteredProds.map(p => (
-                                        <div 
-                                            key={p.id} 
-                                            className="px-3 py-2.5 text-[11px] text-gray-300 hover:bg-[#3b82f6] hover:text-white cursor-pointer border-b border-white/5 last:border-0 flex justify-between items-center"
-                                            onClick={() => {
-                                                setSelectedProductId(p.id);
-                                                setSearchProd(p.name);
-                                                setShowDropdown(false);
-                                            }}
-                                        >
-                                            <span className="truncate">{p.name}</span>
-                                            <span className="text-[9px] opacity-70 border border-white/20 px-1.5 py-0.5 rounded ml-2 shrink-0">{p.category || 'Khác'}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                        <textarea 
-                            value={formMaterials}
-                            onChange={(e) => setFormMaterials(e.target.value)}
-                            placeholder="Danh sách nguyên liệu..."
-                            className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-white text-[11px] outline-none focus:border-[#3b82f6] resize-none h-20 transition-colors"
-                        />
-                        <div className="flex gap-2 mt-2">
-                            <button 
-                                onClick={handleSave}
-                                disabled={saving || !formName.trim() || !formUrl.trim()}
-                                className={`flex-1 text-white rounded-xl py-2.5 flex items-center justify-center transition-all shadow-lg active:scale-95 text-[11px] font-black uppercase tracking-widest ${saving || !formName.trim() || !formUrl.trim() ? 'bg-gray-600 opacity-50 cursor-not-allowed' : 'bg-[#3b82f6] hover:bg-[#2563eb] hover:shadow-[#3b82f6]/30 hover:shadow-lg'}`}
-                            >
-                                {saving ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-1.5"></i> {editingModelId ? 'CẬP NHẬT' : 'LƯU MẪU'}</>}
-                            </button>
-                            {editingModelId && (
+                            <input 
+                                type="text" 
+                                value={formUrl} 
+                                onChange={(e) => setFormUrl(e.target.value)} 
+                                placeholder="Link raw GitHub .glb"
+                                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-white text-[11px] outline-none focus:border-[#3b82f6] transition-colors"
+                            />
+                            <div className="relative">
+                                <input 
+                                    type="text" 
+                                    value={searchProd} 
+                                    onChange={(e) => { setSearchProd(e.target.value); setShowDropdown(true); }} 
+                                    onFocus={() => setShowDropdown(true)}
+                                    placeholder="Tìm hàng hoá liên kết..."
+                                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-white text-[11px] outline-none focus:border-[#3b82f6] transition-colors"
+                                />
+                                {showDropdown && searchProd && (
+                                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-white/10 rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl custom-scrollbar">
+                                        {filteredProds.map(p => (
+                                            <div 
+                                                key={p.id} 
+                                                className="px-3 py-2.5 text-[11px] text-gray-300 hover:bg-[#3b82f6] hover:text-white cursor-pointer border-b border-white/5 last:border-0 flex justify-between items-center"
+                                                onClick={() => {
+                                                    setSelectedProductId(p.id);
+                                                    setSearchProd(p.name);
+                                                    setShowDropdown(false);
+                                                }}
+                                            >
+                                                <span className="truncate">{p.name}</span>
+                                                <span className="text-[9px] opacity-70 border border-white/20 px-1.5 py-0.5 rounded ml-2 shrink-0">{p.category || 'Khác'}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <textarea 
+                                value={formMaterials}
+                                onChange={(e) => setFormMaterials(e.target.value)}
+                                placeholder="Danh sách nguyên liệu..."
+                                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-white text-[11px] outline-none focus:border-[#3b82f6] resize-none h-20 transition-colors"
+                            />
+                            <div className="flex gap-2 mt-2">
                                 <button 
-                                    onClick={handleCancelEdit}
-                                    className="w-11 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
-                                    title="Hủy"
+                                    onClick={handleSave}
+                                    disabled={saving || !formName.trim() || !formUrl.trim()}
+                                    className={`flex-1 text-white rounded-xl py-2.5 flex items-center justify-center transition-all shadow-lg active:scale-95 text-[11px] font-black uppercase tracking-widest ${saving || !formName.trim() || !formUrl.trim() ? 'bg-gray-600 opacity-50 cursor-not-allowed' : 'bg-[#3b82f6] hover:bg-[#2563eb] hover:shadow-[#3b82f6]/30 hover:shadow-lg cursor-pointer'}`}
                                 >
-                                    <i className="fas fa-times"></i>
+                                    {saving ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-1.5"></i> {editingModelId ? 'CẬP NHẬT' : 'LƯU MẪU'}</>}
                                 </button>
-                            )}
+                                {editingModelId && (
+                                    <button 
+                                        onClick={handleCancelEdit}
+                                        className="w-11 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                                        title="Hủy"
+                                    >
+                                        <i className="fas fa-times"></i>
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
 
                 {/* Grid List */}
                 <div className="flex-1 bg-[#141414]/90 backdrop-blur-xl rounded-2xl border border-white/5 p-4 flex flex-col shadow-xl">
@@ -262,15 +278,17 @@ function Viewer3DTab({ models3D, pushDeltas, erpProducts = [] }) {
                                                         className="bg-[#0a0a0a] border border-white/5 hover:border-[#3b82f6]/50 rounded-xl overflow-hidden flex flex-col group transition-all shadow-lg hover:shadow-[#3b82f6]/10 text-left"
                                                     >
                                                         <div className="aspect-square bg-[#1a1a1a] relative flex items-center justify-center w-full">
-                                                            <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                                                <button 
-                                                                    onClick={(e) => { e.stopPropagation(); handleEdit(p); }} 
-                                                                    className="w-8 h-8 rounded-lg bg-black/60 text-white hover:bg-[#3b82f6] flex items-center justify-center transition-colors shadow-lg backdrop-blur-sm border border-white/10"
-                                                                    title="Sửa mẫu"
-                                                                >
-                                                                    <i className="fas fa-pen text-[10px]"></i>
-                                                                </button>
-                                                            </div>
+                                                            {canManage3D && (
+                                                                <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                                                    <button 
+                                                                        onClick={(e) => { e.stopPropagation(); handleEdit(p); }} 
+                                                                        className="w-8 h-8 rounded-lg bg-black/60 text-white hover:bg-[#3b82f6] flex items-center justify-center transition-colors shadow-lg backdrop-blur-sm border border-white/10 cursor-pointer"
+                                                                        title="Sửa mẫu"
+                                                                    >
+                                                                        <i className="fas fa-pen text-[10px]"></i>
+                                                                    </button>
+                                                                </div>
+                                                            )}
                                                             {displayImage ? (
                                                                 <img src={displayImage} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="Thumb" />
                                                             ) : (

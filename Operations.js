@@ -13,7 +13,15 @@
  * Ví dụ: { "Nguyễn Hoàng Dương": { actualWorkingDays: 26, inventoryMatched: 1, qcFailedRate: 0.04, docsComplete: 1, outputVolume: 160, negotiationRate: 1 }, "Nguyễn Thị Diệu Hương": { actualWorkingDays: 26, revenueAchieved: 26000000, ... } }
  * @returns {Object} Kết quả KPI và Lương
  */
-function api_generateMonthlyKPI_All(allStatsMap) {
+function api_generateMonthlyKPI_All(allStatsMap, pin) {
+  var pinToAuth = pin || (allStatsMap && allStatsMap.pin);
+  if (pinToAuth) {
+    var auth = validatePin(pinToAuth);
+    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+    if (!checkServerPermission(auth, 'HR_EDIT_KPI_TARGET')) {
+      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới có quyền sinh KPI hàng loạt!' };
+    }
+  }
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000);
@@ -25,16 +33,16 @@ function api_generateMonthlyKPI_All(allStatsMap) {
     var hrData = hrSheet.getDataRange().getValues();
     var hrHeaders = hrData[0];
     
-    // Fallback tìm cột Name
-    var nameCol = hrHeaders.indexOf('Họ và Tên');
-    if (nameCol === -1) nameCol = hrHeaders.indexOf('Tên Nhân Viên');
+    // v2.11 Audit Fix R4: Sửa tên cột đúng theo SCHEMA.Config_NhanSu
+    var nameCol = hrHeaders.indexOf('Tên Nhân Sự');
+    if (nameCol === -1) nameCol = hrHeaders.indexOf('Họ và Tên'); // Legacy fallback
     if (nameCol === -1) nameCol = hrHeaders.indexOf('user');
     
     var roleCol = hrHeaders.indexOf('Chức Danh');
     var baseSalaryCol = hrHeaders.indexOf('Lương Cơ Bản');
     var funcSalaryCol = hrHeaders.indexOf('Lương Chức Vụ');
     
-    if (nameCol === -1 || roleCol === -1) throw new Error('Cấu trúc Config_NhanSu thiếu cột Họ và Tên hoặc Chức Danh');
+    if (nameCol === -1 || roleCol === -1) throw new Error('Cấu trúc Config_NhanSu thiếu cột Tên Nhân Sự hoặc Chức Danh');
 
     var kpiSheet = ss.getSheetByName('KPI_Progress');
     if (!kpiSheet) throw new Error('Không tìm thấy bảng KPI_Progress');
@@ -278,13 +286,12 @@ function api_getOperationsHealth() {
       var oChannelCol = oHeaders.indexOf('channel');
       var oProdCol = oHeaders.indexOf('hasProduction');
       
-      var excludeStatuses = ['Completed', 'Hoàn thành', 'Cancelled', 'Đã hủy', 'Đơn Huỷ', 'Đã Bàn Giao', 'Đối Soát Thành Công', 'Hàng Hoàn', 'Đã giao', 'Delivered', 'Returned', 'Hoàn tất', 'Đã Giao', 'Đã Gửi Hàng'];
-
       // Bỏ qua dòng tiêu đề, lọc từ dưới lên tối đa 1000 đơn gần nhất để tối ưu tốc độ
       var scanLimit = Math.max(1, orderData.length - 1000);
       for (var i = orderData.length - 1; i >= scanLimit; i--) {
         var status = String(orderData[i][oStatusCol] || '').trim();
-        if (!status || excludeStatuses.indexOf(status) === -1) { // Chưa hoàn thành
+        var isTerm = isTerminalStatus(status) || status.toUpperCase() === 'HOÀN TẤT' || status.toUpperCase() === 'ĐÃ GỬI HÀNG';
+        if (!status || !isTerm) { // Chưa hoàn thành
           var deadlineRaw = orderData[i][oDeadlineCol];
           if (deadlineRaw) {
             var deadline = new Date(deadlineRaw);
@@ -353,63 +360,6 @@ function api_getOperationsHealth() {
           var name = productData[k][prNameCol];
           alerts.inventory.push(`Sản phẩm ${sku} (${name}) chỉ còn ${qty}. Dưới định mức tối thiểu (${minStock}).`);
         }
-      }
-    }
-
-    // 4. BỘ LỌC TỰ ĐỘNG: CẢNH BÁO ĐÓNG GÓI SAU 19:00 & GHI COMBAT LOG (TRỪ CHỦ NHẬT)
-    var currentHour = now.getHours();
-    var isSunday = now.getDay() === 0;
-    var isAfter19 = currentHour >= 19 && !isSunday; // Ngày Chủ Nhật xưởng nghỉ -> Không kích hoạt cảnh báo SLA đóng gói
-    if (isAfter19 && orderSheet) {
-      var unPackedOrders = [];
-      var oData = orderSheet.getDataRange().getValues();
-      var oHeaders2 = oData[0];
-      var oStCol = oHeaders2.indexOf('status');
-      var oCdCol = oHeaders2.indexOf('orderCode');
-      var oChCol = oHeaders2.indexOf('channel');
-
-      for (var m = 1; m < oData.length; m++) {
-        var chUpper = String(oData[m][oChCol] || '').toUpperCase().trim();
-        if (chUpper === 'SẢN XUẤT TỒN' || chUpper === 'SẢN XUẤT BÙ KHO' || chUpper.indexOf('SẢN XUẤT TỒN') !== -1 || chUpper.indexOf('BÙ KHO') !== -1 || chUpper.indexOf('SX TỒN') !== -1) {
-          continue; // Bỏ qua lệnh nội bộ xưởng sản xuất
-        }
-
-        var stUpper = String(oData[m][oStCol] || '').toUpperCase().trim();
-        if (stUpper === 'SẴN SÀNG ĐÓNG GÓI' || stUpper === 'SẴN SÀNG') {
-          unPackedOrders.push({
-            orderCode: oData[m][oCdCol] || ('D-' + m),
-            channel: oData[m][oChCol] || 'Trực tiếp'
-          });
-        }
-      }
-
-      if (unPackedOrders.length > 0) {
-        // Tìm nhân sự phụ trách đóng gói hôm nay
-        var packingStaff = 'Nguyễn Thị Diệu Hương';
-        var attSheet = ss.getSheetByName('Attendance');
-        var todayStr = Utilities.formatDate(now, "GMT+7", "yyyy-MM-dd");
-        if (attSheet) {
-          var attData = attSheet.getDataRange().getValues();
-          for (var a = 1; a < attData.length; a++) {
-            var aDate = String(attData[a][2] || '');
-            var aUser = String(attData[a][1] || '');
-            if (aDate.indexOf(todayStr) !== -1 && (aUser.indexOf('Hương') !== -1 || aUser.indexOf('Đóng Gói') !== -1)) {
-              packingStaff = aUser;
-              break;
-            }
-          }
-        }
-
-        alerts.packingEmergency = {
-          count: unPackedOrders.length,
-          orders: unPackedOrders.slice(0, 10),
-          staff: packingStaff,
-          time: Utilities.formatDate(now, "GMT+7", "HH:mm:ss dd/MM/yyyy"),
-          message: `Sau 19:00 còn ${unPackedOrders.length} đơn hàng Sẵn Sàng Đóng Gói chưa hoàn tất! Vi phạm SLA đóng gói.`
-        };
-
-        // Ghi nhận trực tiếp vào Tracking_Log (Combat Log) & BonusPenalty (Tự động phạt sau 21:00 cho Shopee VN)
-        api_recordPackingViolationLog(packingStaff, unPackedOrders.length, unPackedOrders.map(function(o){ return o.orderCode; }).join(', '), unPackedOrders, ss);
       }
     }
 
@@ -482,158 +432,87 @@ function TOOL_SplitGroupedProductionTasks() {
 }
 
 // =========================================================================
-// 🚨 GHI NHẬN VI PHẠM SLA ĐÓNG GÓI SAU 19:00 & TỰ ĐỘNG PHẠT SHOPEE VN LÚC 21:00 (TRỪ CHỦ NHẬT)
+// 🧹 DỌN DẸP TOÀN BỘ CÁC KHOẢN PHẠT & CẢNH BÁO SLA ĐÓNG GÓI CŨ
 // =========================================================================
-function api_recordPackingViolationLog(staffName, count, orderCodes, unPackedOrders, ss) {
-  try {
-    ss = ss || SpreadsheetApp.getActiveSpreadsheet();
-    var now = new Date();
-    // Chủ nhật xưởng nghỉ -> Tuyệt đối không ghi nhận vi phạm hay phạt SLA đóng gói
-    if (now.getDay() === 0) {
-      return;
+function api_cleanupAllPackingSlaPenalties(pin) {
+  if (pin) {
+    var auth = validatePin(pin);
+    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+    if (!checkServerPermission(auth, 'HR_BONUS_PENALTY')) {
+      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Bạn không có quyền xóa phạt SLA!' };
     }
-
-    var currentHour = now.getHours();
-    var todayStr = Utilities.formatDate(now, "GMT+7", "yyyy-MM-dd");
-    var timestamp = Utilities.formatDate(now, "GMT+7", "yyyy-MM-dd HH:mm:ss");
-    var violationId = 'BP_SLA_PACK_' + todayStr;
-
-    // Lọc các đơn Shopee VN chưa hoàn tất
-    var shopeeOrders = (unPackedOrders || []).filter(function(o) {
-      var ch = String(o.channel || '').toUpperCase();
-      return ch.indexOf('SHOPEE') !== -1;
-    });
-    var shopeeCount = shopeeOrders.length;
-    var shopeeCodes = shopeeOrders.map(function(o) { return o.orderCode; }).join(', ');
-
-    // 1. Ghi vào BonusPenalty
-    var bpSheet = ss.getSheetByName('BonusPenalty');
-    if (bpSheet) {
-      var bpData = bpSheet.getDataRange().getValues();
-      
-      // A. Nếu sau 21:00 và có đơn Shopee VN -> TỰ ĐỘNG PHẠT 20.000đ / ĐƠN
-      if (currentHour >= 21 && shopeeCount > 0) {
-        var autoPenaltyId = 'BP_AUTO_SHOPEE_21H_' + todayStr;
-        var hasAutoPenalized = false;
-        for (var p = 1; p < bpData.length; p++) {
-          if (String(bpData[p][0]) === autoPenaltyId) {
-            hasAutoPenalized = true;
-            break;
-          }
-        }
-
-        if (!hasAutoPenalized) {
-          var penaltyAmount = -(shopeeCount * 20000);
-          var bpHeaders = bpData[0];
-          var penRow = bpHeaders.map(function(h) {
-            if (h === 'id') return autoPenaltyId;
-            if (h === 'user') return staffName;
-            if (h === 'amount') return penaltyAmount;
-            if (h === 'type') return 'Phạt Vi Phạm';
-            if (h === 'note') return 'Tự động phạt sau 21:00: Tồn ' + shopeeCount + ' đơn Shopee VN chưa đóng gói. Mã đơn: ' + shopeeCodes;
-            if (h === 'date') return todayStr;
-            if (h === 'orderCode') return String(shopeeCodes).slice(0, 100);
-            return '';
-          });
-          bpSheet.appendRow(penRow);
-        }
-      }
-
-      // B. Ghi nhận cảnh báo vi phạm SLA sau 19:00 nếu chưa ghi hôm nay
-      var isRecordedToday = false;
-      for (var b = 1; b < bpData.length; b++) {
-        if (String(bpData[b][0]).indexOf('BP_SLA_PACK_' + todayStr) !== -1) {
-          isRecordedToday = true;
-          break;
-        }
-      }
-
-      if (!isRecordedToday) {
-        var bpHeaders2 = bpData[0];
-        var newBpRow = bpHeaders2.map(function(h) {
-          if (h === 'id') return violationId;
-          if (h === 'user') return staffName;
-          if (h === 'amount') return 0;
-          if (h === 'type') return 'Cảnh Báo SLA Đóng Gói';
-          if (h === 'note') return 'Sau 19:00 còn tồn ' + count + ' đơn hàng sẵn sàng đóng gói chưa xử lý. Mã đơn: ' + orderCodes;
-          if (h === 'date') return todayStr;
-          if (h === 'orderCode') return String(orderCodes).slice(0, 100);
-          return '';
-        });
-        bpSheet.appendRow(newBpRow);
-      }
-    }
-
-    // 2. Ghi vào Tracking_Log (Combat Log Hệ Thống)
-    var trackSheet = ss.getSheetByName('Tracking_Log');
-    if (trackSheet) {
-      var trackHeaders = trackSheet.getDataRange().getValues()[0];
-      var actionText = currentHour >= 21 && shopeeCount > 0 
-        ? ('Tự động phạt Shopee 21:00 (-' + (shopeeCount * 20000) + 'đ)')
-        : 'Cảnh báo SLA Đóng Gói';
-      var aiText = currentHour >= 21 && shopeeCount > 0
-        ? ('Sau 21:00 tồn ' + shopeeCount + ' đơn Shopee VN. Đã tự động phạt Diệu Hương ' + (shopeeCount * 20000) + 'đ')
-        : ('Sau 19:00 còn ' + count + ' đơn chưa đóng gói');
-
-      var newTrackRow = trackHeaders.map(function(h) {
-        if (h === 'Thời gian') return timestamp;
-        if (h === 'Tên nhân sự') return staffName;
-        if (h === 'Hoàn thành') return actionText;
-        if (h === 'Hỏi AI') return aiText;
-        if (h === 'Ghi chú thêm') return 'Mã đơn: ' + (shopeeCodes || orderCodes);
-        return '';
-      });
-      trackSheet.appendRow(newTrackRow);
-    }
-  } catch (err) {
-    Logger.log('Lỗi khi ghi nhận log vi phạm đóng gói: ' + err.toString());
   }
-}
-
-/**
- * Trigger tự động quét sau 19:00 mỗi ngày
- */
-function api_auditEndOfDayPackingSLA() {
-  return api_getOperationsHealth();
-}
-
-/**
- * Dọn dẹp an toàn các bản ghi cảnh báo / phạt SLA vô lý tạo vào ngày Chủ Nhật
- */
-function api_cleanupSundayPackingViolations(dateStr) {
   var lock = LockService.getScriptLock();
   try {
-    lock.waitLock(15000);
+    lock.waitLock(30000);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var targetDate = dateStr || Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd");
-    var deletedCount = 0;
+    var deletedBpCount = 0;
+    var deletedTrackCount = 0;
     
-    // 1. Dọn dẹp trong bảng BonusPenalty
+    // 1. Dọn dẹp triệt để trong bảng BonusPenalty
     var bpSheet = ss.getSheetByName('BonusPenalty');
     if (bpSheet) {
       var bpData = bpSheet.getDataRange().getValues();
       var bpHeaders = bpData[0];
       var idCol = bpHeaders.indexOf('id');
-      var dateCol = bpHeaders.indexOf('date');
+      var typeCol = bpHeaders.indexOf('type');
       var noteCol = bpHeaders.indexOf('note');
       
       for (var i = bpData.length - 1; i >= 1; i--) {
         var rowId = String(bpData[i][idCol] || '');
-        var rowDate = String(bpData[i][dateCol] || '');
+        var rowType = String(bpData[i][typeCol] || '');
         var rowNote = String(bpData[i][noteCol] || '');
         
-        var isSundayViolation = (rowId.indexOf('BP_SLA_PACK_' + targetDate) !== -1 || 
-                                 rowId.indexOf('BP_AUTO_SHOPEE_21H_' + targetDate) !== -1 ||
-                                 (rowDate.indexOf(targetDate) !== -1 && (rowNote.indexOf('SLA Đóng Gói') !== -1 || rowNote.indexOf('Shopee VN chưa đóng gói') !== -1)));
-        if (isSundayViolation) {
+        var isPackingPenalty = (
+          rowId.indexOf('BP_SLA_PACK_') !== -1 ||
+          rowId.indexOf('BP_AUTO_SHOPEE_21H_') !== -1 ||
+          rowType.indexOf('Cảnh Báo SLA Đóng Gói') !== -1 ||
+          rowNote.indexOf('SLA Đóng Gói') !== -1 ||
+          rowNote.indexOf('Shopee VN chưa đóng gói') !== -1 ||
+          rowNote.indexOf('đơn hàng sẵn sàng đóng gói chưa xử lý') !== -1 ||
+          rowNote.indexOf('Tự động phạt sau 21:00') !== -1
+        );
+        if (isPackingPenalty) {
           bpSheet.deleteRow(i + 1);
-          deletedCount++;
+          deletedBpCount++;
         }
       }
     }
-    return { success: true, message: 'Đã dọn dẹp ' + deletedCount + ' bản ghi vi phạm SLA ngày Chủ Nhật (' + targetDate + ')' };
+
+    // 2. Dọn dẹp trong bảng Tracking_Log (Combat Log)
+    var trackSheet = ss.getSheetByName('Tracking_Log');
+    if (trackSheet) {
+      var trackData = trackSheet.getDataRange().getValues();
+      var tHeaders = trackData[0];
+      var actionCol = tHeaders.indexOf('Hoàn thành');
+      var aiCol = tHeaders.indexOf('Hỏi AI');
+
+      for (var t = trackData.length - 1; t >= 1; t--) {
+        var aText = String(trackData[t][actionCol] || '');
+        var aiText = String(trackData[t][aiCol] || '');
+
+        var isTrackPacking = (
+          aText.indexOf('SLA Đóng Gói') !== -1 ||
+          aText.indexOf('phạt Shopee 21:00') !== -1 ||
+          aiText.indexOf('chưa đóng gói') !== -1 ||
+          aiText.indexOf('Đã tự động phạt Diệu Hương') !== -1 ||
+          aiText.indexOf('SLA đóng gói') !== -1
+        );
+        if (isTrackPacking) {
+          trackSheet.deleteRow(t + 1);
+          deletedTrackCount++;
+        }
+      }
+    }
+
+    Logger.log(`🧹 Đã xóa sạch ${deletedBpCount} dòng phạt trong BonusPenalty và ${deletedTrackCount} dòng log trong Tracking_Log.`);
+    return {
+      success: true,
+      message: `Đã xóa sạch thành công ${deletedBpCount} dòng phạt trong BonusPenalty và ${deletedTrackCount} dòng log trong Tracking_Log.`
+    };
   } catch (e) {
-    return { success: false, message: 'Lỗi dọn dẹp vi phạm Chủ Nhật: ' + e.message };
+    Logger.log('Lỗi dọn dẹp phạt SLA Đóng Gói: ' + e.message);
+    return { success: false, message: 'Lỗi: ' + e.message };
   } finally {
     lock.releaseLock();
   }
@@ -845,7 +724,15 @@ function api_auditOverdueReturnOrdersSLA(ss) {
 // MODULE: ZALO GROUP NOTIFICATION WEBHOOK
 // =========================================================================
 
-function api_saveZaloWebhookConfig(cfg) {
+function api_saveZaloWebhookConfig(cfg, pin) {
+  var pinToAuth = pin || (cfg && cfg.pin);
+  if (pinToAuth) {
+    var auth = validatePin(pinToAuth);
+    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+    if (!checkServerPermission(auth, 'SYSTEM_CONFIG')) {
+      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới được sửa cấu hình Zalo Bot!' };
+    }
+  }
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000);
@@ -945,7 +832,15 @@ function api_testZaloNotification() {
 // MODULE: TELEGRAM BOT NOTIFICATION (MIỄN PHÍ 100% VĨNH VIỄN)
 // =========================================================================
 
-function api_saveTelegramConfig(cfg) {
+function api_saveTelegramConfig(cfg, pin) {
+  var pinToAuth = pin || (cfg && cfg.pin);
+  if (pinToAuth) {
+    var auth = validatePin(pinToAuth);
+    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+    if (!checkServerPermission(auth, 'SYSTEM_CONFIG')) {
+      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới được sửa cấu hình Telegram Bot!' };
+    }
+  }
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000);
@@ -1029,7 +924,15 @@ function api_testTelegramNotification() {
 // MODULE: GOOGLE CHAT SPACE WEBHOOK (MIỄN PHÍ 100% TRONG GMAIL/GOOGLE CHAT)
 // =========================================================================
 
-function api_saveGoogleChatConfig(cfg) {
+function api_saveGoogleChatConfig(cfg, pin) {
+  var pinToAuth = pin || (cfg && cfg.pin);
+  if (pinToAuth) {
+    var auth = validatePin(pinToAuth);
+    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+    if (!checkServerPermission(auth, 'SYSTEM_CONFIG')) {
+      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới được sửa cấu hình Google Chat!' };
+    }
+  }
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000);
@@ -1109,31 +1012,31 @@ function api_testGoogleChatNotification() {
 function sendNtfyNotification(title, message, topic) {
   try {
     var props = PropertiesService.getScriptProperties();
-    var targetTopic = topic || props.getProperty('NTFY_TOPIC') || 'rfworkspace';
+    var targetTopic = (topic || props.getProperty('NTFY_TOPIC') || 'rfworkspace').trim();
     
     var timeStr = Utilities.formatDate(new Date(), "GMT+7", "HH:mm dd/MM/yyyy");
-    var fullContent = (title ? '🔔 【' + title + '】\n' : '') + message + '\n⏰ ' + timeStr;
+    var fullContent = (message || '') + '\n⏰ ' + timeStr;
     
-    var safeTitle = title || 'RF Workspace Pro';
-    var encodedTitle = '=?UTF-8?B?' + Utilities.base64Encode(safeTitle, Utilities.Charset.UTF_8) + '?=';
+    var payloadObj = {
+      topic: targetTopic,
+      title: title || '🔔 RF Workspace Pro',
+      message: fullContent,
+      priority: 4,
+      tags: ['bell', 'package'],
+      click: 'https://webapp-script.vercel.app'
+    };
     
-    var url = 'https://ntfy.sh/' + encodeURIComponent(targetTopic.trim());
     var options = {
       method: 'post',
-      contentType: 'text/plain; charset=UTF-8',
-      payload: fullContent,
-      headers: {
-        'Title': encodedTitle,
-        'Priority': 'high',
-        'Tags': 'bell,package'
-      },
+      contentType: 'application/json; charset=UTF-8',
+      payload: JSON.stringify(payloadObj),
       muteHttpExceptions: true
     };
     
-    var res = UrlFetchApp.fetch(url, options);
+    var res = UrlFetchApp.fetch('https://ntfy.sh', options);
     var resText = res.getContentText();
     console.log('ntfy.sh API Response:', resText);
-    return { success: true, response: resText };
+    return { success: true, response: resText, topic: targetTopic };
   } catch (e) {
     console.error('Lỗi sendNtfyNotification:', e);
     return { success: false, error: e.toString() };
@@ -1142,6 +1045,36 @@ function sendNtfyNotification(title, message, topic) {
 
 function api_testNtfyNotification(topic) {
   return sendNtfyNotification('TEST THÔNG BÁO RF WORKSPACE', '✅ Kết nối thành công! Thiết bị của bạn đã sẵn sàng nhận thông báo đơn hàng và sản xuất tức thì.', topic);
+}
+
+function api_saveNtfyConfig(config, pin) {
+  var pinToAuth = pin || (config && config.pin);
+  if (pinToAuth) {
+    var auth = validatePin(pinToAuth);
+    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+    if (!checkServerPermission(auth, 'SYSTEM_CONFIG')) {
+      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới được sửa cấu hình ntfy.sh!' };
+    }
+  }
+  try {
+    var props = PropertiesService.getScriptProperties();
+    if (config && config.topic) {
+      props.setProperty('NTFY_TOPIC', config.topic.trim());
+    }
+    return { success: true, message: 'Đã lưu cấu hình ntfy.sh!' };
+  } catch (e) {
+    return { success: false, error: e.toString() };
+  }
+}
+
+function api_getNtfyConfig() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var topic = props.getProperty('NTFY_TOPIC') || 'rfworkspace';
+    return { success: true, config: { topic: topic } };
+  } catch (e) {
+    return { success: false, error: e.toString() };
+  }
 }
 
 // =========================================================================
@@ -1201,5 +1134,1132 @@ function sendSystemAlert(title, message) {
   try { results.telegram = sendTelegramNotification(title, message); } catch (e) { results.telegram = { success: false, error: e.toString() }; }
   try { results.zalo = sendZaloNotification(title, message); } catch (e) { results.zalo = { success: false, error: e.toString() }; }
   return results;
+}
+
+// =========================================================================
+// v2.11 DATA INTEGRITY HEALTH CHECK (Kiểm tra toàn vẹn dữ liệu)
+// Quét toàn bộ CSDL, phát hiện anomalies: orphan records, duplicate IDs,
+// schema drift, negative inventory, missing references
+// =========================================================================
+function api_runDataIntegrityCheck() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var issues = [];
+    var stats = {};
+
+    // ---------------------------------------------------------------
+    // CHECK 1: Orphan Productions (orderId không tồn tại trong Orders)
+    // ---------------------------------------------------------------
+    var orderIds = {};
+    var orderRows = readSheet('Orders', null, ss);
+    stats.ordersCount = orderRows.length;
+    orderRows.forEach(function (o) { if (o.id) orderIds[String(o.id).trim()] = true; });
+
+    var prodRows = readSheet('Production', null, ss);
+    stats.productionCount = prodRows.length;
+    var orphanCount = 0;
+    prodRows.forEach(function (p) {
+      if (p.orderId) {
+        var pRaw = String(p.orderId).trim();
+        var multipleOrders = pRaw.split('|').map(function (s) { return s.trim(); });
+        var matched = false;
+        for (var mo = 0; mo < multipleOrders.length; mo++) {
+          if (orderIds[multipleOrders[mo]] === true) { matched = true; break; }
+        }
+        if (!matched) {
+          orphanCount++;
+          if (orphanCount <= 10) { // Chỉ log 10 đầu tiên để tránh output quá lớn
+            issues.push({
+              severity: 'WARNING', table: 'Production', id: p.id,
+              message: 'Lệnh sản xuất mồ côi — orderId "' + p.orderId + '" không tồn tại trong Orders'
+            });
+          }
+        }
+      }
+    });
+    if (orphanCount > 10) {
+      issues.push({ severity: 'WARNING', table: 'Production', message: '... và ' + (orphanCount - 10) + ' lệnh mồ côi khác' });
+    }
+    stats.orphanProductions = orphanCount;
+
+    // ---------------------------------------------------------------
+    // CHECK 2: Duplicate IDs
+    // ---------------------------------------------------------------
+    ['Orders', 'Production', 'Packings', 'Products'].forEach(function (tableName) {
+      var seen = {};
+      var dupCount = 0;
+      readSheet(tableName, null, ss).forEach(function (row) {
+        if (row.id && seen[row.id]) {
+          dupCount++;
+          if (dupCount <= 3) {
+            issues.push({ severity: 'ERROR', table: tableName, id: row.id, message: 'ID trùng lặp' });
+          }
+        }
+        if (row.id) seen[row.id] = true;
+      });
+      if (dupCount > 3) {
+        issues.push({ severity: 'ERROR', table: tableName, message: '... và ' + (dupCount - 3) + ' ID trùng khác' });
+      }
+      stats['dup_' + tableName] = dupCount;
+    });
+
+    // ---------------------------------------------------------------
+    // CHECK 3: Schema drift (cột thực tế vs SCHEMA definition)
+    // ---------------------------------------------------------------
+    var allSchemas = {};
+    if (typeof SCHEMA !== 'undefined') { Object.keys(SCHEMA).forEach(function (k) { allSchemas[k] = SCHEMA[k]; }); }
+    if (typeof SCHEMA_ERP !== 'undefined') { Object.keys(SCHEMA_ERP).forEach(function (k) { allSchemas[k] = SCHEMA_ERP[k]; }); }
+
+    var missingSheets = [];
+    var missingCols = 0;
+    Object.keys(allSchemas).forEach(function (sheetName) {
+      var sheet = ss.getSheetByName(sheetName);
+      if (!sheet) {
+        missingSheets.push(sheetName);
+        issues.push({ severity: 'ERROR', table: sheetName, message: 'Sheet không tồn tại!' });
+        return;
+      }
+      var lastCol = sheet.getLastColumn();
+      if (lastCol === 0) return;
+      var actualHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+        .map(function (h) { return String(h).trim(); })
+        .filter(function (h) { return h.length > 0; });
+      var expectedHeaders = allSchemas[sheetName];
+      expectedHeaders.forEach(function (col) {
+        if (actualHeaders.indexOf(col) === -1) {
+          missingCols++;
+          issues.push({
+            severity: 'WARNING', table: sheetName,
+            message: 'Thiếu cột "' + col + '" theo schema definition'
+          });
+        }
+      });
+    });
+    stats.missingSheets = missingSheets.length;
+    stats.missingColumns = missingCols;
+
+    // ---------------------------------------------------------------
+    // CHECK 4: Negative Product quantities (tồn kho âm)
+    // ---------------------------------------------------------------
+    var negativeSkus = [];
+    readSheet('Products', null, ss).forEach(function (p) {
+      var qty = Number(p.quantity);
+      if (!isNaN(qty) && qty < 0) {
+        negativeSkus.push(p.sku || p.id);
+        issues.push({
+          severity: 'ERROR', table: 'Products', id: p.id,
+          message: 'SKU "' + (p.sku || 'N/A') + '" có tồn kho ÂM: ' + p.quantity
+        });
+      }
+    });
+    stats.negativeInventory = negativeSkus.length;
+
+    // ---------------------------------------------------------------
+    // CHECK 5: Kích thước bảng (cảnh báo khi cần Archive)
+    // ---------------------------------------------------------------
+    ['Orders', 'Production', 'Packings', 'Attendance', 'BonusPenalty', 'Transactions'].forEach(function (tableName) {
+      var sheet = ss.getSheetByName(tableName);
+      if (sheet) {
+        var rowCount = sheet.getLastRow();
+        stats['rows_' + tableName] = rowCount;
+        if (rowCount > 5000) {
+          issues.push({
+            severity: 'WARNING', table: tableName,
+            message: 'Bảng có ' + rowCount + ' dòng — nên chạy Archive để tối ưu hiệu năng'
+          });
+        }
+      }
+    });
+
+    return {
+      success: true,
+      totalIssues: issues.length,
+      errors: issues.filter(function (i) { return i.severity === 'ERROR'; }),
+      warnings: issues.filter(function (i) { return i.severity === 'WARNING'; }),
+      stats: stats,
+      timestamp: Utilities.formatDate(new Date(), 'GMT+7', 'yyyy-MM-dd HH:mm:ss')
+    };
+  } catch (e) {
+    return { success: false, message: 'Lỗi Health Check: ' + e.toString() };
+  }
+}
+
+// =========================================================================
+// v2.11 NIGHTLY AUTO-ARCHIVE TRIGGER
+// Tự động chuyển đơn đã đối soát >60 ngày sang Orders_Archive lúc 2:00 AM
+// =========================================================================
+/**
+ * Thiết lập Trigger tự động chạy hàng đêm.
+ * Gọi 1 lần duy nhất để cài đặt, sau đó hệ thống tự chạy.
+ */
+function setupNightlyArchiveTrigger() {
+  // Xóa trigger cũ nếu có (tránh duplicate)
+  var triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function (t) {
+    if (t.getHandlerFunction() === 'nightlyAutoArchive') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  ScriptApp.newTrigger('nightlyAutoArchive')
+    .timeBased()
+    .atHour(2)
+    .everyDays(1)
+    .inTimezone('Asia/Ho_Chi_Minh')
+    .create();
+
+  return { success: true, message: 'Đã cài đặt Trigger Auto-Archive hàng đêm lúc 2:00 AM (GMT+7).' };
+}
+
+/**
+ * Hàm được gọi bởi Trigger tự động mỗi đêm (02:00 AM).
+ * Thực hiện logic archive trực tiếp với quyền SYSTEM.
+ */
+function nightlyAutoArchive() {
+  try {
+    Logger.log('🚀 [Auto-Archive Engine] Bắt đầu quét lưu trữ đơn hàng cũ > 60 ngày...');
+    var res = archiveReconciledOrders(60, 'SYSTEM');
+    Logger.log('🗄️ [Auto-Archive Engine] Kết quả: ' + JSON.stringify(res));
+
+    if (res && res.success && res.movedCount > 0) {
+      try {
+        if (typeof sendSystemAlert === 'function') {
+          sendSystemAlert(
+            '🗄️ Auto-Archive Đêm Thành Công',
+            'Đã tự động lưu trữ ' + res.movedCount + ' đơn hàng cũ (>60 ngày) vào Orders_Archive.\nOrders chính còn lại: ' + (res.remainingOrders || 'tối ưu') + ' dòng.'
+          );
+        }
+      } catch (notifErr) {
+        Logger.log('Auto-Archive: Lỗi gửi thông báo: ' + notifErr.toString());
+      }
+    }
+    return res;
+  } catch (e) {
+    Logger.log('Auto-Archive Error: ' + e.toString());
+    return { success: false, error: e.toString() };
+  }
+}
+
+// =========================================================================
+// MODULE: SKU STANDARDIZATION & WAREHOUSE RELATIONAL SYNC ENGINE
+// Chuẩn hóa toàn bộ SKU theo Category & Sub-Category và đồng bộ liên kết CSDL
+// =========================================================================
+
+/**
+ * Loại bỏ dấu tiếng Việt và chuẩn hóa Unicode NFC
+ * @param {string} str
+ * @returns {string}
+ */
+function _removeVietnameseTones(str) {
+  if (!str) return '';
+  var s = String(str).trim();
+  s = s.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/gi, 'a');
+  s = s.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/gi, 'e');
+  s = s.replace(/ì|í|ị|ỉ|ĩ/gi, 'i');
+  s = s.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/gi, 'o');
+  s = s.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/gi, 'u');
+  s = s.replace(/ỳ|ý|ỵ|ỷ|ỹ/gi, 'y');
+  s = s.replace(/đ/gi, 'd');
+  try {
+    s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  } catch (e) {
+    // Fallback nếu môi trường không hỗ trợ normalize
+  }
+  return s;
+}
+
+/**
+ * Làm sạch chuỗi thành định dạng Slug SKU viết hoa, phân cách bằng dấu gạch ngang
+ * @param {string} str
+ * @returns {string}
+ */
+function _sanitizeSkuSlug(str) {
+  if (!str) return '';
+  var noTone = _removeVietnameseTones(str).toUpperCase();
+  var cleaned = noTone.replace(/[^A-Z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  return cleaned;
+}
+
+/**
+ * Bóc tách kích thước 3 chiều D x R x C từ tên sản phẩm hoặc SKU cũ
+ * @param {string} str
+ * @returns {string|null} Chuỗi 6 chữ số (VD: '302020') hoặc null
+ */
+function _extractSkuDimensions(str) {
+  if (!str) return null;
+  var s = String(str);
+  // Match D x R x C (VD: 30x20x20, 30*20*20, 30×20×20, 30_20_20)
+  var match3 = s.match(/(\d{2,3})\s*[xX*×_]\s*(\d{2,3})\s*[xX*×_]\s*(\d{2,3})/);
+  if (match3) {
+    return match3[1] + match3[2] + match3[3];
+  }
+  // Match chuỗi 6 chữ số liền kề biểu thị kích thước trong SKU cũ (VD: 151515, 302020)
+  var matchDigits = s.match(/(?:BE|LAY|ND|BC|TERA|BETTA|STD|MINI)?[-_]?(\d{6})\b/i);
+  if (matchDigits) {
+    return matchDigits[1];
+  }
+  // Match kích thước 2 chiều (VD: 20x20 -> 202020 nếu hình vuông)
+  var match2 = s.match(/(\d{2,3})\s*[xX*×_]\s*(\d{2,3})/);
+  if (match2) {
+    return match2[1] + match2[2] + (match2[1] === match2[2] ? match2[1] : '00');
+  }
+  return null;
+}
+
+/**
+ * Bóc tách số phiên bản Layout (VD: ver 1 -> '001', ver 5 -> '005')
+ * @param {string} str
+ * @returns {string|null} Chuỗi 3 chữ số (VD: '001') hoặc null
+ */
+function _extractSkuVersion(str) {
+  if (!str) return null;
+  var s = String(str);
+  var match = s.match(/ver\.?\s*(\d+)/i) || s.match(/\bv(\d+)\b/i) || s.match(/[A-Z]{3}(\d{3})/i);
+  if (match) {
+    var num = parseInt(match[1], 10);
+    if (!isNaN(num)) {
+      return ('000' + num).slice(-3);
+    }
+  }
+  return null;
+}
+
+/**
+ * Bóc tách mã định danh nguyên vật liệu / phụ kiện sau khi loại bỏ prefix danh mục
+ * @param {string} name
+ * @param {string} oldSku
+ * @param {Array<string>} prefixesToRemove
+ * @returns {string}
+ */
+function _extractMaterialSlug(name, oldSku, prefixesToRemove) {
+  var candidate = (oldSku || '').trim();
+  if (prefixesToRemove && Array.isArray(prefixesToRemove)) {
+    for (var p = 0; p < prefixesToRemove.length; p++) {
+      var pat = new RegExp('^' + prefixesToRemove[p] + '[-_]?', 'i');
+      candidate = candidate.replace(pat, '');
+    }
+  }
+  candidate = candidate.replace(/^(?:SP|PRD|SKU)[-_]?/i, '');
+  candidate = _sanitizeSkuSlug(candidate);
+  if (candidate && candidate.length >= 2) {
+    return candidate;
+  }
+  return _sanitizeSkuSlug(name);
+}
+
+/**
+ * Trích xuất các hậu tố biến thể đặc trưng (Độ dày, Siêu trong, Đúc, Giấu keo, Kích cỡ, Dung tích, Công suất...)
+ * @param {string} str
+ * @returns {string}
+ */
+function _extractVariantSuffix(str) {
+  if (!str) return '';
+  var raw = String(str);
+  var norm = _removeVietnameseTones(raw).toUpperCase();
+  var suffixes = [];
+
+  // 1. Độ dày kính (VD: 4li, 5li, 8li, 10li, 12li, 5mm, 8mm...)
+  var thickMatch = norm.match(/\b(\d{1,2})\s*(?:LI|LY|MM)\b/);
+  if (thickMatch) {
+    suffixes.push(thickMatch[1] + 'LI');
+  }
+
+  // 2. Đặc tính kính (Siêu trong, Đúc, Giấu keo, Mài vi tính)
+  if (norm.indexOf('SIEU TRONG') > -1 || norm.indexOf('EXTRA CLEAR') > -1 || norm.indexOf('-ST') > -1) {
+    suffixes.push('ST');
+  } else if (norm.indexOf('DUC') > -1 || norm.indexOf('BE DUC') > -1) {
+    suffixes.push('DUC');
+  }
+  if (norm.indexOf('GIAU KEO') > -1 || norm.indexOf('DAU KEO') > -1 || norm.indexOf('-GK') > -1) {
+    suffixes.push('GK');
+  }
+
+  // 3. Khối lượng / Dung tích (VD: 500g, 1kg, 2kg, 100ml, 250ml, 500ml, 1L, 1 chai...)
+  var weightMatch = norm.match(/\b(\d+(?:\.\d+)?)\s*(KG|G|GR|ML|LIT|L)\b/);
+  if (weightMatch) {
+    var unit = weightMatch[2] === 'GR' ? 'G' : (weightMatch[2] === 'LIT' ? 'L' : weightMatch[2]);
+    suffixes.push(weightMatch[1] + unit);
+  } else {
+    var packMatch = norm.match(/\b(\d+)\s*(CHAI|VI|CUON|THUNG|GOI|CAN)\b/);
+    if (packMatch) {
+      suffixes.push(packMatch[1] + packMatch[2]);
+    }
+  }
+
+  // 4. Kích cỡ Size đơn lẻ (Size S, Size M, Size L, Size XL)
+  var sizeMatch = norm.match(/\b(?:SIZE|SZ|CO)\s*[-_]?\s*(XXL|XL|XS|S|M|L)\b/) || norm.match(/[-_\s](XXL|XL|XS|S|M|L)$/);
+  if (sizeMatch && !thickMatch) {
+    suffixes.push(sizeMatch[1]);
+  }
+
+  // 5. Công suất Watt (VD: 5W, 10W, 15W, 20W, 35W...)
+  var wattMatch = norm.match(/\b(\d+)\s*W\b/);
+  if (wattMatch) {
+    suffixes.push(wattMatch[1] + 'W');
+  }
+
+  // Khử trùng lặp suffix
+  var uniqueSuffixes = [];
+  for (var i = 0; i < suffixes.length; i++) {
+    if (uniqueSuffixes.indexOf(suffixes[i]) === -1) {
+      uniqueSuffixes.push(suffixes[i]);
+    }
+  }
+
+  return uniqueSuffixes.length > 0 ? '-' + uniqueSuffixes.join('-') : '';
+}
+
+/**
+ * Sinh mã SKU chuẩn hóa theo quy tắc Cột F (category) và Cột G (sub_category) kèm hậu tố biến thể
+ * @param {string} category
+ * @param {string} subCategory
+ * @param {string} name
+ * @param {string} oldSku
+ * @returns {string} Mã SKU chuẩn hóa
+ */
+function _generateStandardSKU(category, subCategory, name, oldSku) {
+  var catNorm = _removeVietnameseTones(category || '').toUpperCase().trim();
+  var subNorm = _removeVietnameseTones(subCategory || '').toUpperCase().trim();
+  var nameNorm = _removeVietnameseTones(name || '').toUpperCase().trim();
+  var rawText = ((category || '') + ' ' + (subCategory || '') + ' ' + (name || '') + ' ' + (oldSku || '')).toUpperCase();
+  var suffix = _extractVariantSuffix(name + ' ' + oldSku);
+
+  // 1. NHÓM BỂ KÍNH (Cột F = "BỂ KÍNH")
+  if (catNorm.indexOf('BE KINH') > -1 || catNorm === 'BE') {
+    var dims = _extractSkuDimensions(name) || _extractSkuDimensions(oldSku) || 'STD';
+    var prefix = 'BE-STD';
+    if (subNorm.indexOf('NANG DAY') > -1 || nameNorm.indexOf('NANG DAY') > -1 || rawText.indexOf('BE-ND') > -1 || rawText.indexOf('ND-') > -1) {
+      prefix = 'BE-ND';
+    } else if (subNorm.indexOf('BETTA') > -1 || nameNorm.indexOf('BETTA') > -1 || rawText.indexOf('BE-BETTA') > -1) {
+      prefix = 'BE-BETTA';
+    } else if (subNorm.indexOf('TERA') > -1 || subNorm.indexOf('TERRARIUM') > -1 || nameNorm.indexOf('TERA') > -1 || rawText.indexOf('BE-TERA') > -1) {
+      prefix = 'BE-TERA';
+    } else if (subNorm.indexOf('BAN CAN') > -1 || nameNorm.indexOf('BAN CAN') > -1 || rawText.indexOf('BE-BC') > -1) {
+      prefix = 'BE-BC';
+    } else if (subNorm.indexOf('DUC') > -1 || nameNorm.indexOf('BE DUC') > -1) {
+      prefix = 'BE-DUC';
+    } else if (subNorm.indexOf('MINI') > -1 || nameNorm.indexOf('MINI') > -1) {
+      prefix = 'BE-MINI';
+    } else {
+      if (dims && dims.length === 6) {
+        var d = parseInt(dims.substring(0, 2), 10);
+        var r = parseInt(dims.substring(2, 4), 10);
+        if (d <= 20 && r <= 20) prefix = 'BE-MINI';
+        else prefix = 'BE-STD';
+      } else {
+        prefix = 'BE-MINI';
+      }
+    }
+    return prefix + '-' + dims + suffix;
+  }
+
+  // 2. NHÓM THÀNH PHẨM LAYOUT (Cột F = "LAYOUT")
+  if (catNorm.indexOf('LAYOUT') > -1) {
+    var code = 'STD';
+    if (subNorm.indexOf('COVER') > -1 || nameNorm.indexOf('COVER') > -1 || rawText.indexOf('LAY-CV') > -1) code = 'CV';
+    else if (subNorm.indexOf('BONSAI') > -1 || nameNorm.indexOf('BONSAI') > -1 || rawText.indexOf('BON') > -1) code = 'BON';
+    else if (subNorm.indexOf('RUNG') > -1 || nameNorm.indexOf('RUNG') > -1 || rawText.indexOf('RUN') > -1) code = 'RUN';
+    else if (subNorm.indexOf('CAU VONG') > -1 || nameNorm.indexOf('CAU VONG') > -1 || rawText.indexOf('CAU') > -1) code = 'CAU';
+    else if (subNorm.indexOf('HANG DONG') > -1 || nameNorm.indexOf('HANG DONG') > -1 || rawText.indexOf('HAN') > -1) code = 'HAN';
+    else if (subNorm.indexOf('VACH SUOI') > -1 || nameNorm.indexOf('VACH SUOI') > -1 || rawText.indexOf('VAC') > -1) code = 'VAC';
+    else if (subNorm.indexOf('DAO BAY') > -1 || nameNorm.indexOf('DAO BAY') > -1 || rawText.indexOf('DAO') > -1) code = 'DAO';
+    else if (subNorm.indexOf('NATURE') > -1 || nameNorm.indexOf('NATURE') > -1 || rawText.indexOf('NAT') > -1) code = 'NAT';
+    else if (subNorm.indexOf('NHAT TRU') > -1 || nameNorm.indexOf('NHAT TRU') > -1 || rawText.indexOf('TRU') > -1) code = 'TRU';
+    else if (subNorm.indexOf('HEM NUI') > -1 || nameNorm.indexOf('HEM NUI') > -1 || rawText.indexOf('HEM') > -1) code = 'HEM';
+    else if (subNorm.indexOf('CONG VOM') > -1 || nameNorm.indexOf('CONG VOM') > -1 || rawText.indexOf('VOM') > -1) code = 'VOM';
+
+    var lDims = _extractSkuDimensions(name) || _extractSkuDimensions(oldSku) || 'STD';
+    if (code === 'CV') {
+      return 'LAY-CV-' + lDims + suffix;
+    }
+    var ver = _extractSkuVersion(name) || _extractSkuVersion(oldSku) || '001';
+    return 'LAY-' + code + ver + '-' + lDims + suffix;
+  }
+
+  // 3. NHÓM NGUYÊN VẬT LIỆU SẢN XUẤT (Cột F = "DANH MỤC SẢN XUẤT")
+  if (catNorm.indexOf('DANH MUC SAN XUAT') > -1 || catNorm.indexOf('SAN XUAT') > -1 || catNorm.indexOf('NGUYEN VAT LIEU') > -1) {
+    if (subNorm.indexOf('LAYOUT') > -1) {
+      var slug = _extractMaterialSlug(name, oldSku, ['NL-LAY', 'NLLAY', 'NL']);
+      return 'NL-LAY-' + slug;
+    } else if (subNorm.indexOf('BE KINH') > -1 || subNorm.indexOf('BE') > -1) {
+      var slug = _extractMaterialSlug(name, oldSku, ['NL-BE', 'NLBE', 'NL']);
+      return 'NL-BE-' + slug;
+    } else if (subNorm.indexOf('DONG GOI') > -1) {
+      var slug = _extractMaterialSlug(name, oldSku, ['NL-DG', 'NLDG', 'DG']);
+      return 'DG-' + slug;
+    } else {
+      var slug = _extractMaterialSlug(name, oldSku, ['VT-SX', 'VTSX', 'VT']);
+      return 'VT-' + slug;
+    }
+  }
+
+  // 4. NHÓM PHỤ KIỆN BÁN LẺ (Cột F = "PHỤ KIỆN")
+  if (catNorm.indexOf('PHU KIEN') > -1 || catNorm === 'PK') {
+    if (subNorm.indexOf('VAT LIEU LOC') > -1 || subNorm === 'VLL' || nameNorm.indexOf('VAT LIEU LOC') > -1) {
+      var slug = _extractMaterialSlug(name, oldSku, ['PK-VLL', 'PKVLL', 'VLL']);
+      return 'PK-VLL-' + slug;
+    } else if (subNorm.indexOf('BOM') > -1 || subNorm.indexOf('LOC') > -1 || nameNorm.indexOf('MAY LOC') > -1 || nameNorm.indexOf('BOM') > -1) {
+      var slug = _extractMaterialSlug(name, oldSku, ['PK-LOC', 'PKLOC']);
+      return 'PK-LOC-' + slug;
+    } else if (subNorm.indexOf('NEN') > -1 || subNorm.indexOf('CAT') > -1 || subNorm.indexOf('PHAN NEN') > -1) {
+      var slug = _extractMaterialSlug(name, oldSku, ['PK-NEN', 'PKNEN']);
+      return 'PK-NEN-' + slug;
+    } else if (subNorm.indexOf('XU LY NUOC') > -1 || subNorm.indexOf('XLN') > -1 || subNorm.indexOf('HOA CHAT') > -1 || subNorm.indexOf('VI SINH') > -1) {
+      var slug = _extractMaterialSlug(name, oldSku, ['PK-XLN', 'PKXLN']);
+      return 'PK-XLN-' + slug;
+    } else if (subNorm.indexOf('THUC AN') > -1 || subNorm === 'AN' || subNorm === 'CAM' || nameNorm.indexOf('THUC AN') > -1 || nameNorm.indexOf('CAM CA') > -1) {
+      var slug = _extractMaterialSlug(name, oldSku, ['PK-AN', 'PKAN']);
+      return 'PK-AN-' + slug;
+    } else {
+      var slug = _extractMaterialSlug(name, oldSku, ['PK-KHAC', 'PKKHAC', 'PK']);
+      return 'PK-KHAC-' + slug;
+    }
+  }
+
+  // Fallback nếu không khớp danh mục nào
+  return _sanitizeSkuSlug(oldSku || name);
+}
+
+/**
+ * Chuẩn hóa toàn bộ cột SKU trong sheet Products và cập nhật đồng bộ các bảng liên kết
+ * @param {Object} [options] - Tuỳ chọn { dryRun: false }
+ * @returns {Object} Báo cáo kết quả chuẩn hóa
+ */
+function standardizeWarehouseSKU(options) {
+  var opts = options || {};
+  var isDryRun = opts.dryRun === true;
+  var lock = LockService.getScriptLock();
+  
+  try {
+    lock.waitLock(30000);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var skuMap = {}; // oldSku -> newSku
+    var report = {
+      success: true,
+      timestamp: Utilities.formatDate(new Date(), 'GMT+7', 'yyyy-MM-dd HH:mm:ss'),
+      dryRun: isDryRun,
+      totalProducts: 0,
+      totalSkuChanged: 0,
+      totalOrdersUpdated: 0,
+      totalBomUpdated: 0,
+      totalKpiUpdated: 0,
+      skuMap: {}
+    };
+
+    // =========================================================================
+    // BƯỚC 1: QUÉT VÀ CHUẨN HÓA SHEET PRODUCTS (KÈM CHỐNG TRÙNG LẶP COLLISION RESOLVER)
+    // =========================================================================
+    var prodSheet = ss.getSheetByName('Products');
+    if (!prodSheet) {
+      throw new Error('Không tìm thấy sheet Products trong hệ thống CSDL.');
+    }
+
+    var prodData = prodSheet.getDataRange().getValues();
+    if (prodData.length <= 1) {
+      return { success: true, message: 'Sheet Products không có dữ liệu để chuẩn hóa.', report: report };
+    }
+
+    var prodHeaders = prodData[0];
+    var pSkuCol = prodHeaders.indexOf('sku');
+    var pNameCol = prodHeaders.indexOf('name');
+    var pCatCol = prodHeaders.indexOf('category');
+    var pSubCatCol = prodHeaders.indexOf('sub_category');
+
+    if (pSkuCol === -1 || pNameCol === -1 || pCatCol === -1 || pSubCatCol === -1) {
+      throw new Error('Cấu trúc sheet Products thiếu một trong các cột: sku, name, category, sub_category.');
+    }
+
+    report.totalProducts = prodData.length - 1;
+    var updatedSkuColumn = [];
+    var seenSkus = {}; // newSku -> productName (để kiểm tra va chạm trùng mã)
+
+    for (var i = 1; i < prodData.length; i++) {
+      var row = prodData[i];
+      var oldSku = String(row[pSkuCol] || '').trim();
+      var name = String(row[pNameCol] || '').trim();
+      var cat = String(row[pCatCol] || '').trim();
+      var subCat = String(row[pSubCatCol] || '').trim();
+
+      var baseSku = _generateStandardSKU(cat, subCat, name, oldSku);
+      var finalSku = baseSku;
+
+      // Cơ chế chống trùng lặp: Nếu trùng mã với sản phẩm khác tên, thêm hậu tố index
+      if (seenSkus[finalSku] && seenSkus[finalSku] !== name) {
+        var counter = 2;
+        while (seenSkus[baseSku + '-' + ('0' + counter).slice(-2)]) {
+          counter++;
+        }
+        finalSku = baseSku + '-' + ('0' + counter).slice(-2);
+      }
+
+      seenSkus[finalSku] = name;
+      updatedSkuColumn.push([finalSku]);
+
+      if (oldSku && oldSku !== finalSku) {
+        skuMap[oldSku] = finalSku;
+      }
+    }
+
+    report.totalSkuChanged = Object.keys(skuMap).length;
+    report.skuMap = skuMap;
+
+    // Ghi đè cột SKU mới vào Products
+    if (!isDryRun && updatedSkuColumn.length > 0) {
+      prodSheet.getRange(2, pSkuCol + 1, updatedSkuColumn.length, 1).setValues(updatedSkuColumn);
+    }
+
+    // =========================================================================
+    // BƯỚC 2: CẬP NHẬT ĐỒNG BỘ SHEET ORDERS (Đơn chưa hoàn tất / chưa đối soát)
+    // =========================================================================
+    var oldSkuKeys = Object.keys(skuMap);
+    if (oldSkuKeys.length > 0) {
+      var orderSheet = ss.getSheetByName('Orders');
+      if (orderSheet && orderSheet.getLastRow() > 1) {
+        var orderData = orderSheet.getDataRange().getValues();
+        var oHeaders = orderData[0];
+        var oStatusCol = oHeaders.indexOf('status');
+        var oAccCol = oHeaders.indexOf('accessories');
+        var oReconCol = oHeaders.indexOf('isReconciled');
+
+        if (oAccCol !== -1) {
+          var orderUpdates = [];
+          for (var oi = 1; oi < orderData.length; oi++) {
+            var oRow = orderData[oi];
+            var oStatus = String(oRow[oStatusCol] || '').trim();
+            var oRecon = (oReconCol !== -1 && (String(oRow[oReconCol]).toUpperCase() === 'TRUE' || oRow[oReconCol] === true));
+
+            // Chỉ cập nhật các đơn hàng chưa hoàn tất / chưa đối soát
+            var isTerminal = (typeof isTerminalStatus === 'function' ? isTerminalStatus(oStatus) : false) || oRecon;
+            if (isTerminal) continue;
+
+            var accRaw = String(oRow[oAccCol] || '').trim();
+            if (!accRaw) continue;
+
+            var changed = false;
+            var newAccStr = accRaw;
+
+            // Thử parse cấu trúc JSON của accessories
+            try {
+              if (accRaw.startsWith('[') || accRaw.startsWith('{')) {
+                var parsed = JSON.parse(accRaw);
+                var items = Array.isArray(parsed) ? parsed : [parsed];
+                for (var it = 0; it < items.length; it++) {
+                  var item = items[it];
+                  if (item && item.sku && skuMap[item.sku]) {
+                    item.sku = skuMap[item.sku];
+                    changed = true;
+                  }
+                }
+                if (changed) {
+                  newAccStr = JSON.stringify(Array.isArray(parsed) ? items : items[0]);
+                }
+              }
+            } catch (jsonErr) {
+              // Fallback text replacement nếu accessories là chuỗi thô
+              for (var sk = 0; sk < oldSkuKeys.length; sk++) {
+                var targetOld = oldSkuKeys[sk];
+                if (newAccStr.indexOf(targetOld) > -1) {
+                  newAccStr = newAccStr.split(targetOld).join(skuMap[targetOld]);
+                  changed = true;
+                }
+              }
+            }
+
+            if (changed) {
+              report.totalOrdersUpdated++;
+              if (!isDryRun) {
+                orderSheet.getRange(oi + 1, oAccCol + 1).setValue(newAccStr);
+              }
+            }
+          }
+        }
+      }
+
+      // =========================================================================
+      // BƯỚC 3: CẬP NHẬT ĐỒNG BỘ SHEET BOM_Config (layoutCode & materialSku)
+      // =========================================================================
+      var bomSheet = ss.getSheetByName('BOM_Config');
+      if (bomSheet && bomSheet.getLastRow() > 1) {
+        var bomData = bomSheet.getDataRange().getValues();
+        var bomHeaders = bomData[0];
+        var bLayoutCol = bomHeaders.indexOf('layoutCode');
+        var bMatSkuCol = bomHeaders.indexOf('materialSku');
+
+        if (bLayoutCol !== -1 && bMatSkuCol !== -1) {
+          var bomChangedCount = 0;
+          for (var bi = 1; bi < bomData.length; bi++) {
+            var bRow = bomData[bi];
+            var bLayout = String(bRow[bLayoutCol] || '').trim();
+            var bMat = String(bRow[bMatSkuCol] || '').trim();
+            var rowModified = false;
+
+            // 1. Khớp layoutCode theo skuMap hoặc theo danh mục tên sản phẩm Products
+            if (bLayout) {
+              if (skuMap[bLayout]) {
+                bRow[bLayoutCol] = skuMap[bLayout];
+                rowModified = true;
+              } else {
+                var foundLayoutSku = null;
+                for (var p = 1; p < prodData.length; p++) {
+                  var pNameStr = String(prodData[p][pNameCol] || '').trim();
+                  var pSkuStr = String(prodData[p][pSkuCol] || '').trim();
+                  if (_sanitizeSkuSlug(pNameStr) === _sanitizeSkuSlug(bLayout) || _sanitizeSkuSlug(pSkuStr) === _sanitizeSkuSlug(bLayout)) {
+                    foundLayoutSku = pSkuStr;
+                    break;
+                  }
+                }
+                if (foundLayoutSku && foundLayoutSku !== bLayout) {
+                  bRow[bLayoutCol] = foundLayoutSku;
+                  rowModified = true;
+                }
+              }
+            }
+
+            // 2. Chuẩn hóa materialSku theo ALIAS_MAP và skuMap
+            if (bMat) {
+              var stdMatSku = typeof findMaterialSkuByAlias === 'function' ? findMaterialSkuByAlias(bMat) : bMat;
+              if (skuMap[bMat]) {
+                stdMatSku = skuMap[bMat];
+              } else if (skuMap[stdMatSku]) {
+                stdMatSku = skuMap[stdMatSku];
+              }
+              if (stdMatSku && stdMatSku !== bMat) {
+                bRow[bMatSkuCol] = stdMatSku;
+                rowModified = true;
+              }
+            }
+
+            if (rowModified) {
+              bomChangedCount++;
+            }
+          }
+
+          report.totalBomUpdated = bomChangedCount;
+          if (!isDryRun && bomChangedCount > 0) {
+            bomSheet.getRange(2, 1, bomData.length - 1, bomData[0].length).setValues(bomData.slice(1));
+          }
+        }
+      }
+
+      // =========================================================================
+      // BƯỚC 4: CẬP NHẬT ĐỒNG BỘ SHEET Config_KPI (Từ Khoá)
+      // =========================================================================
+      var kpiSheet = ss.getSheetByName('Config_KPI');
+      if (kpiSheet && kpiSheet.getLastRow() > 1) {
+        var kpiData = kpiSheet.getDataRange().getValues();
+        var kpiHeaders = kpiData[0];
+        var kpiKeyCol = kpiHeaders.indexOf('Từ Khoá');
+
+        if (kpiKeyCol !== -1) {
+          var kpiChangedCount = 0;
+          for (var ki = 1; ki < kpiData.length; ki++) {
+            var kRow = kpiData[ki];
+            var kKey = String(kRow[kpiKeyCol] || '').trim();
+            if (!kKey) continue;
+
+            var kChanged = false;
+            if (skuMap[kKey]) {
+              kRow[kpiKeyCol] = skuMap[kKey];
+              kChanged = true;
+            } else {
+              for (var sk = 0; sk < oldSkuKeys.length; sk++) {
+                var oKey = oldSkuKeys[sk];
+                if (kKey.indexOf(oKey) > -1) {
+                  kRow[kpiKeyCol] = kKey.split(oKey).join(skuMap[oKey]);
+                  kChanged = true;
+                }
+              }
+            }
+
+            if (kChanged) {
+              kpiChangedCount++;
+            }
+          }
+
+          report.totalKpiUpdated = kpiChangedCount;
+          if (!isDryRun && kpiChangedCount > 0) {
+            kpiSheet.getRange(2, 1, kpiData.length - 1, kpiData[0].length).setValues(kpiData.slice(1));
+          }
+        }
+      }
+    }
+
+    SpreadsheetApp.flush();
+
+    var msg = '✅ Chuẩn hóa SKU hoàn tất thành công!\n' +
+      '• Tổng sản phẩm quét: ' + report.totalProducts + '\n' +
+      '• Số mã SKU cập nhật mới: ' + report.totalSkuChanged + '\n' +
+      '• Số đơn hàng đồng bộ (Orders): ' + report.totalOrdersUpdated + '\n' +
+      '• Số định mức BOM đồng bộ (BOM_Config): ' + report.totalBomUpdated + '\n' +
+      '• Số cấu hình KPI đồng bộ (Config_KPI): ' + report.totalKpiUpdated;
+
+    Logger.log(msg);
+    return {
+      success: true,
+      message: msg,
+      report: report
+    };
+
+  } catch (err) {
+    Logger.log('Lỗi standardizeWarehouseSKU: ' + err.toString());
+    return {
+      success: false,
+      message: 'Lỗi trong quá trình chuẩn hóa SKU: ' + err.toString()
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * ⚡ ĐỒNG BỘ CHÍNH XÁC 100% SKU NGUYÊN LIỆU TỪ PRODUCTS SANG BOM_CONFIG & CÁC BẢNG LIÊN QUAN
+ * - Quét toàn bộ danh mục Nguyên Liệu / Vật Tư trong bảng Products
+ * - Đồng bộ hóa cột materialSku trong sheet BOM_Config khớp chuẩn 100% với Products.sku
+ * - Chuẩn hóa mã ID của BOM_Config
+ */
+function syncBomMaterialSkusWithProducts(options) {
+  var opts = options || {};
+  var isDryRun = opts.dryRun === true;
+  var lock = LockService.getScriptLock();
+
+  try {
+    lock.waitLock(30000);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var prodSheet = ss.getSheetByName('Products');
+    var bomSheet = ss.getSheetByName('BOM_Config');
+
+    if (!prodSheet || !bomSheet) {
+      throw new Error('Không tìm thấy sheet Products hoặc BOM_Config trong hệ thống CSDL.');
+    }
+
+    var prodData = prodSheet.getDataRange().getValues();
+    var prodHeaders = prodData[0];
+    var pSkuCol = prodHeaders.indexOf('sku');
+    var pNameCol = prodHeaders.indexOf('name');
+    var pCatCol = prodHeaders.indexOf('category');
+    var pSubCatCol = prodHeaders.indexOf('sub_category');
+
+    var productSkuMap = {}; // upperSku -> exactSku
+    var productNameMap = {}; // cleanName -> exactSku
+
+    for (var p = 1; p < prodData.length; p++) {
+      var pSku = String(prodData[p][pSkuCol] || '').trim();
+      var pName = String(prodData[p][pNameCol] || '').trim();
+      if (pSku) {
+        productSkuMap[pSku.toUpperCase()] = pSku;
+        if (pName) {
+          productNameMap[_sanitizeSkuSlug(pName)] = pSku;
+        }
+      }
+    }
+
+    var bomData = bomSheet.getDataRange().getValues();
+    if (bomData.length <= 1) {
+      return { success: true, message: 'Sheet BOM_Config không có dữ liệu để đồng bộ.' };
+    }
+
+    var bomHeaders = bomData[0];
+    var bIdCol = bomHeaders.indexOf('id');
+    var bLayoutCol = bomHeaders.indexOf('layoutCode');
+    var bMatSkuCol = bomHeaders.indexOf('materialSku');
+    var bQtyCol = bomHeaders.indexOf('defaultQty');
+    var bUnitCol = bomHeaders.indexOf('unit');
+
+    var updatedCount = 0;
+    var changeDetails = [];
+
+    for (var bi = 1; bi < bomData.length; bi++) {
+      var row = bomData[bi];
+      var oldMatSku = String(row[bMatSkuCol] || '').trim();
+      if (!oldMatSku) continue;
+
+      // 1. Ánh xạ thông minh qua findMaterialSkuByAlias
+      var targetSku = typeof findMaterialSkuByAlias === 'function' ? findMaterialSkuByAlias(oldMatSku) : oldMatSku;
+
+      // 2. Tra cứu trong bảng Products nếu findMaterialSkuByAlias chưa khớp
+      if (!productSkuMap[targetSku.toUpperCase()]) {
+        var slug = _sanitizeSkuSlug(oldMatSku);
+        if (productNameMap[slug]) {
+          targetSku = productNameMap[slug];
+        }
+      }
+
+      // 3. Nếu tìm thấy SKU chính xác trong Products
+      if (productSkuMap[targetSku.toUpperCase()]) {
+        targetSku = productSkuMap[targetSku.toUpperCase()];
+      }
+
+      if (targetSku && targetSku !== oldMatSku) {
+        row[bMatSkuCol] = targetSku;
+        
+        // Cập nhật id nếu chứa mã cũ
+        if (bIdCol !== -1 && row[bIdCol]) {
+          var currentId = String(row[bIdCol]);
+          if (currentId.indexOf(oldMatSku) !== -1) {
+            row[bIdCol] = currentId.replace(oldMatSku, targetSku);
+          }
+        }
+
+        updatedCount++;
+        changeDetails.push({
+          row: bi + 1,
+          layout: row[bLayoutCol],
+          oldSku: oldMatSku,
+          newSku: targetSku
+        });
+      }
+    }
+
+    if (!isDryRun && updatedCount > 0) {
+      bomSheet.getRange(2, 1, bomData.length - 1, bomData[0].length).setValues(bomData.slice(1));
+      SpreadsheetApp.flush();
+    }
+
+    var resultMsg = '✅ Đồng bộ SKU BOM_Config hoàn tất!\n' +
+      '• Tổng số dòng kiểm tra: ' + (bomData.length - 1) + '\n' +
+      '• Số định mức nguyên liệu đã đồng bộ: ' + updatedCount;
+
+    Logger.log(resultMsg);
+    if (changeDetails.length > 0) {
+      Logger.log('Chi tiết thay đổi mẫu:\n' + JSON.stringify(changeDetails.slice(0, 10), null, 2));
+    }
+
+    return {
+      success: true,
+      message: resultMsg,
+      totalUpdated: updatedCount,
+      details: changeDetails
+    };
+
+  } catch (err) {
+    Logger.log('Lỗi syncBomMaterialSkusWithProducts: ' + err.toString());
+    return {
+      success: false,
+      message: 'Lỗi đồng bộ SKU BOM: ' + err.toString()
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * [REQUIREMENT 2] Tạo KPI tùy chỉnh theo chu kỳ Tuần (WEEK) hoặc Tháng (MONTH)
+ * @param {Object} payload { user, kpiName, target, unit, reward, penalty, note, cycle, startTime, endTime }
+ * @returns {Object}
+ */
+function api_createCustomKPI(payload, pin) {
+  var pinToAuth = pin || (payload && payload.pin);
+  if (pinToAuth) {
+    var auth = validatePin(pinToAuth);
+    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+    if (!checkServerPermission(auth, 'HR_EDIT_KPI_TARGET')) {
+      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới có quyền tạo chỉ tiêu KPI tùy chỉnh!' };
+    }
+  }
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var kpiSheet = ss.getSheetByName('KPI_Progress');
+    if (!kpiSheet) throw new Error('Không tìm thấy bảng KPI_Progress');
+
+    var now = new Date();
+    var cycle = String(payload.cycle || 'MONTH').toUpperCase();
+    var sTime = payload.startTime;
+    var eTime = payload.endTime;
+
+    if (!sTime || !eTime) {
+      if (cycle === 'WEEK') {
+        // Thứ 2 đầu tuần (00:00:00) đến Chủ Nhật cuối tuần (23:59:59)
+        var day = now.getDay();
+        var diffToMon = now.getDate() - day + (day === 0 ? -6 : 1);
+        var monday = new Date(now.getFullYear(), now.getMonth(), diffToMon, 0, 0, 0, 0);
+        var sunday = new Date(now.getFullYear(), now.getMonth(), diffToMon + 6, 23, 59, 59, 999);
+        
+        var formatYMD = function(d) {
+          return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        };
+        sTime = formatYMD(monday);
+        eTime = formatYMD(sunday);
+      } else {
+        // Ngày 1 đầu tháng đến ngày cuối tháng
+        var firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        var lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        var formatYMD = function(d) {
+          return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        };
+        sTime = formatYMD(firstDay);
+        eTime = formatYMD(lastDay);
+      }
+    }
+
+    var prefix = cycle === 'WEEK' ? 'KPI_W_' : 'KPI_M_';
+    var kpiId = payload.id || (prefix + Date.now());
+
+    var kpiHeaders = kpiSheet.getRange(1, 1, 1, kpiSheet.getLastColumn()).getValues()[0];
+    
+    var rowObj = {
+      id: kpiId,
+      user: payload.user || '',
+      kpiName: payload.kpiName || '',
+      current: Number(payload.current || 0),
+      target: Number(payload.target || 100),
+      unit: String(payload.unit || 'Lần').trim(),
+      lastUpdated: new Date().toISOString(),
+      startTime: sTime,
+      endTime: eTime,
+      reward: Number(payload.reward || 0),
+      penalty: Number(payload.penalty || 0),
+      isClaimed: Boolean(payload.isClaimed),
+      guide: String(payload.note || payload.guide || '').trim()
+    };
+
+    var newRow = kpiHeaders.map(function(h) {
+      var key = String(h).trim();
+      return rowObj[key] !== undefined ? rowObj[key] : (key === 'Khoản Trừ Vi Phạm' ? rowObj.penalty : '');
+    });
+
+    kpiSheet.appendRow(newRow);
+    SpreadsheetApp.flush();
+
+    return {
+      success: true,
+      message: 'Tạo KPI ' + (cycle === 'WEEK' ? 'Hàng Tuần' : 'Hàng Tháng') + ' thành công!',
+      kpi: rowObj
+    };
+  } catch (err) {
+    Logger.log('Lỗi api_createCustomKPI: ' + err.toString());
+    return { success: false, message: 'Lỗi tạo KPI: ' + err.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * [REQUIREMENT 3] Tự Đánh Giá Tiến Độ KPI (Fast Self-Assessment)
+ * @param {String} kpiId ID của KPI trong KPI_Progress
+ * @param {Number} actualValue Số liệu tiến độ thực tế đạt được
+ * @param {String} note Ghi chú / Giải trình tiến độ
+ * @param {String} proofUrl Link hình ảnh / Bằng chứng nghiệm thu
+ * @returns {Object}
+ */
+function api_submitKpiSelfAssessment(kpiId, actualValue, note, proofUrl) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var kpiSheet = ss.getSheetByName('KPI_Progress');
+    if (!kpiSheet) throw new Error('Không tìm thấy bảng KPI_Progress');
+
+    var data = kpiSheet.getDataRange().getValues();
+    if (data.length <= 1) throw new Error('Dữ liệu bảng KPI_Progress rỗng');
+
+    var headers = data[0];
+    var idCol = headers.indexOf('id');
+    var currentCol = headers.indexOf('current');
+    var targetCol = headers.indexOf('target');
+    var userCol = headers.indexOf('user');
+    var kpiNameCol = headers.indexOf('kpiName');
+    var rewardCol = headers.indexOf('reward');
+    var isClaimedCol = headers.indexOf('isClaimed');
+    var lastUpdatedCol = headers.indexOf('lastUpdated');
+    var guideCol = headers.indexOf('guide') !== -1 ? headers.indexOf('guide') : headers.indexOf('Guide');
+    var noteCol = headers.indexOf('note');
+    var proofCol = headers.indexOf('proof') !== -1 ? headers.indexOf('proof') : headers.indexOf('proofUrl');
+
+    if (idCol === -1 || currentCol === -1) throw new Error('Thiếu cột id hoặc current trong KPI_Progress');
+
+    var targetRowIndex = -1;
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][idCol]).trim() === String(kpiId).trim()) {
+        targetRowIndex = i + 1; // 1-based index in sheet
+        break;
+      }
+    }
+
+    if (targetRowIndex === -1) throw new Error('Không tìm thấy KPI với ID: ' + kpiId);
+
+    var curRowData = data[targetRowIndex - 1];
+    var numActual = Number(actualValue) || 0;
+    var targetNum = targetCol !== -1 ? Number(curRowData[targetCol]) || 0 : 0;
+    var userVal = userCol !== -1 ? curRowData[userCol] : '';
+    var kpiNameVal = kpiNameCol !== -1 ? curRowData[kpiNameCol] : '';
+    var rewardNum = rewardCol !== -1 ? Number(curRowData[rewardCol]) || 0 : 0;
+
+    // 1. Cập nhật current
+    kpiSheet.getRange(targetRowIndex, currentCol + 1).setValue(numActual);
+
+    // 2. Cập nhật lastUpdated
+    if (lastUpdatedCol !== -1) {
+      kpiSheet.getRange(targetRowIndex, lastUpdatedCol + 1).setValue(new Date().toISOString());
+    }
+
+    // 3. Cập nhật note / guide
+    var fullNote = String(note || '').trim();
+    if (proofUrl) {
+      fullNote = (fullNote ? fullNote + '\n' : '') + '🔗 Bằng chứng: ' + String(proofUrl).trim();
+    }
+    // Gắn nhãn [MANUAL_OVERRIDE] để bảo toàn dữ liệu đánh giá
+    if (fullNote.indexOf('[MANUAL_OVERRIDE]') === -1) {
+      fullNote = fullNote + ' [MANUAL_OVERRIDE]';
+    }
+
+    if (guideCol !== -1) {
+      var oldGuide = String(curRowData[guideCol] || '');
+      var updatedGuide = oldGuide ? oldGuide + '\n[ĐÁNH GIÁ]: ' + fullNote : fullNote;
+      kpiSheet.getRange(targetRowIndex, guideCol + 1).setValue(updatedGuide);
+    } else if (noteCol !== -1) {
+      kpiSheet.getRange(targetRowIndex, noteCol + 1).setValue(fullNote);
+    }
+
+    if (proofCol !== -1 && proofUrl) {
+      kpiSheet.getRange(targetRowIndex, proofCol + 1).setValue(proofUrl);
+    }
+
+    // 4. Tự động claim thưởng nếu đạt chỉ tiêu
+    var isPassed = targetNum > 0 && numActual >= targetNum;
+    if (isPassed && isClaimedCol !== -1) {
+      var alreadyClaimed = String(curRowData[isClaimedCol]).toLowerCase() === 'true' || curRowData[isClaimedCol] === true;
+      if (!alreadyClaimed) {
+        kpiSheet.getRange(targetRowIndex, isClaimedCol + 1).setValue(true);
+
+        // Ghi nhận thưởng vào BonusPenalty nếu có reward > 0
+        if (rewardNum > 0) {
+          var bpSheet = ss.getSheetByName('BonusPenalty');
+          if (bpSheet) {
+            var bpHeaders = bpSheet.getRange(1, 1, 1, bpSheet.getLastColumn()).getValues()[0];
+            var bpId = 'BP_KPI_' + Date.now();
+            var bpObj = {
+              id: bpId,
+              user: userVal,
+              amount: rewardNum,
+              type: 'Thưởng KPI',
+              note: 'Tự đánh giá đạt KPI: ' + kpiNameVal + ' (' + numActual + '/' + targetNum + ')',
+              date: new Date().toISOString().slice(0, 10),
+              orderCode: 'SYS_KPI_AUTO'
+            };
+            var bpRow = bpHeaders.map(function(h) {
+              return bpObj[String(h).trim()] !== undefined ? bpObj[String(h).trim()] : '';
+            });
+            bpSheet.appendRow(bpRow);
+          }
+        }
+      }
+    }
+
+    SpreadsheetApp.flush();
+
+    return {
+      success: true,
+      message: 'Đã cập nhật kết quả đánh giá KPI thành công!' + (isPassed ? ' (Đạt chỉ tiêu & Nhận thưởng)' : ''),
+      current: numActual,
+      isPassed: isPassed
+    };
+  } catch (err) {
+    Logger.log('Lỗi api_submitKpiSelfAssessment: ' + err.toString());
+    return { success: false, message: 'Lỗi đánh giá KPI: ' + err.toString() };
+  } finally {
+    lock.releaseLock();
+  }
 }
 

@@ -7,23 +7,33 @@
 // -------------------------------------------------------------------------
 // 1. MODAL THẺ KHO CHI TIẾT (StockHistoryModal)
 // -------------------------------------------------------------------------
-function StockHistoryModal({ product, onClose, importExport }) {
+function StockHistoryModal({ product, onClose, importExport, products, pushDeltas, pushData, triggerToast, isAdmin, isBoss }) {
     const logs = React.useMemo(() => {
         if (!importExport || !product) return [];
         let result = [];
-        const prodNameClean = String(product.name || '').trim().toLowerCase();
         const prodSkuUpper = String(product.sku || '').trim().toUpperCase();
+        const prodId = String(product.id || '').trim();
+        const prodNameClean = String(product.name || '').trim().toLowerCase();
 
         importExport.forEach(log => {
+            // Kiểm tra đúng cột log.type của bảng ImportExport (bỏ qua đơn Đặt Hàng)
+            if (log.type === 'Đặt Hàng' || log.type === 'ORDERED') return;
+            
             try {
-                const items = typeof log.itemsData === 'string' ? safeJSONParse(log.itemsData) : (Array.isArray(log.itemsData) ? log.itemsData : []);
+                const items = typeof log.itemsData === 'string' ? JSON.parse(log.itemsData) : (Array.isArray(log.itemsData) ? log.itemsData : []);
                 if (!Array.isArray(items)) return;
+                
                 const match = items.find(i => {
-                    const iName = String(i.name || '').trim().toLowerCase();
                     const iSku = String(i.sku || '').trim().toUpperCase();
-                    return (iName && prodNameClean && (iName === prodNameClean || iName.includes(prodNameClean) || prodNameClean.includes(iName))) ||
-                           (iSku && prodSkuUpper && (iSku === prodSkuUpper || iSku.includes(prodSkuUpper)));
+                    const iId = String(i.id || '').trim();
+                    const iName = String(i.name || '').trim().toLowerCase();
+                    
+                    // Ưu tiên khớp SKU/ID, fallback khớp tên chính xác cho dữ liệu cũ
+                    return (iSku && prodSkuUpper && iSku === prodSkuUpper) || 
+                           (iId && prodId && iId === prodId) || 
+                           (iName && prodNameClean && iName === prodNameClean);
                 });
+                
                 if (match) {
                     const rawQty = match.qty !== undefined ? match.qty : (match.deductedQty !== undefined ? match.deductedQty : (parseFloat(match.quantity) || 0));
                     result.push({
@@ -34,64 +44,184 @@ function StockHistoryModal({ product, onClose, importExport }) {
                 }
             } catch(e) {}
         });
+        
+        // Sắp xếp giảm dần thời gian
         result.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0));
         
+        // Tính lũy kế tồn kho ngược chuẩn xác
         let currentBal = Number(product.quantity || 0);
         result.forEach(log => {
             log.balanceAfter = Math.round(currentBal * 1000) / 1000;
-            if (log.type === 'Nhập') {
+            if (log.type === 'Nhập' || log.type === 'Cân Tăng') {
                 currentBal -= Number(log.changedQty || 0);
-            } else {
+            } else if (log.type === 'Xuất' || log.type === 'Thanh Lý' || log.type === 'Cân Giảm') {
                 currentBal += Number(log.changedQty || 0);
             }
+            currentBal = Math.round(currentBal * 1000) / 1000;
         });
         
         return result;
     }, [importExport, product]);
 
+    const handleDeleteLog = async (L) => {
+        if (!L || !L.id) return;
+        const isAuditLog = L.type === 'Kiểm Kho' || L.type === 'KIEM_KHO' || L.type === 'Cân Tăng' || L.type === 'Cân Giảm' || String(L.id).includes('KK');
+        const title = isAuditLog ? `phiếu kiểm kho ${L.id}` : `chứng từ ${L.id} (${L.type})`;
+        
+        let confirmMsg = `Bạn có chắc muốn XOÁ VĨNH VIỄN ${title} này không?`;
+        if (L.type === 'Nhập' || L.type === 'Cân Tăng') {
+            confirmMsg += `\n\n⚠️ Hệ thống sẽ tự động TRỪ TRẢ LẠI số lượng tồn kho tương ứng của các mặt hàng trong phiếu.`;
+        } else if (L.type === 'Xuất' || L.type === 'Thanh Lý' || L.type === 'Cân Giảm') {
+            confirmMsg += `\n\n⚠️ Hệ thống sẽ tự động CỘNG HOÀN TRẢ số lượng tồn kho tương ứng của các mặt hàng trong phiếu.`;
+        }
+
+        if (!window.confirm(confirmMsg)) return;
+
+        // Parse itemsData để tính toán hoàn tồn
+        let parsedItems = [];
+        try {
+            parsedItems = typeof L.itemsData === 'string' ? JSON.parse(L.itemsData) : (Array.isArray(L.itemsData) ? L.itemsData : []);
+        } catch (e) {
+            parsedItems = [];
+        }
+
+        const allProds = products || (typeof erpData !== 'undefined' && erpData?.Products) || (typeof window !== 'undefined' && window.erpData?.Products) || [];
+        const updatedProducts = [];
+
+        if (parsedItems.length > 0) {
+            parsedItems.forEach(item => {
+                const iSku = String(item.sku || '').trim().toUpperCase();
+                const iId = String(item.id || '').trim();
+                const iName = String(item.name || '').trim().toLowerCase();
+                const rawQty = item.qty !== undefined ? item.qty : (item.deductedQty !== undefined ? item.deductedQty : (parseFloat(item.quantity) || 0));
+                const itemQty = Number(rawQty) || 0;
+
+                let targetProd = allProds.find(p => {
+                    const pSku = String(p.sku || '').trim().toUpperCase();
+                    const pId = String(p.id || '').trim();
+                    const pName = String(p.name || '').trim().toLowerCase();
+                    return (iSku && pSku && iSku === pSku) || (iId && pId && iId === pId) || (iName && pName && iName === pName);
+                });
+
+                // Fallback nếu chính là product đang mở thẻ kho
+                if (!targetProd && product) {
+                    const pSku = String(product.sku || '').trim().toUpperCase();
+                    const pId = String(product.id || '').trim();
+                    const pName = String(product.name || '').trim().toLowerCase();
+                    if ((iSku && pSku && iSku === pSku) || (iId && pId && iId === pId) || (iName && pName && iName === pName)) {
+                        targetProd = product;
+                    }
+                }
+
+                if (targetProd && itemQty !== 0) {
+                    let diffVal = 0;
+                    if (L.type === 'Nhập' || L.type === 'Cân Tăng') {
+                        diffVal = -itemQty; // Xóa phiếu nhập -> giảm tồn kho
+                    } else if (L.type === 'Xuất' || L.type === 'Thanh Lý' || L.type === 'Cân Giảm') {
+                        diffVal = itemQty; // Xóa phiếu xuất -> cộng trả tồn kho
+                    }
+
+                    if (diffVal !== 0) {
+                        const currentQty = Number(targetProd.quantity || 0);
+                        const newQty = Math.round((currentQty + diffVal) * 1000) / 1000;
+                        updatedProducts.push({
+                            ...targetProd,
+                            quantity: newQty,
+                            _diff: diffVal
+                        });
+                    }
+                }
+            });
+        }
+
+        const payload = {
+            deletes: { ImportExport: [L.id] },
+            ...(updatedProducts.length > 0 ? { Products: updatedProducts } : {})
+        };
+
+        const pushFn = pushDeltas || pushData;
+        if (typeof pushFn === 'function') {
+            try {
+                await pushFn(payload, `Đã xoá ${title} và cập nhật lại tồn kho!`, 'fa-trash-alt');
+                if (typeof triggerToast === 'function') {
+                    triggerToast(`Đã xoá ${title} và cập nhật lại tồn kho!`, 'fa-check', 'success');
+                }
+            } catch (e) {
+                alert('Lỗi xoá: ' + (e?.message || e));
+            }
+        }
+    };
+
     return (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm animate-fade-in" onClick={onClose}>
-            <div className="bg-[#141414] border border-[#333] w-full max-w-md rounded-3xl p-5 shadow-2xl flex flex-col max-h-[80vh] animate-slide-up" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-4 shrink-0 border-b border-[#222] pb-3">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4 backdrop-blur-md animate-fade-in" onClick={onClose}>
+            <div className="bg-[#121216] border border-white/[0.08] w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col max-h-[82vh] animate-scale-up" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-4 shrink-0 border-b border-white/[0.06] pb-3.5">
                     <div>
-                        <div className="font-black text-[11px] text-[#10b981] uppercase tracking-wider flex items-center gap-1.5"><i className="fas fa-history"></i> THẺ KHO SẢN PHẨM</div>
-                        <div className="text-[#f5f5f5] font-black text-sm mt-1">{product.name}</div>
+                        <div className="font-black text-[11px] text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <i className="fas fa-history"></i> THẺ KHO SẢN PHẨM
+                        </div>
+                        <div className="text-white font-black text-sm mt-1">{product.name}</div>
                     </div>
-                    <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#222] text-gray-400 hover:text-rose-500 flex items-center justify-center transition-colors border border-[#333]"><i className="fas fa-times"></i></button>
+                    <button 
+                        onClick={onClose} 
+                        className="w-8 h-8 rounded-full bg-white/[0.04] hover:bg-white/[0.1] text-zinc-400 hover:text-white flex items-center justify-center transition-colors border border-white/[0.08] cursor-pointer"
+                    >
+                        <i className="fas fa-times text-xs"></i>
+                    </button>
                 </div>
 
                 <div className="flex gap-3 mb-4 shrink-0">
-                    <div className="flex-1 bg-[#0a0a0a] border border-[#222] rounded-xl p-3 text-center shadow-inner">
-                        <div className="text-[8px] text-gray-500 font-black uppercase tracking-widest mb-1">Mã SKU</div>
-                        <div className="text-[12px] font-black text-[#d4af37]">{product.sku || 'N/A'}</div>
+                    <div className="flex-1 bg-[#09090b] border border-white/[0.08] rounded-2xl p-3 text-center shadow-inner">
+                        <div className="text-[8.5px] text-zinc-400 font-black uppercase tracking-widest mb-1">Mã SKU</div>
+                        <div className="text-[12px] font-mono font-black text-[#d4af37]">{product.sku || 'N/A'}</div>
                     </div>
-                    <div className="flex-1 bg-[#0a0a0a] border border-[#222] rounded-xl p-3 text-center shadow-inner">
-                        <div className="text-[8px] text-gray-500 font-black uppercase tracking-widest mb-1">Tồn Hiện Tại</div>
-                        <div className="text-[16px] font-black text-[#10b981] leading-none mt-0.5">{product.quantity || 0} <span className="text-[10px] text-gray-400 font-bold uppercase">{product.unit || 'Cái'}</span></div>
+                    <div className="flex-1 bg-[#09090b] border border-white/[0.08] rounded-2xl p-3 text-center shadow-inner">
+                        <div className="text-[8.5px] text-zinc-400 font-black uppercase tracking-widest mb-1">Tồn Hiện Tại</div>
+                        <div className="text-[16px] font-mono font-black text-emerald-400 leading-none mt-0.5">
+                            {product.quantity || 0} <span className="text-[10px] text-zinc-400 font-bold uppercase">{product.unit || 'Cái'}</span>
+                        </div>
                     </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-2">
                     {logs.length === 0 ? (
-                        <div className="text-center text-gray-500 font-bold text-[11px] py-10 bg-[#0a0a0a] rounded-xl border border-[#222] italic">
+                        <div className="text-center text-zinc-500 font-bold text-[11px] py-10 bg-[#09090b] rounded-2xl border border-white/[0.06] italic">
                             Chưa có lịch sử xuất/nhập nào.
                         </div>
                     ) : (
                         logs.map((L, i) => (
-                            <div key={i} className="bg-[#0a0a0a] p-3 rounded-xl border border-[#222] flex justify-between items-center hover:border-[#333] transition-colors group shadow-sm">
+                            <div key={i} className="bg-[#09090b] p-3 rounded-2xl border border-white/[0.04] hover:border-white/[0.12] flex justify-between items-center transition-colors group shadow-sm">
                                 <div className="flex-1 min-w-0 pr-3">
                                     <div className="flex items-center gap-2 mb-1.5">
-                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider ${L.type==='Nhập' ? 'bg-[#10b981]/10 text-[#10b981] border-[#10b981]/25' : 'bg-[#e11d48]/10 text-[#fb7185] border-[#e11d48]/25'}`}>{L.type}</span>
-                                        <span className="text-[9px] text-gray-500 font-bold font-mono">{String(L.date).slice(0, 16)}</span>
+                                        <span className={`text-[8.5px] font-black px-2 py-0.5 rounded-md border uppercase tracking-wider ${
+                                            L.type==='Nhập' || L.type==='Cân Tăng' 
+                                                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' 
+                                                : (L.type==='Kiểm Kho' || L.type==='KIEM_KHO' 
+                                                    ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' 
+                                                    : 'bg-rose-500/15 text-rose-300 border-rose-500/30')
+                                        }`}>
+                                            {L.type}
+                                        </span>
+                                        <span className="text-[9.5px] text-zinc-400 font-bold font-mono">{String(L.date).slice(0, 16)}</span>
+                                        {(isAdmin || isBoss) && (
+                                            <button 
+                                                type="button"
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteLog(L); }} 
+                                                className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-rose-400 transition-all p-0.5 ml-auto cursor-pointer"
+                                                title="Xóa chứng từ kho này"
+                                            >
+                                                <i className="fas fa-trash-alt text-[10px]"></i>
+                                            </button>
+                                        )}
                                     </div>
-                                    <div className="text-[11px] font-bold text-gray-300 leading-tight group-hover:text-white transition-colors line-clamp-2">{L.note || L.target}</div>
+                                    <div className="text-[11.5px] font-bold text-zinc-300 leading-tight group-hover:text-white transition-colors line-clamp-2">{L.note || L.target}</div>
                                 </div>
                                 <div className="flex flex-col items-end shrink-0">
-                                    <div className={`text-[15px] font-black ${L.type==='Nhập' ? 'text-[#10b981]' : 'text-[#fb7185]'}`}>
-                                        {L.type==='Nhập' ? '+' : '-'}{L.changedQty} <span className="text-[9px] font-bold uppercase opacity-70">{product.unit || 'Cái'}</span>
+                                    <div className={`text-[14.5px] font-mono font-black ${L.type==='Nhập' || L.type==='Cân Tăng' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                        {L.type==='Nhập' || L.type==='Cân Tăng' ? '+' : '-'}{L.changedQty} <span className="text-[9px] font-bold uppercase opacity-70 font-sans">{product.unit || 'Cái'}</span>
                                     </div>
-                                    <div className="text-[9px] text-gray-500 font-bold mt-1 bg-[#1a1a1a] px-2 py-0.5 rounded border border-[#333]">
-                                        Tồn: <span className="text-[#f5f5f5]">{L.balanceAfter}</span>
+                                    <div className="text-[9.5px] text-zinc-400 font-bold mt-1 bg-white/[0.04] px-2 py-0.5 rounded-lg border border-white/[0.06] font-mono">
+                                        Tồn: <span className="text-zinc-200 font-bold">{L.balanceAfter}</span>
                                     </div>
                                 </div>
                             </div>
@@ -115,7 +245,25 @@ function ImportExportPrintModal({ ticket, onClose, triggerToast }) {
 
     const ticketType = ticket.type || 'Nhập';
     const isImport = ticketType === 'Nhập';
-    const ticketTitle = ticketType === 'Nhập' ? 'PHIẾU NHẬP KHO' : (ticketType === 'Xuất' ? 'PHIẾU XUẤT KHO' : `PHIẾU ${ticketType.toUpperCase()} KHO`);
+    const isAudit = ticket.isAudit ||
+                    (ticket.id && String(ticket.id).includes('GCHK')) || 
+                    (ticket.target && String(ticket.target).toLowerCase().includes('kiểm kho')) ||
+                    (ticket.target && String(ticket.target).toLowerCase().includes('cân')) ||
+                    (ticket.note && String(ticket.note).toLowerCase().includes('kiểm kho'));
+
+    let ticketTitle = 'PHIẾU XUẤT NHẬP KHO';
+    if (isAudit) {
+        ticketTitle = ticket.isConsolidated ? 'PHIẾU KIỂM KHO TỔNG HỢP' : 'PHIẾU KIỂM KHO';
+    } else if (ticket.isConsolidated) {
+        ticketTitle = ticket.consolidatedTitle || 'PHIẾU TỔNG HỢP XUẤT NHẬP KHO';
+    } else if (ticketType === 'Nhập') {
+        ticketTitle = 'PHIẾU NHẬP KHO';
+    } else if (ticketType === 'Xuất') {
+        ticketTitle = 'PHIẾU XUẤT KHO';
+    } else {
+        ticketTitle = `PHIẾU ${ticketType.toUpperCase()} KHO`;
+    }
+
     const ticketId = ticket.id || 'IE_' + Date.now();
 
     const generateReceiptCanvas = React.useCallback(() => {
@@ -159,7 +307,7 @@ function ImportExportPrintModal({ ticket, onClose, triggerToast }) {
             let y = 35;
             ctx.fillStyle = '#000000';
 
-            // Tiêu đề PHIẾU NHẬP / XUẤT KHO
+            // Tiêu đề PHIẾU NHẬP / XUẤT KHO / KIỂM KHO
             ctx.textAlign = 'center';
             ctx.font = 'bold 20px "Courier New", monospace, Arial';
             ctx.fillText(ticketTitle, width / 2, y);
@@ -203,9 +351,14 @@ function ImportExportPrintModal({ ticket, onClose, triggerToast }) {
             };
 
             drawInfoLine('Số Phiếu: ', ticketId);
-            drawInfoLine('Loại phiếu: ', ticketType);
-            drawInfoLine(isImport ? 'Đối tác / NCC: ' : 'Người nhận / Khách: ', ticket.target || 'Nội bộ/Khác');
-            if (ticket.creator) drawInfoLine('Người lập: ', ticket.creator);
+            if (isAudit) {
+                drawInfoLine('Loại phiếu: ', ticket.isConsolidated ? 'Kiểm kho (Tổng hợp theo ngày)' : (ticketType === 'Nhập' || String(ticket.target).includes('Cân tăng') ? 'Kiểm kho (Cân tăng)' : 'Kiểm kho (Cân giảm)'));
+                drawInfoLine('Mục đích: ', ticket.target || 'Cân đối kiểm kê kho định kỳ');
+            } else {
+                drawInfoLine('Loại phiếu: ', ticket.isConsolidated ? 'Tổng Hợp Xuất Nhập' : ticketType);
+                drawInfoLine(isImport ? 'Đối tác / NCC: ' : 'Người nhận / Khách: ', ticket.target || 'Nội bộ/Khác');
+            }
+            if (ticket.creator || ticket.user) drawInfoLine('Người lập: ', ticket.creator || ticket.user || 'Hệ thống');
             drawInfoLine('Thời gian ghi sổ: ', ticket.date || new Date().toLocaleString('vi-VN'));
             if (ticket.note) drawInfoLine('Ghi chú: ', ticket.note);
 
@@ -274,14 +427,14 @@ function ImportExportPrintModal({ ticket, onClose, triggerToast }) {
             };
 
             const baseAmount = itemsList.reduce((sum, i) => sum + (Number(i.price || 0) * Number(i.qty || 1)), 0);
-            const otherFees = Number(ticket.otherFees || 0);
-            const totalAmount = Number(ticket.totalAmount || (baseAmount + otherFees));
+            const totalAmount = Number(ticket.totalAmount || baseAmount);
+            const otherFees = Number(ticket.otherFees || 0) || Math.max(0, totalAmount - baseAmount);
             const paidAmount = Number(ticket.paidAmount || 0);
             const debtAmount = Number(ticket.debtAmount || (isImport && paidAmount > 0 ? Math.max(0, totalAmount - paidAmount) : 0));
 
             drawTotalRow('Tổng tiền hàng:', baseAmount.toLocaleString('vi-VN') + ' đ', true);
             if (otherFees > 0) {
-                drawTotalRow('Cước VC / Phụ phí:', otherFees.toLocaleString('vi-VN') + ' đ');
+                drawTotalRow('Cước VC / Chi phí khác:', '+' + otherFees.toLocaleString('vi-VN') + ' đ');
             }
             drawTotalRow('Tổng thanh toán:', totalAmount.toLocaleString('vi-VN') + ' đ', true);
             if (paidAmount > 0) {
@@ -309,6 +462,88 @@ function ImportExportPrintModal({ ticket, onClose, triggerToast }) {
     React.useEffect(() => {
         generateReceiptCanvas();
     }, [generateReceiptCanvas]);
+
+    const handlePrintThermal = (format = 'K58') => {
+        if (!receiptImageUrl) return;
+        try {
+            const isK58 = format === 'K58';
+            const paperWidth = isK58 ? '58mm' : '80mm';
+            const printContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>${ticketTitle} - ${ticketId}</title>
+                    <style>
+                        @page {
+                            size: ${paperWidth} auto;
+                            margin: 0;
+                        }
+                        * {
+                            box-sizing: border-box;
+                            margin: 0;
+                            padding: 0;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                        body {
+                            margin: 0;
+                            padding: ${isK58 ? '1mm 1mm' : '2mm 2mm'};
+                            background: #fff;
+                            display: flex;
+                            justify-content: center;
+                            align-items: flex-start;
+                        }
+                        img {
+                            width: 100%;
+                            max-width: ${paperWidth};
+                            height: auto;
+                            display: block;
+                            margin: 0 auto;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <img src="${receiptImageUrl}" onload="window.focus(); window.print();" />
+                </body>
+                </html>
+            `;
+
+            // Thử mở qua iframe để không bị chặn popup
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            document.body.appendChild(iframe);
+
+            const doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(printContent);
+            doc.close();
+
+            setTimeout(() => {
+                try {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                } catch (e) {
+                    console.warn("Iframe print fallback:", e);
+                }
+                setTimeout(() => {
+                    try { document.body.removeChild(iframe); } catch (e) {}
+                }, 2500);
+            }, 300);
+
+            if (typeof triggerToast === 'function') {
+                triggerToast(`Đang mở lệnh in ${format} cho máy in nhiệt...`, 'fa-print', 'info');
+            }
+        } catch (e) {
+            console.error("Lỗi in nhiệt:", e);
+            alert("Lỗi in phiếu: " + e.message);
+        }
+    };
 
     const handleDownloadImage = () => {
         if (!receiptImageUrl) return;
@@ -344,7 +579,11 @@ function ImportExportPrintModal({ ticket, onClose, triggerToast }) {
 
     const handleCopySummary = () => {
         const itemsList = Array.isArray(ticket.items) ? ticket.items : (typeof ticket.itemsData === 'string' ? safeJSONParse(ticket.itemsData) : []);
-        let text = `📄 ${ticketTitle} - RICH FISH AQUARIUM\n`;
+        const baseAmount = itemsList.reduce((sum, i) => sum + (Number(i.price || 0) * Number(i.qty || 1)), 0);
+        const totalAmount = Number(ticket.totalAmount || baseAmount);
+        const otherFees = Number(ticket.otherFees || 0) || Math.max(0, totalAmount - baseAmount);
+
+        let text = `📄 ${ticketTitle} - RF AQUARIUM\n`;
         text += `------------------------------------\n`;
         text += `Số Phiếu: ${ticketId}\n`;
         text += `Thời gian: ${ticket.date || new Date().toLocaleString('vi-VN')}\n`;
@@ -356,7 +595,11 @@ function ImportExportPrintModal({ ticket, onClose, triggerToast }) {
             text += `${idx + 1}. ${it.name} (x${it.qty} ${it.unit || 'Cái'}) - ĐG: ${Number(it.price || 0).toLocaleString('vi-VN')}đ\n`;
         });
         text += `------------------------------------\n`;
-        text += `TỔNG TIỀN: ${Number(ticket.totalAmount || 0).toLocaleString('vi-VN')} VNĐ\n`;
+        text += `Tổng tiền hàng: ${baseAmount.toLocaleString('vi-VN')} VNĐ\n`;
+        if (otherFees > 0) {
+            text += `Cước VC / Chi phí khác: +${otherFees.toLocaleString('vi-VN')} VNĐ\n`;
+        }
+        text += `TỔNG THANH TOÁN: ${totalAmount.toLocaleString('vi-VN')} VNĐ\n`;
         if (ticket.note) text += `Ghi chú: ${ticket.note}\n`;
 
         if (navigator.clipboard) {
@@ -382,14 +625,36 @@ function ImportExportPrintModal({ ticket, onClose, triggerToast }) {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                        {/* NÚT IN NHIỆT K58 CHUYÊN DỤNG */}
+                        <button 
+                            type="button"
+                            onClick={() => handlePrintThermal('K58')} 
+                            className="px-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black rounded-lg text-[10.5px] font-black uppercase flex items-center gap-1.5 shadow-md shadow-amber-950/40 transition-all active:scale-95 cursor-pointer"
+                            title="In trực tiếp ra máy in nhiệt khổ K58 (58mm)"
+                        >
+                            <i className="fas fa-print"></i>
+                            <span>In K58</span>
+                        </button>
+
+                        {/* NÚT IN NHIỆT K80 */}
+                        <button 
+                            type="button"
+                            onClick={() => handlePrintThermal('K80')} 
+                            className="px-2 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded-lg text-[10px] font-bold uppercase hidden sm:flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+                            title="In máy in nhiệt khổ K80 (80mm)"
+                        >
+                            <i className="fas fa-print text-zinc-400"></i>
+                            <span>K80</span>
+                        </button>
+
                         <button onClick={handleCopyImage} className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 cursor-pointer">
                             <i className="fas fa-copy"></i>
-                            <span className="hidden sm:inline">Sao Chép Ảnh</span>
+                            <span className="hidden sm:inline">Sao Chép</span>
                         </button>
                         <button onClick={handleDownloadImage} className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 cursor-pointer">
                             <i className="fas fa-download"></i>
-                            <span className="hidden sm:inline">Tải Ảnh PNG</span>
+                            <span className="hidden sm:inline">Tải PNG</span>
                         </button>
                         <button onClick={onClose} className="w-7 h-7 rounded-lg bg-zinc-800 hover:bg-rose-600 text-zinc-400 hover:text-white flex items-center justify-center transition-colors text-xs cursor-pointer">&times;</button>
                     </div>
@@ -399,7 +664,7 @@ function ImportExportPrintModal({ ticket, onClose, triggerToast }) {
                 <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center bg-[#09090b] custom-scrollbar">
                     <div className="text-[11px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full mb-3 flex items-center gap-1.5 shadow-sm">
                         <i className="fas fa-check-circle text-xs"></i>
-                        Ảnh Phiếu Kho Đã Sẵn Sàng Để Lưu / Gửi Đối Tác
+                        Ảnh Phiếu Kho Đã Sẵn Sàng Để In K58 / Gửi Đối Tác
                     </div>
 
                     <div className="bg-white rounded-2xl shadow-2xl p-2 max-w-[380px] w-full flex justify-center border-4 border-zinc-300">
@@ -414,18 +679,34 @@ function ImportExportPrintModal({ ticket, onClose, triggerToast }) {
                     </div>
 
                     <p className="text-[10px] text-zinc-400 text-center mt-3 italic">
-                        💡 Bạn có thể bấm <b className="text-zinc-200">Sao Chép Ảnh</b> (rồi ấn Ctrl+V gửi Zalo) hoặc <b className="text-zinc-200">Tải Ảnh PNG</b>.
+                        💡 Bạn có thể bấm <b className="text-amber-300">In K58 / K80</b> để in trực tiếp qua máy in nhiệt, hoặc <b className="text-zinc-200">Sao Chép Ảnh</b> (Ctrl+V gửi Zalo) / <b className="text-zinc-200">Tải Ảnh PNG</b>.
                     </p>
                 </div>
 
                 {/* Footer */}
-                <div className="p-3 bg-[#18181c] border-t border-zinc-800 flex items-center justify-between gap-2 shrink-0">
+                <div className="p-3 bg-[#18181c] border-t border-zinc-800 flex flex-wrap items-center justify-between gap-2 shrink-0">
                     <button onClick={handleCopySummary} className="text-[10.5px] font-black text-amber-400 hover:text-amber-300 flex items-center gap-1.5 transition-colors cursor-pointer">
-                        <i className="fas fa-file-alt"></i> Sao Chép Văn Bản Tóm Tắt
+                        <i className="fas fa-file-alt"></i> Sao Chép Tóm Tắt
                     </button>
-                    <button onClick={onClose} className="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-bold transition-colors cursor-pointer">
-                        Đóng
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            type="button"
+                            onClick={() => handlePrintThermal('K58')}
+                            className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-black text-xs rounded-xl shadow-md shadow-amber-950/40 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                        >
+                            <i className="fas fa-print"></i> In K58 (58mm)
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => handlePrintThermal('K80')}
+                            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                        >
+                            <i className="fas fa-print text-zinc-400"></i> In K80
+                        </button>
+                        <button onClick={onClose} className="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-xl text-xs font-bold transition-colors cursor-pointer">
+                            Đóng
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -435,8 +716,9 @@ function ImportExportPrintModal({ ticket, onClose, triggerToast }) {
 // -------------------------------------------------------------------------
 // 2. TAB LỊCH SỬ XUẤT NHẬP TỔNG HỢP & NÚT KIỂM KHO (ImportExportTab)
 // -------------------------------------------------------------------------
-const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, isAdmin, mode, userConfigs, triggerToast }) {
+const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, isAdmin: propIsAdmin, isBoss: propIsBoss, userRole: propUserRole, currentUser: propCurrentUser, hasPerm: propHasPerm, mode, userConfigs, triggerToast }) {
     // 1. Modals & Forms State
+    const [selectedProduct, setSelectedProduct] = React.useState(null);
     const [showForm, setShowForm] = React.useState(false);
     const [printTicketData, setPrintTicketData] = React.useState(null);
     const [prefilledProduct, setPrefilledProduct] = React.useState(null);
@@ -461,14 +743,63 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
     const [filterType, setFilterType] = React.useState('TẤT CẢ');
     const [filterMonth, setFilterMonth] = React.useState(new Date().toISOString().slice(0, 7));
     const [searchTerm, setSearchTerm] = React.useState('');
+    const deferredSearchTerm = React.useDeferredValue ? React.useDeferredValue(searchTerm) : searchTerm;
     const [expandedIds, setExpandedIds] = React.useState({});
 
-    const currentRole = localStorage.getItem('rf_role') || '';
-    const currentUser = localStorage.getItem('rf_user');
-    const isBossRole = localStorage.getItem('rf_boss') === 'true';
-    const isBoss = isBossRole || currentRole === 'TỐI CAO' || Boolean(isAdmin);
-    const isKiemToan = isBoss || currentRole === 'KẾ TOÁN' || currentRole === 'KIỂM TOÁN' || currentUser === 'Nguyễn Thị Diệu Hương';
-    const canDelete = isAdmin || isBoss || currentRole === 'TỐI CAO';
+    const currentRole = propUserRole || localStorage.getItem('rf_role') || '';
+    const currentUser = propCurrentUser || localStorage.getItem('rf_user') || '';
+    const isBossRole = localStorage.getItem('rf_boss') === 'true' || currentRole === 'TỐI CAO' || currentUser.includes('Tiến');
+    const isBoss = propIsBoss !== undefined ? propIsBoss : isBossRole;
+    const isAdmin = propIsAdmin !== undefined ? propIsAdmin : (localStorage.getItem('rf_admin') === 'true' || isBoss);
+
+    const hasPerm = React.useCallback((actionCode) => {
+        if (isBoss || currentRole === 'TỐI CAO') return true;
+        if (typeof propHasPerm === 'function') return propHasPerm(actionCode);
+        if (typeof canUserDo === 'function') return canUserDo(actionCode, currentRole, currentUser);
+        return isAdmin;
+    }, [propHasPerm, currentRole, currentUser, isAdmin, isBoss]);
+
+    const canCreateImport = hasPerm('IE_CREATE_IMPORT'); // Tiến, Dương, Trang
+    const canCreateExport = hasPerm('IE_CREATE_EXPORT'); // Tiến, Dương, Trang
+    const canCreatePO = hasPerm('IE_CREATE_PO'); // Tất cả nhân sự nội bộ
+    const canApprovePO = hasPerm('IE_APPROVE_PO'); // Tiến, Dương, Trang
+    const canEditLog = hasPerm('IE_EDIT_LOG'); // Tiến, Dương, Trang
+    const canDelete = hasPerm('IE_DELETE_LOG'); // Chỉ Tiến
+    const isKiemToan = isBoss || currentRole === 'KẾ TOÁN' || currentRole === 'KIỂM TOÁN';
+
+    const handleRepairBOM = async () => {
+        if (!window.confirm('Bạn có chắc chắn muốn TỰ ĐỘNG CHUẨN HOÁ & SỬA LẠI toàn bộ các phiếu xuất BOM (gán đúng đối tượng Sản Xuất Bể Kính / Sản Xuất Layout và tính lại nguyên liệu BOM cho Layout) không?')) return;
+        try {
+            if (typeof triggerToast === 'function') triggerToast('Đang quét và chuẩn hoá toàn bộ phiếu BOM...', 'fa-spinner fa-spin', 'info');
+            const res = await runGAS('repairAllBomTickets');
+            if (res && res.success) {
+                if (typeof triggerToast === 'function') triggerToast(res.message || 'Đã chuẩn hoá thành công các phiếu BOM!', 'fa-check', 'success');
+                else alert(res.message || 'Đã chuẩn hoá thành công các phiếu BOM!');
+                if (typeof window.triggerDataRefresh === 'function') window.triggerDataRefresh();
+            } else {
+                alert('Lỗi: ' + (res?.message || 'Không thể sửa phiếu BOM'));
+            }
+        } catch (e) {
+            alert('Lỗi: ' + e.message);
+        }
+    };
+
+    const handleSyncBomSku = async () => {
+        if (!window.confirm('Xác nhận ĐỒNG BỘ CHÍNH XÁC 100% mã SKU Nguyên Liệu từ bảng Products sang bảng định mức BOM_Config?')) return;
+        try {
+            if (typeof triggerToast === 'function') triggerToast('Đang đồng bộ mã SKU Nguyên Liệu sang BOM_Config...', 'fa-spinner fa-spin', 'info');
+            const res = await runGAS('syncBomMaterialSkus');
+            if (res && res.success) {
+                if (typeof triggerToast === 'function') triggerToast(res.message || 'Đã đồng bộ SKU BOM thành công!', 'fa-check', 'success');
+                else alert(res.message || 'Đã đồng bộ SKU BOM thành công!');
+                if (typeof window.triggerDataRefresh === 'function') window.triggerDataRefresh();
+            } else {
+                alert('Lỗi: ' + (res?.message || 'Không thể đồng bộ SKU'));
+            }
+        } catch (e) {
+            alert('Lỗi: ' + e.message);
+        }
+    };
 
     const toggleExpand = (id) => {
         setExpandedIds(prev => ({ ...prev, [id]: !prev[id] }));
@@ -495,19 +826,41 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
             const user = String(log.user || '').toLowerCase();
 
             if (filterType !== 'TẤT CẢ') {
-                let logCategories = [];
                 const parsedItems = safeJSONParse(log.itemsData) || [];
+                let logCategories = [];
                 parsedItems.forEach(it => {
-                    const p = (data?.Products || []).find(x => x.name === it.name);
-                    if (p) logCategories.push(String(p.category || '').toUpperCase().trim());
+                    const itNameLower = String(it.name || it.sku || '').toLowerCase();
+                    const p = (data?.Products || []).find(x => x.name === it.name || (it.sku && x.sku === it.sku) || String(x.name || '').toLowerCase() === itNameLower);
+                    if (p && p.category) {
+                        logCategories.push(String(p.category || '').toUpperCase().trim());
+                    }
+                    if (p && p.sub_category) {
+                        logCategories.push(String(p.sub_category || '').toUpperCase().trim());
+                    }
                 });
 
-                if (filterType === 'KHO HÀNG HOÁ') {
-                    if (!logCategories.some(c => c === 'PHỤ KIỆN' || c === 'HÀNG HOÁ' || c === 'PHỤ KIỆN BÁN LẺ')) return false;
-                } else if (filterType === 'KHO THÀNH PHẨM') {
-                    if (!logCategories.some(c => c === 'LAYOUT' || c === 'BỂ KÍNH' || c === 'THÀNH PHẨM')) return false;
+                const targetUpper = String(log.target || '').toUpperCase();
+                const noteUpper = String(log.note || '').toUpperCase();
+                const isBomTicket = log.id && String(log.id).startsWith('IE_BOM_');
+
+                if (filterType === 'KHO BỂ KÍNH') {
+                    const isTankLog = targetUpper.includes('BỂ KÍNH') || targetUpper.includes('BE KINH') || noteUpper.includes('BỂ KÍNH') ||
+                        logCategories.some(c => c === 'BỂ KÍNH' || c === 'BE KINH' || c.includes('BỂ KÍNH'));
+                    if (!isTankLog) return false;
+                } else if (filterType === 'KHO LAYOUT') {
+                    const isLayoutLog = targetUpper.includes('LAYOUT') || noteUpper.includes('LAYOUT') ||
+                        logCategories.some(c => c === 'LAYOUT' || c === 'THÀNH PHẨM');
+                    if (!isLayoutLog) return false;
+                } else if (filterType === 'KHO HÀNG HOÁ') {
+                    // Kho Hàng Hoá (Phụ Kiện Bán Lẻ)
+                    const isAccessoryLog = targetUpper.includes('PHỤ KIỆN') || targetUpper.includes('HÀNG HOÁ') || targetUpper.includes('BÁN LẺ') ||
+                        logCategories.some(c => c === 'PHỤ KIỆN' || c === 'HÀNG HOÁ' || c === 'PHỤ KIỆN BÁN LẺ');
+                    if (!isAccessoryLog) return false;
                 } else if (filterType === 'KHO NGUYÊN LIỆU') {
-                    if (!logCategories.some(c => c === 'VẬT TƯ SẢN XUẤT' || c === 'DANH MỤC SẢN XUẤT' || c === 'NGUYÊN LIỆU')) return false;
+                    // Kho Nguyên Liệu (Vật Tư)
+                    const isMaterialLog = targetUpper.includes('VẬT TƯ') || targetUpper.includes('NGUYÊN LIỆU') ||
+                        logCategories.some(c => c === 'VẬT TƯ SẢN XUẤT' || c === 'DANH MỤC SẢN XUẤT' || c === 'NGUYÊN LIỆU' || c === 'VẬT TƯ' || c.includes('NGUYÊN LIỆU'));
+                    if (!isMaterialLog) return false;
                 }
             }
 
@@ -516,8 +869,8 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
                 if (!String(logDate).startsWith(filterMonth)) return false;
             }
 
-            if (searchTerm) {
-                const term = searchTerm.toLowerCase();
+            if (deferredSearchTerm) {
+                const term = deferredSearchTerm.toLowerCase();
                 const matchId = id.includes(term);
                 const matchTarget = target.includes(term);
                 const matchNote = note.includes(term);
@@ -529,11 +882,74 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
         });
         
         return list.sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
-    }, [logs, filterType, filterMonth, searchTerm, mode, data?.Suppliers]);
+    }, [logs, filterType, filterMonth, deferredSearchTerm, mode, data?.Suppliers]);
 
     const totalValue = React.useMemo(() => {
         return filteredLogs.reduce((sum, l) => sum + (Number(l.totalAmount) || 0), 0);
     }, [filteredLogs]);
+
+    const dateGroups = React.useMemo(() => {
+        const groups = {};
+        filteredLogs.forEach(log => {
+            const rawDate = String(log.date || log.createdAt || '').slice(0, 10) || 'Chưa rõ ngày';
+            if (!groups[rawDate]) groups[rawDate] = [];
+            groups[rawDate].push(log);
+        });
+        return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
+    }, [filteredLogs]);
+
+    const handlePrintConsolidatedDay = (dateKey, dayLogs) => {
+        let mergedItemsMap = {};
+        let totalAmt = 0;
+        const isAudit = mode === 'KIEM_KHO' || dayLogs.every(l => String(l.id).includes('GCHK') || String(l.target).toLowerCase().includes('kiểm kho') || String(l.target).toLowerCase().includes('cân'));
+
+        dayLogs.forEach(log => {
+            let rawItems = safeJSONParse(log.itemsData) || [];
+            rawItems.forEach(it => {
+                const itSku = String(it.sku || it.name || '').trim();
+                const itName = String(it.name || it.sku || 'Sản phẩm').trim();
+                const key = (itSku && itSku !== 'N/A') ? itSku : itName;
+                const qty = Number(it.qty) || 1;
+                const price = Number(it.price !== undefined ? it.price : it.costPrice) || 0;
+                const lineAmt = Number(it.amount) || (qty * price);
+
+                if (!mergedItemsMap[key]) {
+                    mergedItemsMap[key] = {
+                        sku: itSku,
+                        name: itName,
+                        qty: 0,
+                        unit: it.unit || 'Cái',
+                        price: price,
+                        amount: 0
+                    };
+                }
+                mergedItemsMap[key].qty += qty;
+                mergedItemsMap[key].amount += lineAmt;
+                if (price > 0 && (!mergedItemsMap[key].price || mergedItemsMap[key].price === 0)) {
+                    mergedItemsMap[key].price = price;
+                }
+            });
+            totalAmt += Number(log.totalAmount || 0);
+        });
+
+        const consolidatedItems = Object.values(mergedItemsMap);
+        const dayFormatted = dateKey.includes('-') ? dateKey.split('-').reverse().join('/') : dateKey;
+
+        const consolidatedTicket = {
+            id: `IE_SUM_${dateKey.replace(/[^0-9]/g, '')}`,
+            type: isAudit ? 'Kiểm Kho' : 'Tổng Hợp',
+            target: isAudit ? `Kiểm kê kho ngày ${dayFormatted}` : `Tổng hợp xuất nhập ngày ${dayFormatted}`,
+            date: `${dayFormatted} (Gộp ${dayLogs.length} chứng từ)`,
+            note: `Gộp từ ${dayLogs.length} phiếu (${dayLogs.map(l => l.id).slice(0, 3).join(', ')}${dayLogs.length > 3 ? '...' : ''})`,
+            items: consolidatedItems,
+            totalAmount: totalAmt > 0 ? totalAmt : consolidatedItems.reduce((s, i) => s + (i.amount || 0), 0),
+            isConsolidated: true,
+            isAudit: isAudit,
+            consolidatedTitle: isAudit ? `PHIẾU KIỂM KHO TỔNG HỢP` : `PHIẾU XUẤT NHẬP KHO TỔNG HỢP`
+        };
+
+        setPrintTicketData(consolidatedTicket);
+    };
 
     const handleDelete = async (log) => {
         if (!canDelete) {
@@ -610,11 +1026,17 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
             </div>`;
         });
 
+        const isAuditLog = (log.id && String(log.id).includes('GCHK')) || 
+                           (log.target && String(log.target).toLowerCase().includes('kiểm kho')) ||
+                           (log.target && String(log.target).toLowerCase().includes('cân')) ||
+                           mode === 'KIEM_KHO';
+        const k58Title = isAuditLog ? 'PHIẾU KIỂM KHO' : `PHIẾU ${String(log.type).toUpperCase()} KHO`;
+
         const printContent = `
             <html>
             <head>
                 <meta charset="utf-8">
-                <title>In Phiếu ${log.type}</title>
+                <title>${k58Title}</title>
                 <style>
                     @page { margin: 0; size: 58mm auto; }
                     body { font-family: Arial, Helvetica, sans-serif; width: 58mm; margin: 0; padding: 12px 6px; font-size: 12px; font-weight: 500; color: #000; line-height: 1.4; box-sizing: border-box; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
@@ -627,15 +1049,15 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
                 </style>
             </head>
             <body>
-                <div class="text-center bold title">RF Aquarium</div>
-                <div class="text-center" style="font-size: 10px;">Kiến Tạo Thế Giới Thuỷ Sinh</div>
+                <div class="text-center bold title">RF AQUARIUM</div>
+                <div class="text-center" style="font-size: 10px;">30 Lương Thế Vinh, Thống Nhất, Phú Thọ</div>
                 <div class="border-bottom"></div>
-                <div class="text-center bold" style="font-size: 15px; margin: 5px 0;">PHIẾU ${String(log.type).toUpperCase()} KHO</div>
+                <div class="text-center bold" style="font-size: 15px; margin: 5px 0;">${k58Title}</div>
                 <div class="border-bottom"></div>
                 <div><span class="bold">Mã phiếu:</span> ${log.id}</div>
                 <div><span class="bold">Ngày lập:</span> ${new Date().toLocaleString('vi-VN')}</div>
                 <div><span class="bold">Ngày GD:</span> ${String(log.date).slice(0, 16).replace('T', ' ')}</div>
-                <div><span class="bold">${log.type === 'Nhập' ? 'Nhà CC' : 'Khách/Mục đích'}:</span> ${log.target || 'Nội bộ'}</div>
+                <div><span class="bold">${isAuditLog ? 'Mục đích/Cân đối' : (log.type === 'Nhập' ? 'Nhà CC' : 'Khách/Mục đích')}:</span> ${log.target || 'Nội bộ'}</div>
                 <div class="border-bottom"></div>
                 
                 <div class="row bold" style="margin-bottom:3px;">
@@ -672,19 +1094,20 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
 
     return (
         <div className="space-y-4 sm:space-y-5 animate-fade-in pb-4 w-full max-w-full overflow-x-hidden">
-            {/* Action Buttons (Kiểm Kho / Nhập / Xuất) - VIBRANT COLOR PALETTE */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gradient-to-r from-[#141824] via-[#10141f] to-[#141824] p-3.5 sm:p-4 rounded-2xl shadow-[0_8px_25px_rgba(0,0,0,0.5)] border border-[#3b82f6]/30 gap-3 w-full max-w-full">
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center shadow-[0_0_15px_rgba(56,189,248,0.2)] shrink-0"><i className="fas fa-boxes text-sky-400 text-sm"></i></div>
+            {/* Action Buttons (Kiểm Kho / Nhập / Xuất / Đặt Hàng / Thanh Lý) - 1 GỌN GÀNG ĐỒNG BỘ */}
+            <div className="bg-[#121214] p-2.5 sm:p-3 rounded-2xl border border-white/[0.08] shadow-sm flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5 w-full">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0">
+                        <i className="fas fa-boxes text-sky-400 text-xs"></i>
+                    </div>
                     <div className="min-w-0">
-                        <h3 className="font-black text-white text-[13px] uppercase tracking-wide flex items-center gap-2 truncate">
+                        <h3 className="font-black text-white text-[12px] uppercase tracking-wider flex items-center gap-2 truncate">
                             QUẢN LÝ {mode === 'KIEM_KHO' ? 'KIỂM KHO' : 'CHỨNG TỪ'}
-                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 shrink-0">Kho Vận Pro</span>
+                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400 border border-sky-500/30 shrink-0">Kho Vận Pro</span>
                         </h3>
-                        <div className="text-[10px] text-gray-400 font-bold mt-0.5 truncate">Hệ thống quản lý xuất nhập và chứng từ tự động</div>
                     </div>
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto flex-wrap justify-start sm:justify-end">
+                <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap w-full sm:w-auto">
                     {mode === 'KIEM_KHO' && (
                         <button onClick={() => {
                             if (isKiemToan || currentRole === 'KHO VẬN' || currentRole === 'QUẢN LÝ KHO VẬN') {
@@ -692,24 +1115,42 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
                             } else {
                                 alert('Chỉ Quản Lý Kho, Kế Toán hoặc Kiểm Toán mới có quyền tạo phiếu kiểm kho!');
                             }
-                        }} className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white text-[11px] font-black px-4 py-2.5 sm:px-6 sm:py-3.5 rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.4)] border border-blue-400/40 active:scale-95 transition-all uppercase tracking-wider flex items-center gap-1.5 cursor-pointer">
-                            <i className="fas fa-plus-circle"></i> Tạo Phiếu Kiểm Kho
+                        }} className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md cursor-pointer">
+                            <i className="fas fa-plus-circle text-xs"></i> <span>Tạo Phiếu Kiểm Kho</span>
                         </button>
                     )}
                     {mode === 'NHAT_KY' && (
                         <>
-                            <button onClick={() => { window.pendingType = 'Nhập'; setShowForm(true); }} className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-emerald-400/50 text-[11px] font-black px-3.5 py-2.5 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.35)] active:scale-95 transition-all uppercase tracking-wider flex items-center gap-1.5 cursor-pointer">
-                                <i className="fas fa-arrow-down text-[10px]"></i> Nhập Kho
-                            </button>
-                            <button onClick={() => { window.pendingType = 'Đặt Hàng'; setShowForm(true); }} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border border-purple-400/50 text-[11px] font-black px-3.5 py-2.5 rounded-xl shadow-[0_0_15px_rgba(147,51,234,0.35)] active:scale-95 transition-all uppercase tracking-wider flex items-center gap-1.5 cursor-pointer">
-                                <i className="fas fa-file-invoice text-[10px]"></i> Đặt Hàng
-                            </button>
-                            <button onClick={() => { window.pendingType = 'Xuất'; setShowForm(true); }} className="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white border border-rose-400/50 text-[11px] font-black px-3.5 py-2.5 rounded-xl shadow-[0_0_15px_rgba(244,63,94,0.35)] active:scale-95 transition-all uppercase tracking-wider flex items-center gap-1.5 cursor-pointer">
-                                <i className="fas fa-arrow-up text-[10px]"></i> Xuất Kho
-                            </button>
-                            <button onClick={() => { window.pendingType = 'Thanh Lý'; setShowForm(true); }} className="bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-black border border-amber-300/60 text-[11px] font-black px-3.5 py-2.5 rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.35)] active:scale-95 transition-all uppercase tracking-wider flex items-center gap-1.5 cursor-pointer">
-                                <i className="fas fa-trash-restore text-[10px]"></i> Thanh Lý
-                            </button>
+                            {canCreateImport && (
+                                <button onClick={() => { window.pendingType = 'Nhập'; setShowForm(true); }} className="flex-1 sm:flex-none h-9 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm">
+                                    <i className="fas fa-arrow-down text-[10px]"></i> <span>Nhập Kho</span>
+                                </button>
+                            )}
+                            {canCreatePO && (
+                                <button onClick={() => { window.pendingType = 'Đặt Hàng'; setShowForm(true); }} className="flex-1 sm:flex-none h-9 px-3 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm">
+                                    <i className="fas fa-file-invoice text-[10px]"></i> <span>Đặt Hàng</span>
+                                </button>
+                            )}
+                            {canCreateExport && (
+                                <>
+                                    <button onClick={() => { window.pendingType = 'Xuất'; setShowForm(true); }} className="flex-1 sm:flex-none h-9 px-3 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm">
+                                        <i className="fas fa-arrow-up text-[10px]"></i> <span>Xuất Kho</span>
+                                    </button>
+                                    <button onClick={() => { window.pendingType = 'Thanh Lý'; setShowForm(true); }} className="flex-1 sm:flex-none h-9 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm">
+                                        <i className="fas fa-trash-restore text-[10px]"></i> <span>Thanh Lý</span>
+                                    </button>
+                                </>
+                            )}
+                            {hasPerm('INV_BOM_CONFIG') && (
+                                <>
+                                    <button onClick={handleSyncBomSku} className="flex-1 sm:flex-none h-9 px-3 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 border border-teal-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm" title="Đồng bộ chính xác 100% SKU nguyên liệu từ bảng Products sang bảng BOM_Config">
+                                        <i className="fas fa-sync-alt text-[10px]"></i> <span>Đồng Bộ BOM</span>
+                                    </button>
+                                    <button onClick={handleRepairBOM} className="flex-1 sm:flex-none h-9 px-3 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm" title="Tự động chuẩn hóa đối tượng và tính lại nguyên liệu cho các phiếu xuất BOM bị lỗi">
+                                        <i className="fas fa-magic text-[10px]"></i> <span>Sửa BOM</span>
+                                    </button>
+                                </>
+                            )}
                         </>
                     )}
                 </div>
@@ -718,177 +1159,427 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
             {/* Thống kê tổng quan */}
             {mode !== 'KIEM_KHO' && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-full">
-                <div className="bg-[#141414] border border-[#2a2a2a] p-3.5 sm:p-4 rounded-2xl flex flex-col min-w-0">
-                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1 truncate">Tổng Số Phiếu</span>
-                    <span className="text-xl font-black text-white truncate">{filteredLogs.length} <span className="text-xs font-normal text-gray-500">phiếu</span></span>
+                <div className="bg-[#121215] border border-white/[0.08] p-3.5 sm:p-4 rounded-2xl flex flex-col min-w-0 shadow-sm">
+                    <span className="text-[10px] font-black text-zinc-400 uppercase tracking-wider mb-1 truncate">Tổng Số Phiếu</span>
+                    <span className="text-xl font-black text-white truncate">{filteredLogs.length} <span className="text-xs font-normal text-zinc-500">phiếu</span></span>
                 </div>
-                <div className="bg-[#141414] border border-[#2a2a2a] p-3.5 sm:p-4 rounded-2xl flex flex-col min-w-0">
-                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1 truncate">Tổng Giá Trị</span>
+                <div className="bg-[#121215] border border-white/[0.08] p-3.5 sm:p-4 rounded-2xl flex flex-col min-w-0 shadow-sm">
+                    <span className="text-[10px] font-black text-zinc-400 uppercase tracking-wider mb-1 truncate">Tổng Giá Trị</span>
                     <span className="text-xl font-black text-sky-400 font-mono truncate">{totalValue.toLocaleString('vi-VN')}đ</span>
                 </div>
             </div>
             )}
 
             {/* Bộ lọc nghiệp vụ & Thanh tìm kiếm */}
-            <div className="bg-[#141414] border border-[#2a2a2a] p-3.5 sm:p-4 rounded-2xl space-y-3 shadow-sm w-full max-w-full overflow-x-hidden">
+            <div className="bg-[#121215] border border-white/[0.08] p-3.5 sm:p-4 rounded-2xl space-y-3 shadow-sm w-full max-w-full overflow-x-hidden">
                 {mode !== 'KIEM_KHO' && (
-                <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1 overscroll-x-contain touch-pan-x max-w-full">
-                    <button onClick={() => setFilterType('TẤT CẢ')} className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap border ${filterType === 'TẤT CẢ' ? 'bg-zinc-950 text-white border-zinc-700 shadow-sm' : 'bg-transparent text-gray-500 border-[#333] hover:text-gray-300'}`}>TẤT CẢ</button>
-                    <button onClick={() => setFilterType('KHO HÀNG HOÁ')} className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap border ${filterType === 'KHO HÀNG HOÁ' ? 'bg-blue-600 text-white border-blue-500 shadow-[0_0_10px_rgba(37,99,235,0.3)]' : 'bg-transparent text-gray-500 border-[#333] hover:text-gray-300'}`}>KHO HÀNG HOÁ (PHỤ KIỆN)</button>
-                    <button onClick={() => setFilterType('KHO THÀNH PHẨM')} className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap border ${filterType === 'KHO THÀNH PHẨM' ? 'bg-emerald-600 text-white border-emerald-500 shadow-[0_0_10px_rgba(5,150,105,0.3)]' : 'bg-transparent text-gray-500 border-[#333] hover:text-gray-300'}`}>KHO THÀNH PHẨM (LAYOUT/BỂ)</button>
-                    <button onClick={() => setFilterType('KHO NGUYÊN LIỆU')} className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap border ${filterType === 'KHO NGUYÊN LIỆU' ? 'bg-amber-600 text-white border-amber-500 shadow-[0_0_10px_rgba(217,119,6,0.3)]' : 'bg-transparent text-gray-500 border-[#333] hover:text-gray-300'}`}>KHO NGUYÊN LIỆU (VẬT TƯ)</button>
+                <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-0.5 overscroll-x-contain touch-pan-x max-w-full">
+                    {[
+                        { 
+                            id: 'TẤT CẢ', 
+                            label: 'Tất Cả', 
+                            icon: 'fa-layer-group', 
+                            activeClass: 'bg-white/[0.2] text-white border-white/40 shadow-sm font-black', 
+                            inactiveClass: 'bg-[#18181e] text-zinc-400 border border-white/[0.06] hover:text-white',
+                            iconColor: 'text-zinc-300'
+                        },
+                        { 
+                            id: 'KHO BỂ KÍNH', 
+                            label: 'Kho Bể Kính', 
+                            icon: 'fa-fish', 
+                            activeClass: 'bg-gradient-to-r from-cyan-500/30 via-cyan-500/15 to-transparent text-cyan-300 border-cyan-400/60 shadow-[0_0_16px_rgba(6,182,212,0.35)] ring-1 ring-cyan-400/40 font-black', 
+                            inactiveClass: 'bg-[#18181e] text-zinc-400 border border-white/[0.06] hover:text-cyan-300 hover:border-cyan-500/30',
+                            iconColor: 'text-cyan-400'
+                        },
+                        { 
+                            id: 'KHO LAYOUT', 
+                            label: 'Kho Layout', 
+                            icon: 'fa-mountain-sun', 
+                            activeClass: 'bg-gradient-to-r from-amber-500/30 via-amber-500/15 to-transparent text-amber-300 border-amber-400/60 shadow-[0_0_16px_rgba(245,158,11,0.35)] ring-1 ring-amber-400/40 font-black', 
+                            inactiveClass: 'bg-[#18181e] text-zinc-400 border border-white/[0.06] hover:text-amber-300 hover:border-amber-500/30',
+                            iconColor: 'text-amber-400'
+                        },
+                        { 
+                            id: 'KHO HÀNG HOÁ', 
+                            label: 'Kho Hàng Hoá (Phụ Kiện)', 
+                            icon: 'fa-plug', 
+                            activeClass: 'bg-gradient-to-r from-purple-500/30 via-purple-500/15 to-transparent text-purple-300 border-purple-400/60 shadow-[0_0_16px_rgba(168,85,247,0.35)] ring-1 ring-purple-400/40 font-black', 
+                            inactiveClass: 'bg-[#18181e] text-zinc-400 border border-white/[0.06] hover:text-purple-300 hover:border-purple-500/30',
+                            iconColor: 'text-purple-400'
+                        },
+                        { 
+                            id: 'KHO NGUYÊN LIỆU', 
+                            label: 'Kho Nguyên Liệu (Vật Tư)', 
+                            icon: 'fa-boxes-stacked', 
+                            activeClass: 'bg-gradient-to-r from-emerald-500/30 via-emerald-500/15 to-transparent text-emerald-300 border-emerald-400/60 shadow-[0_0_16px_rgba(16,185,129,0.35)] ring-1 ring-emerald-400/40 font-black', 
+                            inactiveClass: 'bg-[#18181e] text-zinc-400 border border-white/[0.06] hover:text-emerald-300 hover:border-emerald-500/30',
+                            iconColor: 'text-emerald-400'
+                        }
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setFilterType(tab.id)}
+                            className={`px-3.5 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer active:scale-95 border ${
+                                filterType === tab.id ? tab.activeClass : tab.inactiveClass
+                            }`}
+                        >
+                            <i className={`fas ${tab.icon} text-[10px] ${tab.iconColor}`}></i>
+                            <span>{tab.label}</span>
+                        </button>
+                    ))}
                 </div>
                 )}
 
-                <div className="flex gap-2">
-                    <div className="relative flex-1">
-                        <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                <div className="flex gap-2 items-center">
+                    <div className="relative flex-1 bg-[#09090b] border border-white/[0.08] rounded-xl flex items-center px-3 py-1 focus-within:border-[#d4af37]/60 focus-within:ring-1 focus-within:ring-[#d4af37]/25 transition-all">
+                        <i className="fas fa-search text-zinc-500 text-xs mr-2.5 shrink-0"></i>
                         <input 
                             type="text" 
                             value={searchTerm} 
                             onChange={(e) => setSearchTerm(e.target.value)} 
-                            placeholder="Tìm kiếm theo mã phiếu, đối tượng, ghi chú, nhân sự hoặc tên sản phẩm..." 
-                            className="w-full bg-[#0a0a0a] border border-[#333] rounded-xl pl-11 pr-4 py-3.5 text-xs font-bold text-white outline-none focus:border-[#0dcaf0] transition-colors shadow-inner"
+                            placeholder="Tìm theo mã phiếu, đối tượng, ghi chú, tên SP..." 
+                            className="w-full bg-transparent text-xs font-semibold text-white placeholder-zinc-500 outline-none min-w-0"
                         />
+                        {searchTerm && (
+                            <button onClick={() => setSearchTerm('')} className="text-zinc-500 hover:text-zinc-300 p-0.5 shrink-0 transition-colors cursor-pointer">
+                                <i className="fas fa-times-circle text-xs"></i>
+                            </button>
+                        )}
                     </div>
                     <div className="relative w-[130px] sm:w-40 shrink-0">
                         <input 
                             type="month" 
                             value={filterMonth}
                             onChange={(e) => setFilterMonth(e.target.value)}
-                            className="w-full h-full bg-[#0a0a0a] border border-[#333] rounded-xl px-2 sm:px-4 py-3.5 text-xs font-bold text-white outline-none focus:border-[#0dcaf0] transition-colors custom-month-picker"
-                            style={{minHeight: "46px"}}
+                            className="w-full bg-[#09090b] border border-white/[0.08] rounded-xl px-2.5 sm:px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#d4af37] transition-colors"
                         />
                     </div>
                 </div>
             </div>
 
-            {/* Danh sách chứng từ dạng Accordion Cards */}
-            <div className="space-y-3">
+            <div className="space-y-4">
                 {filteredLogs.length === 0 ? (
                     <div className="text-center py-16 bg-[#141414] border border-[#2a2a2a] rounded-2xl text-gray-500 font-bold">
                         <i className="fas fa-box-open text-4xl mb-3 opacity-30 block"></i>
                         Không tìm thấy chứng từ kho nào phù hợp.
                     </div>
                 ) : (
-                    filteredLogs.map(log => {
-                        const isExpanded = !!expandedIds[log.id];
-                        const isImport = String(log.type).trim() === 'Nhập';
-                        let items = safeJSONParse(log.itemsData) || [];
+                    dateGroups.map(([dateKey, dayLogs]) => {
+                        const dayFormatted = dateKey.includes('-') ? dateKey.split('-').reverse().join('/') : dateKey;
+                        const dayTotal = dayLogs.reduce((sum, l) => sum + (Number(l.totalAmount) || 0), 0);
 
                         return (
-                            <div key={log.id} className={`bg-[#141414] border rounded-2xl overflow-hidden transition-all shadow-sm ${isExpanded ? 'border-sky-500/50' : 'border-[#2a2a2a]'}`}>
-                                {/* Card Header */}
-                                <div className="p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-[#1a1a1a]/50 transition-colors" onClick={() => toggleExpand(log.id)}>
-                                    <div className="flex items-center gap-3 min-w-0">
-                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-black text-xs ${isImport ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
-                                            <i className={`fas ${isImport ? 'fa-arrow-down' : 'fa-arrow-up'}`}></i>
+                            <div key={dateKey} className="space-y-2.5">
+                                {/* Thanh Header gom nhóm theo Ngày kèm nút In Gộp Ngày */}
+                                <div className="flex flex-wrap items-center justify-between gap-2 bg-[#161619] border border-white/[0.08] px-3.5 py-2.5 rounded-2xl shadow-sm">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0">
+                                            <i className="fas fa-calendar-alt text-xs"></i>
                                         </div>
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-black text-xs text-white truncate font-mono">{log.id}</span>
-                                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide ${isImport ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
-                                                    {log.type}
-                                                </span>
-                                            </div>
-                                            <div className="text-[11px] font-bold text-gray-400 truncate mt-1">
-                                                Đối tượng: <span className="text-sky-300 font-black">{log.target || 'Nội bộ'}</span> • <span className="text-gray-500 font-mono text-[10px]">{String(log.date).slice(0, 16).replace('T', ' ')}</span>
-                                            </div>
-                                            <div className="text-[10px] text-gray-500 font-bold mt-0.5">
-                                                <i className="fas fa-user-edit mr-1"></i> {log.user || 'Hệ thống'}
-                                            </div>
-                                        </div>
+                                        <span className="font-black text-xs text-white">Ngày {dayFormatted}</span>
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-400">
+                                            {dayLogs.length} chứng từ
+                                        </span>
+                                        <span className="text-[11px] font-black text-sky-400 font-mono hidden sm:inline">
+                                            {Math.round(dayTotal).toLocaleString('vi-VN')}đ
+                                        </span>
                                     </div>
 
-                                    <div className="flex items-center gap-3 shrink-0">
-                                        <div className="text-right hidden sm:block">
-                                            <div className={`font-black text-sm ${isImport ? 'text-emerald-400' : 'text-rose-400'}`}>{Number(log.totalAmount || 0).toLocaleString('vi-VN')}đ</div>
-                                            <div className="text-[10px] text-gray-500 font-bold">{items.length} mặt hàng</div>
-                                        </div>
-
-                                        <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
-                                            <button onClick={() => setPrintTicketData({ ...log, items: safeJSONParse(log.itemsData) })} className="w-8 h-8 rounded-lg bg-[#222] hover:bg-emerald-500/20 text-gray-300 hover:text-emerald-400 flex items-center justify-center transition-colors border border-[#333]" title="In phiếu kho / Tạo ảnh gửi Zalo">
-                                                <i className="fas fa-print text-[11px]"></i>
-                                            </button>
-                                            
-                                            {log.type === 'Đặt Hàng' && (isAdmin || isBossRole || currentRole === 'KHO VẬN') && (
-                                            <button onClick={() => handleConfirmReceived(log)} className="w-8 h-8 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 flex items-center justify-center transition-colors border border-emerald-500/20" title="Xác nhận Hàng Đã Về (Cộng Kho)">
-                                                <i className="fas fa-check-circle text-[12px]"></i>
-                                            </button>
-                                            )}
-                                            
-                                            {isAdmin && (
-                                            <button onClick={() => {
-                                                setEditingLog(log);
-                                                setEditingItems(safeJSONParse(log.itemsData));
-                                            }} className="w-8 h-8 rounded-lg bg-[#222] hover:bg-sky-500/20 text-gray-300 hover:text-sky-400 flex items-center justify-center transition-colors border border-[#333]" title="Sửa phiếu">
-                                                <i className="fas fa-pencil-alt text-[10px]"></i>
-                                            </button>
-                                            )}
-
-                                            {canDelete && (
-                                            <button onClick={() => handleDelete(log)} className="w-8 h-8 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 flex items-center justify-center transition-colors border border-rose-500/20" title="Xóa chứng từ">
-                                                <i className="fas fa-trash-alt text-[10px]"></i>
-                                            </button>
-                                            )}
-                                        </div>
-
-                                        <div className={`w-8 h-8 rounded-lg bg-[#1a1a1a] border border-[#333] flex items-center justify-center text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180 bg-sky-500/20 text-sky-400 border-sky-500/30' : ''}`}>
-                                            <i className="fas fa-chevron-down text-[10px]"></i>
-                                        </div>
-                                    </div>
+                                    {dayLogs.length > 1 && (
+                                        <button 
+                                            onClick={() => handlePrintConsolidatedDay(dateKey, dayLogs)}
+                                            className="h-8 px-3 rounded-xl bg-gradient-to-r from-sky-600/30 to-blue-600/30 hover:from-sky-600/40 hover:to-blue-600/40 text-sky-300 border border-sky-500/40 text-[10.5px] font-black uppercase tracking-wider flex items-center gap-1.5 active:scale-95 transition-all shadow-sm cursor-pointer"
+                                            title={`Gộp ${dayLogs.length} phiếu của ngày ${dayFormatted} thành 1 phiếu in tổng hợp duy nhất`}
+                                        >
+                                            <i className="fas fa-print text-xs text-sky-400"></i>
+                                            <span>In Gộp Ngày ({dayLogs.length} phiếu)</span>
+                                        </button>
+                                    )}
                                 </div>
 
-                                {/* Expanded Mini-Table */}
-                                {isExpanded && (
-                                    <div className="border-t border-[#222] bg-[#0a0a0a] p-4 animate-fade-in">
-                                        {/* Mobile view only total amount */}
-                                        <div className="sm:hidden flex justify-between items-center mb-3 p-2 bg-[#141414] rounded-lg border border-[#2a2a2a]">
-                                            <span className="text-[10px] font-black text-gray-400 uppercase">TỔNG TIỀN PHIẾU:</span>
-                                            <span className={`font-black text-sm ${isImport ? 'text-emerald-400' : 'text-rose-400'}`}>{Number(log.totalAmount || 0).toLocaleString('vi-VN')}đ</span>
-                                        </div>
+                                {/* Danh sách từng chứng từ trong ngày */}
+                                <div className="space-y-2.5">
+                                    {dayLogs.map(log => {
+                                        const isExpanded = !!expandedIds[log.id];
+                                        const isImport = String(log.type).trim() === 'Nhập';
+                                        let rawItems = safeJSONParse(log.itemsData) || [];
+                                        const isBomTicket = log.id && String(log.id).startsWith('IE_BOM_');
 
-                                        {log.note && (
-                                            <div className="text-[11px] text-sky-300 mb-3 bg-sky-500/10 p-3 rounded-xl border border-sky-500/20 shadow-inner">
-                                                <span className="font-black text-sky-400 uppercase tracking-wider text-[10px] block mb-0.5"><i className="fas fa-tag mr-1"></i> Ghi chú:</span> 
-                                                {log.note}
+                                        let calculatedTotal = 0;
+                                        const items = rawItems.map(it => {
+                                            const qty = Number(it.qty) || 1;
+                                            const itSku = String(it.sku || '').trim();
+                                            const itName = String(it.name || '').trim();
+                                            const itNameLower = itName.toLowerCase();
+                                            const itSkuLower = itSku.toLowerCase();
+
+                                            const matchedP = (data?.Products || []).find(x => 
+                                                (itSku && String(x.sku || '').toUpperCase() === itSku.toUpperCase()) || 
+                                                (itName && String(x.name || '').toLowerCase() === itNameLower) ||
+                                                (itSku && String(x.name || '').toLowerCase() === itSkuLower)
+                                            );
+
+                                            const displayUnit = (matchedP && matchedP.unit) ? matchedP.unit : (it.unit || 'Cái');
+                                            const uClean = String(displayUnit || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+                                            const isGram = uClean === 'gam' || uClean === 'g' || uClean === 'gram';
+
+                                            let rawPrice = 0;
+                                            if (it.price !== undefined && Number(it.price) > 0) {
+                                                rawPrice = Number(it.price);
+                                            } else if (it.costPrice !== undefined && Number(it.costPrice) > 0) {
+                                                rawPrice = Number(it.costPrice);
+                                            } else if (matchedP && (Number(matchedP.costPrice) > 0 || Number(matchedP.price) > 0)) {
+                                                rawPrice = Number(matchedP.costPrice || matchedP.price);
+                                            } else if (Number(log.totalAmount) > 0) {
+                                                rawPrice = (rawItems.length === 1) ? (Number(log.totalAmount) / qty) : (Number(log.totalAmount) / rawItems.length / qty);
+                                            }
+
+                                            let effectivePrice = rawPrice;
+
+                                            // Chỉ quy đổi đơn giá nếu là phiếu xuất BOM và đơn vị tính của dòng thực sự là gam
+                                            if (isBomTicket && isGram && effectivePrice >= 1000) {
+                                                const conv = (matchedP && Number(matchedP.conversionRate) > 1) ? Number(matchedP.conversionRate) : 1000;
+                                                effectivePrice = Number((rawPrice / conv).toFixed(2));
+                                            }
+
+                                            let lineAmt = Number(it.amount);
+                                            if (isNaN(lineAmt) || lineAmt <= 0) {
+                                                lineAmt = Math.round(qty * effectivePrice);
+                                            }
+
+                                            calculatedTotal += lineAmt;
+
+                                            return {
+                                                ...it,
+                                                qty,
+                                                itSku: itSku || matchedP?.sku || '',
+                                                itName: itName || matchedP?.name || '',
+                                                matchedP,
+                                                displayUnit: displayUnit,
+                                                unit: displayUnit,
+                                                effectivePrice,
+                                                price: effectivePrice,
+                                                effectiveAmount: lineAmt
+                                            };
+                                        });
+
+                                        const displayTotalAmount = (isBomTicket && calculatedTotal < Number(log.totalAmount || 0)) 
+                                            ? calculatedTotal 
+                                            : Number(log.totalAmount || calculatedTotal || 0);
+
+                                        return (
+                                            <div key={log.id} className={`bg-[#141414] border rounded-2xl overflow-hidden transition-all shadow-sm ${isExpanded ? 'border-sky-500/50' : 'border-[#2a2a2a]'}`}>
+                                                <div className="p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-[#1a1a1a]/50 transition-colors" onClick={() => toggleExpand(log.id)}>
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-black text-xs ${isImport ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                                                            <i className={`fas ${isImport ? 'fa-arrow-down' : 'fa-arrow-up'}`}></i>
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-black text-xs text-white truncate font-mono">{log.id}</span>
+                                                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide ${isImport ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                                                                    {log.type}
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-[11px] font-bold text-gray-400 truncate mt-1">
+                                                                Đối tượng: <span className="text-sky-300 font-black">{log.target || 'Nội bộ'}</span> • <span className="text-gray-500 font-mono text-[10px]">{String(log.date).slice(0, 16).replace('T', ' ')}</span>
+                                                            </div>
+                                                            <div className="text-[10px] text-gray-500 font-bold mt-0.5">
+                                                                <i className="fas fa-user-edit mr-1"></i> {log.user || 'Hệ thống'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-3 shrink-0">
+                                                        <div className="text-right hidden sm:block">
+                                                            <div className={`font-black text-sm ${isImport ? 'text-emerald-400' : 'text-rose-400'}`}>{Math.round(displayTotalAmount).toLocaleString('vi-VN')}đ</div>
+                                                            <div className="text-[10px] text-gray-500 font-bold">{items.length} mặt hàng</div>
+                                                        </div>
+
+                                                        <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
+                                                            <button onClick={() => setPrintTicketData({ ...log, totalAmount: displayTotalAmount, items: items.map(x => ({ ...x, price: x.effectivePrice, amount: x.effectiveAmount })) })} className="w-8 h-8 rounded-lg bg-[#222] hover:bg-emerald-500/20 text-gray-300 hover:text-emerald-400 flex items-center justify-center transition-colors border border-[#333]" title="In phiếu kho / Tạo ảnh gửi Zalo">
+                                                                <i className="fas fa-print text-[11px]"></i>
+                                                            </button>
+                                                            
+                                                            {log.type === 'Đặt Hàng' && (isAdmin || isBossRole || currentRole === 'KHO VẬN') && (
+                                                            <button onClick={() => handleConfirmReceived(log)} className="w-8 h-8 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 flex items-center justify-center transition-colors border border-emerald-500/20" title="Xác nhận Hàng Đã Về (Cộng Kho)">
+                                                                <i className="fas fa-check-circle text-[12px]"></i>
+                                                            </button>
+                                                            )}
+                                                            
+                                                            {isAdmin && (
+                                                            <button onClick={() => {
+                                                                setEditingLog(log);
+                                                                setEditingItems(items.map(x => ({ ...x, price: x.effectivePrice, amount: x.effectiveAmount })));
+                                                            }} className="w-8 h-8 rounded-lg bg-[#222] hover:bg-sky-500/20 text-gray-300 hover:text-sky-400 flex items-center justify-center transition-colors border border-[#333]" title="Sửa phiếu">
+                                                                <i className="fas fa-pencil-alt text-[10px]"></i>
+                                                            </button>
+                                                            )}
+
+                                                            {canDelete && (
+                                                            <button onClick={() => handleDelete(log)} className="w-8 h-8 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 flex items-center justify-center transition-colors border border-rose-500/20" title="Xóa chứng từ">
+                                                                <i className="fas fa-trash-alt text-[10px]"></i>
+                                                            </button>
+                                                            )}
+                                                        </div>
+
+                                                        <div className={`w-8 h-8 rounded-lg bg-[#1a1a1a] border border-[#333] flex items-center justify-center text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180 bg-sky-500/20 text-sky-400 border-sky-500/30' : ''}`}>
+                                                            <i className="fas fa-chevron-down text-[10px]"></i>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {isExpanded && (
+                                                    <div className="p-4 border-t border-[#222] bg-[#0d0d0d] space-y-3 animate-fade-in">
+                                                        {log.note && (
+                                                            <div className="bg-[#181818] p-3 rounded-xl border border-[#2a2a2a] text-xs text-gray-300 flex items-start gap-2">
+                                                                <i className="fas fa-sticky-note text-sky-400 mt-0.5"></i>
+                                                                <div>
+                                                                    <span className="font-bold text-gray-400 uppercase text-[9px] block">Ghi chú:</span>
+                                                                    <span className="font-medium">{log.note}</span>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {items.length === 0 ? (
+                                                            <div className="text-center py-4 text-gray-500 text-xs italic">Không có chi tiết sản phẩm</div>
+                                                        ) : (
+                                                            <div className="overflow-x-auto rounded-xl border border-[#222]">
+                                                                <table className="w-full text-left text-xs">
+                                                                    <thead>
+                                                                        <tr className="bg-[#141414] text-gray-500 border-b border-[#222]">
+                                                                            <th className="py-2.5 px-3 font-black uppercase text-[9px] tracking-wider">Tên Sản Phẩm</th>
+                                                                            <th className="py-2.5 px-3 font-black uppercase text-[9px] tracking-wider text-center">Số Lượng</th>
+                                                                            <th className="py-2.5 px-3 font-black uppercase text-[9px] tracking-wider text-right">Đơn Giá</th>
+                                                                            <th className="py-2.5 px-3 font-black uppercase text-[9px] tracking-wider text-right">Thành Tiền</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody className="divide-y divide-[#222]">
+                                                                        {items.map((it, idx) => {
+                                                                            const { qty, itSku, itName, matchedP, displayUnit, effectivePrice, effectiveAmount } = it;
+
+                                                                            // Tên hiển thị & Mã SKU chuẩn hóa đồng bộ kho thật
+                                                                            let displayName = itName || matchedP?.name || itSku || 'Vật tư';
+                                                                            let rawSku = itSku || matchedP?.sku || '';
+                                                                            
+                                                                            if (displayName === 'NLSX-KINH-5LI' || rawSku === 'NLSX-KINH-5LI' || rawSku === 'NL-BE-KINH5LI') {
+                                                                                displayName = 'Kính Siêu Trong 5li';
+                                                                                rawSku = 'NL-BE-KINH5LI';
+                                                                            } else if (displayName === 'NLSX-KINH-8LI' || rawSku === 'NLSX-KINH-8LI' || rawSku === 'NL-BE-KINH8LI') {
+                                                                                displayName = 'Kính Siêu Trong 8li';
+                                                                                rawSku = 'NL-BE-KINH8LI';
+                                                                            } else if (displayName === 'NLSX-MAI-CNC' || rawSku === 'NLSX-MAI-CNC' || rawSku === 'DICHVU-MAI-CNC' || displayName.includes('Mài CNC')) {
+                                                                                displayName = 'Mài CNC Cạnh Vi Tính (Gia công)';
+                                                                                rawSku = 'DICHVU-MAI-CNC';
+                                                                            } else if (displayName === 'NLSX-KEO-WACKER' || rawSku === 'NLSX-KEO-WACKER' || rawSku === 'NL-BE-KEO-WACKER') {
+                                                                                displayName = 'Keo Silicone Wacker Chuyên Dụng';
+                                                                                rawSku = 'NL-BE-KEO-WACKER';
+                                                                            } else if (displayName === 'NLSX-KEO-502' || displayName === 'NLSX-502-1CHAI' || rawSku === 'NLSX-502-1CHAI' || rawSku === 'NLSX-KEO-502') {
+                                                                                displayName = 'Keo 502 Chuyên Dụng';
+                                                                                rawSku = 'NL-LAY-KEO-502';
+                                                                            } else if (displayName.includes('FOMEX-8') || displayName.includes('FOMEX 8') || rawSku === 'NLSX-FOMEX-8') {
+                                                                                displayName = 'Fomex Đế Layout 8li';
+                                                                                rawSku = 'NL-LAY-FOMEX-8';
+                                                                            } else if (displayName.includes('FOMEX-10') || displayName.includes('FOMEX 10') || rawSku === 'NLSX-FOMEX-10') {
+                                                                                displayName = 'Fomex Đế Layout 10li';
+                                                                                rawSku = 'NL-LAY-FOMEX-10';
+                                                                            } else if (displayName === 'NLSX-REU-A04' || rawSku === 'NLSX-REU-A04') {
+                                                                                displayName = 'Rêu Xanh A04 Dán Layout';
+                                                                                rawSku = 'NL-LAY-REU-A04';
+                                                                            } else if (displayName === 'NLSX-REU-A11' || rawSku === 'NLSX-REU-A11') {
+                                                                                displayName = 'Rêu Đỏ A11 Dán Layout';
+                                                                                rawSku = 'NL-LAY-REU-A11';
+                                                                            } else if (displayName === 'NLSX-LUASANMIENG' || rawSku === 'NLSX-LUASANMIENG') {
+                                                                                displayName = 'Lũa Săn Miếng Tự Nhiên';
+                                                                                rawSku = 'NL-LAY-LUASANMIENG';
+                                                                            } else if (displayName === 'NLSX-TAIMEO' || rawSku === 'NLSX-TAIMEO') {
+                                                                                displayName = 'Đá Tai Mèo Vân Đẹp';
+                                                                                rawSku = 'NL-LAY-TAIMEO';
+                                                                            } else if (displayName === 'NLSX-CUOI' || rawSku === 'NLSX-CUOI') {
+                                                                                displayName = 'Đá Cuội Tự Nhiên';
+                                                                                rawSku = 'NL-LAY-CUOI';
+                                                                            } else if (displayName === 'NLSX-NHAM' || rawSku === 'NLSX-NHAM') {
+                                                                                displayName = 'Nham Thạch Đen/Đỏ';
+                                                                                rawSku = 'NL-LAY-NHAM';
+                                                                            } else if (displayName === 'NLSX-DOQUYEN' || rawSku === 'NLSX-DOQUYEN') {
+                                                                                displayName = 'Lũa Đỗ Quyên Tự Nhiên';
+                                                                                rawSku = 'NL-LAY-DOQUYEN';
+                                                                            } else if (displayName === 'NLSX-RF' || rawSku === 'NLSX-RF') {
+                                                                                displayName = 'Rễ Rừng Tự Nhiên';
+                                                                                rawSku = 'NL-LAY-SX-RF';
+                                                                            } else if (matchedP && matchedP.name && matchedP.name !== matchedP.sku) {
+                                                                                displayName = matchedP.name;
+                                                                                rawSku = matchedP.sku || rawSku;
+                                                                            }
+
+                                                                            const displaySku = rawSku;
+
+                                                                            return (
+                                                                                <tr key={idx} className="hover:bg-[#1a1a1a]/40 transition-colors">
+                                                                                    <td className="py-2.5 px-3">
+                                                                                        <div className="font-bold text-gray-200 text-[11px] leading-tight">{displayName}</div>
+                                                                                        {displaySku && (
+                                                                                            <div className="text-[9.5px] font-mono text-zinc-400 font-semibold flex items-center gap-1 mt-0.5">
+                                                                                                <i className="fas fa-barcode text-[8.5px] text-[#d4af37]"></i>
+                                                                                                <span className="text-[#d4af37]">{displaySku}</span>
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </td>
+                                                                                    <td className="py-2.5 px-3 text-center font-black text-sky-400">
+                                                                                        <span className="bg-sky-500/10 px-2 py-0.5 rounded-md border border-sky-500/20">{qty} {displayUnit}</span>
+                                                                                    </td>
+                                                                                    <td className="py-2.5 px-3 text-right text-gray-400 font-mono">{Math.round(effectivePrice).toLocaleString('vi-VN')}đ</td>
+                                                                                    <td className="py-2.5 px-3 text-right font-black text-emerald-400 font-mono">{Math.round(effectiveAmount).toLocaleString('vi-VN')}đ</td>
+                                                                                </tr>
+                                                                            );
+                                                                        })}
+                                                                    </tbody>
+                                                                    <tfoot className="bg-[#121216] border-t border-zinc-800 text-xs font-mono">
+                                                                        {(() => {
+                                                                            const sumItemAmt = items.reduce((sum, it) => sum + (Number(it.effectiveAmount || (it.qty * it.price)) || 0), 0);
+                                                                            const ticketTotal = Number(log.totalAmount || 0);
+                                                                            const otherCost = Math.max(0, ticketTotal - Math.round(sumItemAmt));
+                                                                            return (
+                                                                                <>
+                                                                                    <tr>
+                                                                                        <td colSpan="3" className="py-2 px-3 text-right text-zinc-400 font-sans font-bold text-[10.5px]">
+                                                                                            Tổng tiền hàng ({items.length} mặt hàng):
+                                                                                        </td>
+                                                                                        <td className="py-2 px-3 text-right font-bold text-zinc-200">
+                                                                                            {Math.round(sumItemAmt).toLocaleString('vi-VN')}đ
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                    {otherCost > 0 && (
+                                                                                        <tr className="bg-amber-500/[0.04]">
+                                                                                            <td colSpan="3" className="py-2 px-3 text-right text-amber-400 font-sans font-bold text-[10.5px]">
+                                                                                                <i className="fas fa-truck mr-1 text-[9.5px]"></i> Cước vận chuyển / Chi phí khác:
+                                                                                            </td>
+                                                                                            <td className="py-2 px-3 text-right font-black text-amber-400">
+                                                                                                +{otherCost.toLocaleString('vi-VN')}đ
+                                                                                            </td>
+                                                                                        </tr>
+                                                                                    )}
+                                                                                    <tr className="bg-emerald-500/[0.08] border-t border-emerald-500/20">
+                                                                                        <td colSpan="3" className="py-2.5 px-3 text-right text-emerald-400 font-sans font-black text-[11px] uppercase tracking-wider">
+                                                                                            Tổng thanh toán phiếu:
+                                                                                        </td>
+                                                                                        <td className="py-2.5 px-3 text-right font-black text-emerald-400 text-sm">
+                                                                                            {ticketTotal.toLocaleString('vi-VN')}đ
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                </>
+                                                                            );
+                                                                        })()}
+                                                                    </tfoot>
+                                                                </table>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                        <div className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-2 mt-2">Chi tiết sản phẩm ({items.length}):</div>
-                                        {items.length === 0 ? (
-                                            <div className="text-xs text-gray-500 italic py-2">Không có thông tin chi tiết mặt hàng.</div>
-                                        ) : (
-                                            <div className="overflow-x-auto rounded-xl border border-[#222] overscroll-x-contain touch-pan-x max-w-full">
-                                                <table className="w-full text-left text-xs min-w-[320px]">
-                                                    <thead>
-                                                        <tr className="bg-[#141414] text-gray-500 border-b border-[#222]">
-                                                            <th className="py-2.5 px-3 font-black uppercase text-[9px] tracking-wider">Tên Sản Phẩm</th>
-                                                            <th className="py-2.5 px-3 font-black uppercase text-[9px] tracking-wider text-center">Số Lượng</th>
-                                                            <th className="py-2.5 px-3 font-black uppercase text-[9px] tracking-wider text-right">Đơn Giá</th>
-                                                            <th className="py-2.5 px-3 font-black uppercase text-[9px] tracking-wider text-right">Thành Tiền</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-[#222]">
-                                                        {items.map((it, idx) => {
-                                                            const qty = Number(it.qty) || 1;
-                                                            const price = Number(it.price) || 0;
-                                                            return (
-                                                                <tr key={idx} className="hover:bg-[#1a1a1a]/40 transition-colors">
-                                                                    <td className="py-2.5 px-3 font-bold text-gray-200">{it.name || it.sku || 'N/A'}</td>
-                                                                    <td className="py-2.5 px-3 text-center font-black text-sky-400">
-                                                                        <span className="bg-sky-500/10 px-2 py-0.5 rounded-md border border-sky-500/20">{qty} {it.unit || 'Cái'}</span>
-                                                                    </td>
-                                                                    <td className="py-2.5 px-3 text-right text-gray-400 font-mono">{price.toLocaleString('vi-VN')}đ</td>
-                                                                    <td className="py-2.5 px-3 text-right font-black text-emerald-400 font-mono">{(qty * price).toLocaleString('vi-VN')}đ</td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
+                                        );
+                                    })}
+                                </div>
                             </div>
                         );
                     })
@@ -926,11 +1617,17 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
                         </div>
                         
                         <div className="space-y-3 max-h-[50vh] overflow-y-auto custom-scrollbar pr-1">
-                            {editingItems.map((it, idx) => (
+                            {editingItems.map((it, idx) => {
+                                const matchedP = (data?.Products || []).find(x => 
+                                    (it.sku && String(x.sku || '').toUpperCase() === String(it.sku).trim().toUpperCase()) || 
+                                    (it.name && String(x.name || '').toLowerCase() === String(it.name).trim().toLowerCase())
+                                );
+                                const itemUnit = (matchedP && matchedP.unit) ? matchedP.unit : (it.unit || 'Cái');
+                                return (
                                 <div key={idx} className="flex justify-between items-center bg-[#0a0a0a] p-3 rounded-xl border border-[#222]">
                                     <div className="flex-1">
                                         <div className="text-[12px] font-black text-gray-200">{it.name}</div>
-                                        <div className="text-[10px] text-gray-500 font-bold">{Number(it.price || 0).toLocaleString()}đ / {it.unit || 'Cái'}</div>
+                                        <div className="text-[10px] text-gray-500 font-bold">{Number(it.price || 0).toLocaleString('vi-VN')}đ / {itemUnit}</div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <label className="text-[10px] font-bold text-gray-500">SỐ LƯỢNG:</label>
@@ -946,7 +1643,8 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
                                         />
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                         
                         <div className="pt-4 mt-2 border-t border-[#222]">
@@ -1130,7 +1828,7 @@ function IEFormModal({ data, onClose, pushData, prefilledProduct, userConfigs, o
            pPrice = pPrice / Number(p.conversionRate);
        }
 
-       setItems([...items, { id: p.id, name: p.name, qty: qtyNum, price: pPrice, unit: p.unit || 'Cái' }]); 
+       setItems([...items, { id: p.id, name: p.name, qty: qtyNum, price: pPrice, unit: p.unit || '' }]); 
        setSelProd(''); setSelQty(''); setSelPrice(''); setSearchProd(''); 
        setIsUsingImportUnit(false);
    };
@@ -1155,6 +1853,8 @@ function IEFormModal({ data, onClose, pushData, prefilledProduct, userConfigs, o
      setIsSaving(true);
      let payload = { Products: [], ImportExport: [], Transactions: [], Accounts: [], Suppliers: [] };
      let formattedDate = (dateStr || '').replace('T', ' ');
+     let logId = '';
+     let targetName = '';
 
      if (type === 'Kiểm Kho') {
          let nhapItems = []; let xuatItems = []; let totalNhapAmt = 0; let totalXuatAmt = 0;
@@ -1164,9 +1864,9 @@ function IEFormModal({ data, onClose, pushData, prefilledProduct, userConfigs, o
                  const diff = actual - Number(p.quantity);
                  payload.Products.push({ ...p, quantity: actual, _diff: diff });
                  if (diff > 0) {
-                     nhapItems.push({ name: p.name, qty: diff, price: p.costPrice || 0, unit: p.unit || 'Cái' }); totalNhapAmt += diff * Number(p.costPrice || 0);
+                     nhapItems.push({ name: p.name, qty: diff, price: p.costPrice || 0, unit: p.unit || '' }); totalNhapAmt += diff * Number(p.costPrice || 0);
                  } else {
-                     const absDiff = Math.abs(diff); xuatItems.push({ name: p.name, qty: absDiff, price: p.costPrice || 0, unit: p.unit || 'Cái' }); totalXuatAmt += absDiff * Number(p.costPrice || 0);
+                     const absDiff = Math.abs(diff); xuatItems.push({ name: p.name, qty: absDiff, price: p.costPrice || 0, unit: p.unit || '' }); totalXuatAmt += absDiff * Number(p.costPrice || 0);
                  }
              }
          });
@@ -1180,7 +1880,7 @@ function IEFormModal({ data, onClose, pushData, prefilledProduct, userConfigs, o
          if (nhapItems.length > 0) payload.ImportExport.push({ id: 'IE_GCHK_N_' + Date.now(), type: 'Nhập', target: 'Kiểm kho (Cân tăng)', totalAmount: totalNhapAmt, date: formattedDate, note: `Cân đối kiểm kho tăng danh mục: ${checkSubCat}`, itemsData: JSON.stringify(nhapItems) });
          if (xuatItems.length > 0) payload.ImportExport.push({ id: 'IE_GCHK_X_' + Date.now() + 1, type: 'Xuất', target: 'Kiểm kho (Cân giảm)', totalAmount: totalXuatAmt, date: formattedDate, note: `Cân đối kiểm kho giảm danh mục: ${checkSubCat}`, itemsData: JSON.stringify(xuatItems) });
      } else {
-         const logId = 'IE_'+Date.now(); let totalDebtAdd = 0;
+         logId = 'IE_'+Date.now(); let totalDebtAdd = 0;
          items.forEach(i => { 
              const p = (data?.Products||[]).find(x=>x.id===i.id); 
              if(p && type !== 'Đặt Hàng') {
@@ -1188,7 +1888,7 @@ function IEFormModal({ data, onClose, pushData, prefilledProduct, userConfigs, o
                  payload.Products.push({...p, quantity: Number(p.quantity) + diffVal, _diff: diffVal}); 
              }
          });
-         let targetName = 'Nội bộ/Khác';
+         targetName = 'Nội bộ/Khác';
 
          if(type === 'Nhập' || type === 'Đặt Hàng') {
             targetName = supplierId ? ((data?.Suppliers||[]).find(s=>s.id===supplierId)?.name || 'Khác') : 'Khác';

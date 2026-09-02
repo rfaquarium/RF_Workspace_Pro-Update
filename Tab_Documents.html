@@ -137,8 +137,8 @@ function DocumentUploadModal({ onClose, pushDeltas, triggerToast }) {
 // -------------------------------------------------------------------------
 // MỤC 2: GIAO DIỆN CHÍNH TAB TÀI LIỆU
 // -------------------------------------------------------------------------
-function DocumentsTab({ documents = [], isAdmin, pushDeltas, triggerToast }) {
-  const [search, setSearch] = React.useState('');
+function DocumentsTab({ documents = [], isAdmin: propIsAdmin, isBoss: propIsBoss, userRole: propUserRole, currentUser: propCurrentUser, hasPerm: propHasPerm, pushDeltas, triggerToast }) {
+  const [search] = React.useState('');
   const [categoryFilter, setCategoryFilter] = React.useState('Tất cả');
   const [editingDoc, setEditingDoc] = React.useState(null);
   const [previewDoc, setPreviewDoc] = React.useState(null);
@@ -146,7 +146,20 @@ function DocumentsTab({ documents = [], isAdmin, pushDeltas, triggerToast }) {
   const [editUploading, setEditUploading] = React.useState(false);
   const [editProgress, setEditProgress] = React.useState(0);
   
-  const currentUser = localStorage.getItem('rf_user') || 'Unknown';
+  const currentRole = propUserRole || localStorage.getItem('rf_role') || '';
+  const currentUser = propCurrentUser || localStorage.getItem('rf_user') || 'Unknown';
+  const isBoss = propIsBoss !== undefined ? propIsBoss : (localStorage.getItem('rf_boss') === 'true' || currentRole === 'TỐI CAO' || currentUser.includes('Tiến'));
+  const isAdmin = propIsAdmin !== undefined ? propIsAdmin : (localStorage.getItem('rf_admin') === 'true' || isBoss);
+
+  const hasPerm = React.useCallback((actionCode) => {
+    if (isBoss || currentRole === 'TỐI CAO') return true;
+    if (typeof propHasPerm === 'function') return propHasPerm(actionCode);
+    if (typeof canUserDo === 'function') return canUserDo(actionCode, currentRole, currentUser);
+    return isAdmin;
+  }, [propHasPerm, currentRole, currentUser, isAdmin, isBoss]);
+
+  const canManageDocs = hasPerm('DOC_MANAGE'); // Chỉ Tiến
+  const canDownloadAttachment = hasPerm('DOC_DOWNLOAD_ATTACHMENT'); // Tiến, Tân, Dương, Tâm, Hương, Trang
 
   const categories = ['Tất cả', 'Phiếu Lương', 'Hướng Dẫn', 'Biểu Mẫu', 'Báo Giá', 'Đào Tạo', 'Thông Tin', 'Kế Hoạch', 'Khác'];
 
@@ -339,10 +352,10 @@ function DocumentsTab({ documents = [], isAdmin, pushDeltas, triggerToast }) {
           <h2 className="font-black text-2xl text-white tracking-wide">TÀI LIỆU <span className="text-[#d4af37]">NỘI BỘ</span></h2>
           <p className="text-sm text-gray-400 mt-1">Quản lý và tra cứu biểu mẫu, hướng dẫn, báo giá ({filteredDocs.length} tài liệu)</p>
         </div>
-        {isAdmin && (
+        {canManageDocs && (
           <button 
             onClick={() => window.dispatchEvent(new CustomEvent('openDocumentUpload'))}
-            className="bg-gradient-to-r from-[#d4af37] to-[#b8972e] text-[#0a0a0a] px-6 py-2.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg hover:shadow-xl hover:shadow-[#d4af37]/20 whitespace-nowrap"
+            className="bg-gradient-to-r from-[#d4af37] to-[#b8972e] text-[#0a0a0a] px-6 py-2.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg hover:shadow-xl hover:shadow-[#d4af37]/20 whitespace-nowrap cursor-pointer"
           >
             <i className="fas fa-cloud-upload-alt text-lg"></i> TẢI LÊN TÀI LIỆU
           </button>
@@ -405,12 +418,12 @@ function DocumentsTab({ documents = [], isAdmin, pushDeltas, triggerToast }) {
                       <i className={`fas ${theme.icon} text-xl`}></i>
                     </div>
                     
-                    {isAdmin && (
+                    {canManageDocs && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => openEdit(doc)} className="w-8 h-8 flex items-center justify-center text-amber-500/70 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors" title="Sửa">
+                        <button onClick={() => openEdit(doc)} className="w-8 h-8 flex items-center justify-center text-amber-500/70 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors cursor-pointer" title="Sửa">
                           <i className="fas fa-edit text-sm"></i>
                         </button>
-                        <button onClick={() => handleDelete(doc)} className="w-8 h-8 flex items-center justify-center text-rose-500/70 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors" title="Xoá">
+                        <button onClick={() => handleDelete(doc)} className="w-8 h-8 flex items-center justify-center text-rose-500/70 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer" title="Xoá">
                           <i className="fas fa-trash text-sm"></i>
                         </button>
                       </div>

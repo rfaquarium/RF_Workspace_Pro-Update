@@ -19,7 +19,7 @@ const ORDER_STATUS = { AUTO_SCAN: 'Quét Tự Động', PENDING_PROD: 'Chờ S�
 const CATEGORIES = ['LAYOUT', 'BỂ KÍNH', 'PHỤ KIỆN', 'DANH MỤC SẢN XUẤT'];
 const SUB_CATEGORIES = { 
     'LAYOUT': ['LINH THÚ', 'VÁCH SUỐI', 'HẺM NÚI', 'NATURE', 'NHẤT TRỤ', 'TRĂNG', 'BONSAI', 'CẦU VỒNG', 'BIOTOP CUỘI', 'HANG ĐỘNG', 'RỪNG', 'ĐẢO BAY', 'CỔNG VÒM', 'COVER'], 
-    'BỂ KÍNH': ['BỂ MINI', 'TERRARIUM', 'BÁN CẠN', 'BỂ BETTA', 'BỂ NÂNG ĐÁY'], 
+    'BỂ KÍNH': ['BỂ MINI', 'TERRARIUM', 'BÁN CẠN', 'BỂ BETTA', 'BỂ NÂNG ĐÁY', 'BỂ LẺ SIZE'], 
     'PHỤ KIỆN': ['CÁT, PHÂN NỀN', 'BƠM LỌC', 'VẬT LIỆU LỌC', 'ĐÈN LED', 'THỨC ĂN', 'PHỤ KIỆN KHÁC'], 
     'DANH MỤC SẢN XUẤT': ['NGUYÊN LIỆU LAYOUT', 'NGUYÊN LIỆU BỂ KÍNH', 'NGUYÊN LIỆU ĐÓNG GÓI', 'VẬT TƯ SẢN XUẤT'] 
 };
@@ -30,6 +30,80 @@ const INVENTORY_GROUPS = {
     RAW_MATERIALS: { label: 'NGUYÊN LIỆU SẢN XUẤT', icon: 'fa-boxes-stacked', categories: ['DANH MỤC SẢN XUẤT'] },
     DEFECT: { label: 'HÀNG HỎNG VỠ', icon: 'fa-heart-crack', categories: ['HÀNG HỎNG VỠ'] }
 };
+
+/**
+ * Hàm tìm kiếm nguyên liệu chuẩn xác trong Products (Kho Nguyên Liệu)
+ * Khớp chuẩn SKU, ID, Alias SKU (NLSX-NOIN <-> NLSX-NHAMNONOI, NLSX-RE <-> NLSX-REEN...) 
+ * và tên sản phẩm trong kho.
+ */
+function findMaterialInProducts(matSku, matId, prodList) {
+    if (!prodList || prodList.length === 0) return null;
+    const s = String(matSku || '').trim().toUpperCase();
+    const cleanS = s.replace(/[^A-Z0-9]/g, '');
+
+    // 1. Khớp chính xác ID hoặc SKU
+    let found = prodList.find(p => 
+        (matId && String(p.id) === String(matId)) ||
+        (s && String(p.sku || '').trim().toUpperCase() === s)
+    );
+    if (found) return found;
+
+    // 2. Tra cứu từ điển Alias SKU chuẩn xác
+    const ALIAS_MAP = {
+        'NLSX-KINH-5LI': ['KINH 5LI', 'KINH 5 LI', 'KINH 5MM', 'KINH 5 LY', 'NLSX-KINH-5MM', 'KINH 5', 'KINH 5LY', 'KINH SIEU TRONG 5LI'],
+        'NLSX-KINH-8LI': ['KINH 8LI', 'KINH 8 LI', 'KINH 8MM', 'KINH 8 LY', 'NLSX-KINH-8MM', 'KINH 8', 'KINH 8LY', 'KINH SIEU TRONG 8LI'],
+        'NLSX-MAI-CNC': ['MAI CNC', 'MAI VI TINH', 'MAI CNC VI TINH', 'CONG MAI CNC', 'MAI VI TINH CNC', 'GIA CONG MAI CNC'],
+        'NLSX-KEO-WACKER': ['KEO WACKER', 'WACKER', 'SILICONE WACKER', 'KEO DAN BE WACKER', 'KEO WACKER 121', 'KEO SILICONE WACKER'],
+        'NLSX-NOIN': ['NLSX-NHONOI', 'NHONOI', 'NHO NOI', 'LUA NHO NOI'],
+        'NLSX-NHONOI': ['NLSX-NOIN', 'NOIN', 'NHO NOI', 'LUA NHO NOI'],
+        'NLSX-NHAMXANH': ['NLSX-NHAM', 'NHAM', 'NHAM XANH', 'DA NHAM XANH'],
+        'NLSX-NHAM': ['NLSX-NHAMXANH', 'NHAMXANH', 'NHAM XANH'],
+        'NLSX-VIAVOI': ['NLSX-VIA', 'VIA', 'VIA VOI', 'DA VIA VOI', 'DA VIA'],
+        'NLSX-VIA': ['NLSX-VIAVOI', 'VIAVOI', 'VIA VOI', 'DA VIA VOI'],
+        'NLSX-DANHCANH': ['NLSX-LUASANCANH', 'LUASANCANH', 'SAN CANH', 'DANG CANH', 'LUA DANG CANH', 'LUA SAN CANH'],
+        'NLSX-LUASANHTHANG': ['NLSX-LUASANCANH', 'LUASANTHANG', 'SAN THANG', 'LUA SAN THANG'],
+        'NLSX-LUASANCANH': ['NLSX-DANHCANH', 'NLSX-LUASANHTHANG', 'SAN CANH', 'DANG CANH'],
+        'NLSX-REEN': ['NLSX-RE', 'RE', 'RE RUNG', 'LUA RE RUNG', 'RE EN'],
+        'NLSX-RE': ['NLSX-REEN', 'REEN', 'RE RUNG', 'LUA RE RUNG'],
+        'NLSX-LUASANMIENG': ['LUASANMIENG', 'SAN MIENG', 'LUA SAN MIENG', 'LUA SAM MIENG'],
+        'NLSX-TAIMEO': ['TAIMEO', 'TAI MEO', 'DA TAI MEO'],
+        'NLSX-CUOI': ['CUOI', 'DA CUOI', 'BIOTOP CUOI'],
+        'NLSX-DOQUYEN': ['DOQUYEN', 'DO QUYEN', 'LUA DO QUYEN'],
+        'NLSX-THACHSUNG': ['THACHSUNG', 'THACH SUNG', 'LUA THACH SUNG'],
+        'NLSX-REU-A04': ['REU-A04', 'A04', 'REU BOT MAU XANH', 'REU XANH', 'REU BOT XANH'],
+        'NLSX-REU-A11': ['REU-A11', 'A11', 'REU BOT MAU DO', 'REU DO', 'REU BOT DO'],
+        'NLSX-FOMEX-8LI': ['FOMEX-8LI', 'FOMEX 8LI', 'FOMEX 8', 'FOMEX8'],
+        'NLSX-FOMEX10-54': ['FOMEX10-54', 'FOMEX-10LI', 'FOMEX 10LI', 'FOMEX 10', 'FOMEX10'],
+        'NLSX-502-1CHAI': ['502', 'KEO 502', 'KEO 502 CHAI', '502-1CHAI', 'NLSX-502', 'NLSX-KEO-502'],
+        'NLSX-KEO-502': ['502', 'KEO 502', 'KEO 502 CHAI', '502-1CHAI', 'NLSX-502', 'NLSX-502-1CHAI']
+    };
+
+    const aliases = ALIAS_MAP[s] || [];
+    for (const alias of aliases) {
+        found = prodList.find(p => {
+            const pSkuUpper = String(p.sku || '').trim().toUpperCase();
+            const pNameUpper = String(p.name || '').trim().toUpperCase();
+            return pSkuUpper === alias || pSkuUpper.includes(alias) || pNameUpper.includes(alias);
+        });
+        if (found) return found;
+    }
+
+    // 3. Khớp SKU chuẩn hoá không dấu / không ký tự đặc biệt
+    found = prodList.find(p => {
+        const pSkuClean = String(p.sku || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        return cleanS && pSkuClean && (pSkuClean === cleanS || pSkuClean.includes(cleanS) || cleanS.includes(pSkuClean));
+    });
+    if (found) return found;
+
+    // 4. Khớp theo Tên sản phẩm
+    found = prodList.find(p => {
+        const pName = String(p.name || '').trim().toLowerCase();
+        const matSkuLower = s.toLowerCase();
+        return pName && (pName === matSkuLower || matSkuLower.includes(pName) || pName.includes(matSkuLower));
+    });
+
+    return found || null;
+}
 
 /**
  * Hàm tính toán chi phí và quy đổi đơn vị định mức BOM chuẩn xác
@@ -926,4 +1000,170 @@ const exportToExcel = async (items, columns, filename = 'export.xlsx') => {
   XLSX.utils.book_append_sheet(wb, ws, "Data");
   XLSX.writeFile(wb, filename);
 };
+
+// ==========================================
+// MA TRẬN PHÂN QUYỀN RBAC CHUẨN XÁC 100% (THEO CHỐT TỪ BOSS TIẾN)
+// ==========================================
+const RF_INTERNAL_ROLES = [
+  'TỐI CAO', 'QUẢN LÝ SẢN XUẤT', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ NHÂN SỰ',
+  'QUẢN LÝ BÁN HÀNG', 'KẾ TOÁN', 'THỢ SẢN XUẤT', 'NHÂN VIÊN',
+  // Các alias tương đương đề phòng tên viết tắt
+  'QUẢN LÝ KHO', 'SẢN XUẤT', 'KHO VẬN', 'BÁN HÀNG', 'NHÂN SỰ', 'FOUNDER', 'ADMIN'
+];
+
+const RF_RBAC_RULES = {
+  // 1. Header & Nút Toàn Cục
+  BLACKBOX_AUDIT: ['TỐI CAO'],
+  RELOAD_DATA: 'ALL',
+  LOGIN_LOGOUT: 'ALL',
+  CALC_FREIGHT: 'ALL',
+  CALC_TANK: 'ALL',
+  CALC_LAYOUT: 'ALL',
+  VIEW_PRICE_LIST: 'ALL_INTERNAL',
+  REIMBURSE_SUBMIT: 'ALL_INTERNAL',
+  REIMBURSE_APPROVE: ['TỐI CAO', 'KẾ TOÁN'],
+  QUICK_PENALTY: ['TỐI CAO', 'QUẢN LÝ SẢN XUẤT', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ NHÂN SỰ', 'QUẢN LÝ BÁN HÀNG', 'KẾ TOÁN'],
+  QUICK_EXPENSE: ['TỐI CAO', 'KẾ TOÁN'],
+
+  // 2. Tab Đơn Hàng
+  ORDER_CREATE: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ BÁN HÀNG', 'KẾ TOÁN', 'CỘNG TÁC VIÊN', 'CTV'],
+  ORDER_IMPORT: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ BÁN HÀNG', 'KẾ TOÁN'],
+  ORDER_SCAN_QR: ['TỐI CAO', 'QUẢN LÝ SẢN XUẤT', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ BÁN HÀNG'],
+  ORDER_EDIT: ['TỐI CAO', 'QUẢN LÝ BÁN HÀNG'],
+  ORDER_CANCEL: ['TỐI CAO', 'QUẢN LÝ BÁN HÀNG'],
+  ORDER_DELETE: ['TỐI CAO'],
+  ORDER_STATUS_PENDING_PROD: ['TỐI CAO', 'QUẢN LÝ BÁN HÀNG'],
+  ORDER_STATUS_DELIVERED: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ BÁN HÀNG'],
+  ORDER_STATUS_RECONCILED: ['TỐI CAO', 'QUẢN LÝ BÁN HÀNG', 'KẾ TOÁN'],
+  ORDER_ARCHIVE_VIEW: ['TỐI CAO', 'QUẢN LÝ SẢN XUẤT', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ NHÂN SỰ', 'QUẢN LÝ BÁN HÀNG', 'KẾ TOÁN'],
+  ORDER_PRINT_EXPORT: ['TỐI CAO', 'QUẢN LÝ SẢN XUẤT', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ NHÂN SỰ', 'QUẢN LÝ BÁN HÀNG', 'KẾ TOÁN'],
+
+  // 3. Tab Sản Xuất
+  PROD_PHASE1_TAKE: ['TỐI CAO', 'QUẢN LÝ SẢN XUẤT', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ NHÂN SỰ', 'THỢ SẢN XUẤT', 'NHÂN VIÊN', 'SẢN XUẤT'],
+  PROD_PHASE1_START: ['TỐI CAO', 'QUẢN LÝ SẢN XUẤT', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ NHÂN SỰ', 'THỢ SẢN XUẤT', 'NHÂN VIÊN', 'SẢN XUẤT'],
+  PROD_PHASE1_SUBMIT: ['TỐI CAO', 'QUẢN LÝ SẢN XUẤT', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ NHÂN SỰ', 'THỢ SẢN XUẤT', 'NHÂN VIÊN', 'SẢN XUẤT'],
+  PROD_PHASE2_TAKE: ['TỐI CAO', 'QUẢN LÝ SẢN XUẤT', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ NHÂN SỰ', 'THỢ SẢN XUẤT', 'NHÂN VIÊN', 'SẢN XUẤT'],
+  PROD_PHASE2_START: ['TỐI CAO', 'QUẢN LÝ SẢN XUẤT', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ NHÂN SỰ', 'THỢ SẢN XUẤT', 'NHÂN VIÊN', 'SẢN XUẤT'],
+  PROD_PHASE2_SUBMIT: ['TỐI CAO', 'QUẢN LÝ SẢN XUẤT', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ NHÂN SỰ', 'THỢ SẢN XUẤT', 'NHÂN VIÊN', 'SẢN XUẤT'],
+  PROD_QC_APPROVE: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO'],
+  PROD_QC_REJECT: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO'],
+  PROD_REASSIGN_WORKER: ['TỐI CAO', 'QUẢN LÝ NHÂN SỰ'],
+  PROD_CREATE_STOCK_BATCH: ['TỐI CAO', 'QUẢN LÝ SẢN XUẤT', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ NHÂN SỰ'],
+  PROD_CANCEL_DEFECT: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO'],
+  PROD_MOVE_TO_PACKING: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ BÁN HÀNG'],
+
+  // 4. Khâu Đóng Gói
+  PACKING_TAKE: 'ALL_INTERNAL',
+  PACKING_PREFLIGHT: 'ALL_INTERNAL',
+  PACKING_PHOTO: 'ALL_INTERNAL',
+  PACKING_COMPLETE: 'ALL_INTERNAL',
+  PACKING_CARRIED_WH: 'ALL_INTERNAL',
+
+  // 5. Tab Nhân Sự
+  HR_ATTENDANCE_SELF: 'ALL_INTERNAL',
+  HR_LEAVE_SELF: 'ALL_INTERNAL',
+  HR_CLAIM_KPI_REWARD: 'ALL_INTERNAL',
+  HR_EDIT_ATTENDANCE: ['TỐI CAO', 'QUẢN LÝ NHÂN SỰ'],
+  HR_BONUS_PENALTY: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ NHÂN SỰ', 'QUẢN LÝ BÁN HÀNG', 'KẾ TOÁN'],
+  HR_EDIT_KPI_TARGET: ['TỐI CAO'],
+  HR_VIEW_TOTAL_PAYROLL: 'ALL_INTERNAL',
+  HR_PRINT_PAYSLIP: ['TỐI CAO', 'QUẢN LÝ NHÂN SỰ', 'KẾ TOÁN'],
+  HR_PAY_SALARY_ADVANCE: ['TỐI CAO', 'KẾ TOÁN'],
+  HR_CONFIG_STAFF: ['TỐI CAO'],
+
+  // 6. Tab Kho Hàng & Định Mức BOM
+  INV_VIEW_FINISHED: 'ALL_INTERNAL',
+  INV_VIEW_RAW_MATERIALS: 'ALL_INTERNAL',
+  INV_ADD_PRODUCT: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'KẾ TOÁN'],
+  INV_EDIT_PRODUCT: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'KẾ TOÁN'],
+  INV_ADJUST_STOCK: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ BÁN HÀNG', 'KẾ TOÁN'],
+  INV_DELETE_PRODUCT: ['TỐI CAO'],
+  INV_STOCK_HISTORY: ['TỐI CAO', 'QUẢN LÝ SẢN XUẤT', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'QUẢN LÝ NHÂN SỰ', 'QUẢN LÝ BÁN HÀNG', 'KẾ TOÁN', 'THỢ SẢN XUẤT'],
+  INV_BOM_CONFIG: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'KẾ TOÁN'],
+
+  // 7. Tab Xuất Nhập Kho
+  IE_CREATE_IMPORT: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'KẾ TOÁN'],
+  IE_CREATE_EXPORT: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'KẾ TOÁN'],
+  IE_CREATE_PO: 'ALL_INTERNAL',
+  IE_APPROVE_PO: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'KẾ TOÁN'],
+  IE_EDIT_LOG: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'KẾ TOÁN'],
+  IE_DELETE_LOG: ['TỐI CAO'],
+
+  // 8. Tab Tài Chính & Đối Tác
+  FIN_VIEW_ACCOUNTS: ['TỐI CAO', 'QUẢN LÝ BÁN HÀNG', 'KẾ TOÁN'],
+  FIN_CREATE_TRANSACTION: ['TỐI CAO', 'KẾ TOÁN'],
+  FIN_TRANSFER_MONEY: ['TỐI CAO', 'KẾ TOÁN'],
+  FIN_EDIT_DELETE_TRANSACTION: ['TỐI CAO'],
+  FIN_INCOME: ['TỐI CAO', 'QUẢN LÝ BÁN HÀNG', 'KẾ TOÁN'],
+  FIN_EXPENSE: ['TỐI CAO', 'KẾ TOÁN'],
+  FIN_TRANSFER: ['TỐI CAO', 'KẾ TOÁN'],
+  FIN_EDIT_TRANSACTION: ['TỐI CAO', 'KẾ TOÁN'],
+  FIN_DELETE_TRANSACTION: ['TỐI CAO'],
+  FIN_CONFIG_ACCOUNTS: ['TỐI CAO'],
+  SUPPLIER_MANAGE: ['TỐI CAO', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ KHO', 'KẾ TOÁN'],
+  SUPPLIER_PAY_DEBT: ['TỐI CAO', 'KẾ TOÁN'],
+
+  // 9. Tab Báo Cáo P&L, KQKD & Shopee Global
+  REPORT_PL_VIEW: ['TỐI CAO', 'QUẢN LÝ BÁN HÀNG', 'KẾ TOÁN'],
+  REPORT_BUSINESS_VIEW: ['TỐI CAO', 'KẾ TOÁN'],
+  SHOPEE_GLOBAL_VIEW: ['TỐI CAO', 'QUẢN LÝ BÁN HÀNG', 'KẾ TOÁN'],
+  REPORT_EXPORT_EXCEL: ['TỐI CAO', 'KẾ TOÁN'],
+
+  // 10. Cộng Tác Viên & Tiện Ích
+  CTV_WALLET_MANAGE: ['TỐI CAO', 'QUẢN LÝ BÁN HÀNG', 'KẾ TOÁN'],
+  CTV_LAYOUT_PRICE_CONFIG: ['TỐI CAO', 'QUẢN LÝ BÁN HÀNG'],
+  VIEWER_3D_VIEW: 'ALL',
+  MODELS_3D_UPLOAD: ['TỐI CAO'],
+  DOCUMENTS_UPLOAD: ['TỐI CAO'],
+  WORKSPACES_ASSIGN: ['TỐI CAO', 'QUẢN LÝ NHÂN SỰ']
+};
+
+/**
+ * Hàm kiểm tra quyền tập trung chuẩn xác (Single Source of Truth)
+ * @param {string} actionCode Mã quyền (ví dụ 'ORDER_EDIT', 'PROD_QC_APPROVE')
+ * @param {string} role Phân quyền của user (ví dụ 'TỐI CAO', 'QUẢN LÝ SẢN XUẤT')
+ * @param {string} user Tên nhân sự (ví dụ 'Nguyễn Ngọc Tiến')
+ * @returns {boolean}
+ */
+function canUserDo(actionCode, role, user) {
+  let r = String(role || localStorage.getItem('rf_role') || '').trim().toUpperCase();
+  const u = String(user || localStorage.getItem('rf_user') || '').trim();
+
+  // Boss Tối Cao luôn có 100% quyền
+  if (r === 'TỐI CAO' || u.includes('Tiến') || localStorage.getItem('rf_boss') === 'true') {
+    return true;
+  }
+
+  // Khách (Guest) không có quyền thao tác bất kỳ nút nào ngoại trừ xem
+  if (r === 'KHÁCH') return false;
+
+  // Chuẩn hóa tên phân quyền nếu viết tắt hoặc không dấu
+  if (r === 'KETOAN' || r === 'KE TOAN') r = 'KẾ TOÁN';
+  if (r === 'BAN HANG' || r === 'BANHANG') r = 'QUẢN LÝ BÁN HÀNG';
+  if (r === 'SAN XUAT' || r === 'SANXUAT') r = 'QUẢN LÝ SẢN XUẤT';
+  if (r === 'KHO VAN' || r === 'KHOVAN' || r === 'KHO') r = 'QUẢN LÝ KHO VẬN';
+  if (r === 'NHAN SU' || r === 'NHANSU') r = 'QUẢN LÝ NHÂN SỰ';
+  if (r === 'THO SAN XUAT' || r === 'THOSANXUAT') r = 'THỢ SẢN XUẤT';
+  if (r === 'NHAN VIEN' || r === 'NHANVIEN') r = 'NHÂN VIÊN';
+  if (r === 'CONG TAC VIEN' || r === 'CTV') r = 'CỘNG TÁC VIÊN';
+
+  const rule = RF_RBAC_RULES[actionCode];
+  if (!rule) return false;
+
+  if (rule === 'ALL') return true;
+
+  const isInternal = RF_INTERNAL_ROLES.includes(r);
+  if (rule === 'ALL_INTERNAL') {
+    return isInternal && r !== 'CỘNG TÁC VIÊN' && r !== 'CTV';
+  }
+
+  if (Array.isArray(rule)) {
+    return rule.some(allowed => {
+      const a = String(allowed).trim().toUpperCase();
+      return a === r || (a === 'CTV' && (r === 'CỘNG TÁC VIÊN' || r === 'CTV'));
+    });
+  }
+
+  return false;
+}
 </script>

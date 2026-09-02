@@ -5,12 +5,23 @@
 // KÊNH CHUẨN: Shopee VN, TH, SG, MA, PH, TW, TikTok Shop, Cộng Tác Viên, Bán Lẻ, Bán Sỉ, Bảo Hành, Sản Xuất Tồn
 // =========================================================================
 
-const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin, mode, userConfigs }) {
-    const currentRole = localStorage.getItem('rf_role') || '';
-    const isBoss = currentRole === 'TỐI CAO' || currentRole === 'ADMIN' || isAdmin;
+const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin: propIsAdmin, isBoss: propIsBoss, userRole: propUserRole, currentUser: propCurrentUser, hasPerm: propHasPerm, mode, userConfigs }) {
+    const currentRole = propUserRole || localStorage.getItem('rf_role') || '';
+    const currentUser = propCurrentUser || localStorage.getItem('rf_user') || '';
+    const isBoss = propIsBoss !== undefined ? propIsBoss : (localStorage.getItem('rf_boss') === 'true' || currentRole === 'TỐI CAO' || currentUser.includes('Tiến'));
+    const isAdmin = propIsAdmin !== undefined ? propIsAdmin : (localStorage.getItem('rf_admin') === 'true' || isBoss);
+
+    const hasPerm = React.useCallback((actionCode) => {
+        if (isBoss || currentRole === 'TỐI CAO') return true;
+        if (typeof propHasPerm === 'function') return propHasPerm(actionCode);
+        if (typeof canUserDo === 'function') return canUserDo(actionCode, currentRole, currentUser);
+        return isBoss;
+    }, [propHasPerm, currentRole, currentUser, isBoss]);
+
+    const canViewFinanceReport = hasPerm('REPORT_FINANCE_VIEW'); // Tiến & Trang
     
     // 1. BẢO MẬT & PHÂN QUYỀN
-    if (!isBoss) {
+    if (!canViewFinanceReport) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[65vh] text-center animate-fade-in p-6">
                 <div className="relative mb-8 group">
@@ -22,7 +33,7 @@ const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin,
                 <h2 className="text-3xl font-black text-rose-500 tracking-[0.25em] uppercase drop-shadow-[0_0_10px_rgba(225,29,72,0.5)] mb-4">Tuyệt Mật</h2>
                 <div className="w-16 h-[2px] bg-rose-500/50 mb-5 mx-auto"></div>
                 <p className="text-[13px] font-bold text-gray-400 max-w-md tracking-wide leading-relaxed">
-                    Khu vực này chứa dữ liệu P&L sinh tử của doanh nghiệp.<br/><br/>Chỉ tài khoản mang đặc quyền <span className="text-rose-400 drop-shadow-[0_0_5px_rgba(225,29,72,0.8)]">TỐI CAO</span> mới được phép truy cập.
+                    Khu vực này chứa dữ liệu P&L sinh tử của doanh nghiệp.<br/><br/>Chỉ tài khoản mang đặc quyền <span className="text-rose-400 drop-shadow-[0_0_5px_rgba(225,29,72,0.8)]">TỐI CAO</span> và <span className="text-amber-400">KẾ TOÁN</span> mới được phép truy cập.
                 </p>
             </div>
         );
@@ -121,11 +132,12 @@ const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin,
         }
     };
 
-    // Hàm an toàn parse số tiền tránh tràn số hoặc dính mã vạch
-    const safeNum = React.useCallback((val, max = 50000000) => {
-        const n = Number(val) || 0;
-        if (n < 0 || n > max) return 0;
-        return n;
+    // Hàm an toàn parse số tiền (Ngưỡng an toàn thực tế: 2 Tỷ đồng chống parse nhầm SĐT)
+    const safeNum = React.useCallback((val, max = 2000000000) => {
+        if (val === null || val === undefined || val === '') return 0;
+        const num = Number(String(val).replace(/[^\d.-]/g, ''));
+        if (isNaN(num) || num < 0 || num > max) return 0;
+        return num;
     }, []);
 
     // Hàm lấy giá vốn COGS cho sản phẩm từ bảng Products hoặc ImportExport
@@ -309,10 +321,15 @@ const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin,
                 channelBreakdown[chName].sold += 1;
 
                 // 1. Doanh thu (Chuẩn hoá theo VNĐ)
-                let rev = safeNum(o.revenue, 100000000) || safeNum(o.retailTotal, 100000000) || 0;
-                if ((chName === 'Xuất Khẩu' || String(o.channel || '').toUpperCase().includes('USD')) && rev > 0 && rev < 10000) {
-                    rev = Math.round(rev * 25500);
+                // Lưu ý: Tất cả đơn hàng (Shopee Global TH, SG, MA, PH, TW, TikTok, Shopee VN, Bán Lẻ...) đều ĐÃ ĐƯỢC QUY ĐỔI SẴN SANG VNĐ khi lưu vào bảng Orders
+                let rev = safeNum(o.revenue) || safeNum(o.retailTotal) || 0;
+                let chUpper = String(o.channel || '').trim().toUpperCase();
+                let rate = 1;
+                if ((chUpper.includes('USD') || chName === 'Xuất Khẩu') && rev > 0 && rev < 10000) {
+                    rate = 25500;
                 }
+
+                rev = Math.round(rev * rate);
 
                 totalRevenue += rev;
                 channelBreakdown[chName].revenue += rev;
@@ -377,39 +394,255 @@ const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin,
             }
         });
 
-        // 4. Quét Chi Phí Lương & Vận Hành từ Transactions
+        // 4. QUÉT CHI PHÍ LƯƠNG & VẬN HÀNH CHUẨN XÁC (SINGLE SOURCE OF TRUTH TỪ BẢNG LƯƠNG ĐÃ CỘNG 100% KPI)
         let totalSalaryExpense = 0;
         let totalOperationExpense = 0;
 
+        const cleanNumber = (v) => {
+            if (v === undefined || v === null || v === '') return 0;
+            if (typeof v === 'number') return isNaN(v) ? 0 : v;
+            const n = Number(String(v).replace(/[^0-9.-]+/g, ''));
+            return isNaN(n) ? 0 : n;
+        };
+
+        const filterMonth = startDateStr.slice(0, 7); // e.g. "2026-08"
+
+        const parseDateSafe = (dStr) => {
+            if (!dStr) return NaN;
+            const str = String(dStr).trim();
+            if (str.includes('T')) return new Date(str).getTime();
+            if (str.includes('/')) {
+                const parts = str.split(' ')[0].split('/');
+                if (parts.length === 3) {
+                    if (parts[2].length === 4) return new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T12:00:00`).getTime();
+                    if (parts[0].length === 4) return new Date(`${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}T12:00:00`).getTime();
+                }
+            }
+            if (str.includes('-')) {
+                const parts = str.split(' ')[0].split('-');
+                if (parts.length === 3) {
+                    if (parts[0].length === 4) return new Date(`${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}T12:00:00`).getTime();
+                    if (parts[2].length === 4) return new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T12:00:00`).getTime();
+                }
+            }
+            return new Date(str).getTime();
+        };
+
+        const isDateInFilter = (dStr) => {
+            if (!dStr) return false;
+            const str = String(dStr).trim();
+            if (str.includes(filterMonth)) return true;
+            const t = parseDateSafe(str);
+            return !isNaN(t) && t >= sTime && t <= eTime;
+        };
+
+        const isUserMatch = (u1, u2) => {
+            if (!u1 || !u2) return false;
+            const s1 = String(u1).trim().toLowerCase();
+            const s2 = String(u2).trim().toLowerCase();
+            return s1 === s2 || s1.includes(s2) || s2.includes(s1);
+        };
+
+        const isExportChannel = (ch) => {
+            const c = String(ch || '').toUpperCase();
+            return c.includes('XUẤT KHẨU') || c.includes('EXPORT') || c.includes('QUỐC TẾ') ||
+                   /\bSHOPEE\s*[-_]?\s*(TH|MA|MY|SG|TW|PH)\b/i.test(c);
+        };
+
+        const nhanSuList = (data?.Config_NhanSu || window.erpData?.Config_NhanSu || userConfigs?.raw || window.userConfigs?.raw || []);
+        const allAttendance = (data?.Attendance || data?.attendance || window.erpData?.Attendance || window.attendance || []);
+        const allBPs = (data?.BonusPenalty || window.erpData?.BonusPenalty || []);
+        const allKpis = (data?.KPI_Progress || window.erpData?.KPI_Progress || []);
+        const allPackings = (data?.Packings || data?.packings || window.erpData?.Packings || window.packings || []);
+        const kpiConfigList = (data?.Config_KPI || data?.kpiConfig || window.kpiConfig || window.erpData?.Config_KPI || []);
+
+        const isXuKPI = (k) => {
+            const uStr = String(k.unit || '').toLowerCase().trim();
+            const idStr = String(k.id || '').toUpperCase();
+            const typeStr = String(k.type || '').toUpperCase();
+            const nameStr = String(k.kpiName || '').toLowerCase();
+            return uStr === 'xu' || uStr.includes('xu') || idStr.startsWith('KPI_XU_') || typeStr === 'XU_REWARD' || nameStr.includes('nhận xu') || nameStr.includes('thưởng xu');
+        };
+
+        const users = (userConfigs?.users && Array.isArray(userConfigs.users) && userConfigs.users.length > 0)
+            ? userConfigs.users
+            : (nhanSuList && nhanSuList.length > 0)
+                ? nhanSuList.map(ns => String(ns['Tên Nhân Sự'] || ns.name || '').trim()).filter(Boolean)
+                : Object.keys(userConfigs?.salaries || {});
+
+        const allSnapshots = (data?.monthlySnapshots || data?.Monthly_Snapshots || window.erpData?.monthlySnapshots || window.erpData?.Monthly_Snapshots || []);
+
+        users.forEach(u => {
+            const sal = userConfigs?.salaries?.[u] || (userConfigs?.raw || nhanSuList || []).find(ns => isUserMatch(ns['Tên Nhân Sự'] || ns.name, u)) || {};
+            const baseSalary = cleanNumber(sal.baseSalary !== undefined ? sal.baseSalary : (sal['Lương Cơ Bản'] || 0));
+            const hourlyRate = baseSalary > 1000000 ? Math.round(baseSalary / 28 / 8) : baseSalary;
+
+            // 1. Chấm công & Giờ công
+            const userAtts = allAttendance.filter(a => isUserMatch(a.user, u) && isDateInFilter(a.date));
+            const totalGateHours = userAtts.reduce((sum, a) => sum + cleanNumber(a.totalHours), 0);
+            const daysWorked = new Set(userAtts.filter(a => cleanNumber(a.totalHours) > 0).map(a => String(a.date).slice(0, 10))).size;
+            const luongChinh = (Math.round(hourlyRate * totalGateHours) || 0) || (baseSalary > 1000000 && totalGateHours === 0 ? baseSalary : 0);
+
+            // 2. Thưởng & Phụ cấp
+            const userBPs = allBPs.filter(b => isUserMatch(b.user, u) && isDateInFilter(b.date));
+            const luongLamThemGio = userBPs.filter(b => b.type === 'Lương Làm Thêm Giờ').reduce((sum, b) => sum + cleanNumber(b.amount), 0);
+            const hoaHongBanHang = userBPs.filter(b => b.type === 'Thưởng Bán Hàng').reduce((sum, b) => sum + cleanNumber(b.amount), 0);
+            const hoTroSanLuong = userBPs.filter(b => b.type === 'Hỗ Trợ Sản Lượng').reduce((sum, b) => sum + cleanNumber(b.amount), 0);
+            const phuCapKhac = userBPs.filter(b => b.type === 'Phụ Cấp Khác').reduce((sum, b) => sum + cleanNumber(b.amount), 0);
+            const thuongNong = userBPs.filter(b => b.type === 'Thưởng Nóng' || b.type === 'Thưởng').reduce((sum, b) => sum + cleanNumber(b.amount), 0);
+            const manualChuyenCan = userBPs.find(b => b.type === 'Thưởng Chuyên Cần');
+            const chuyenCan = manualChuyenCan ? cleanNumber(manualChuyenCan.amount) : ((daysWorked >= 28 || totalGateHours >= 216) ? 500000 : 0);
+            const tongThuong = thuongNong + chuyenCan;
+            const cacKhoanThuKhac = userBPs.filter(b => b.type === 'Thu Nhập Khác' || b.type === 'Các Khoản Thu Khác').reduce((sum, b) => sum + cleanNumber(b.amount), 0);
+
+            // Các khoản thưởng phát sinh khác
+            const excludeBonusTypes = [
+                'Lương Làm Thêm Giờ', 'Thưởng Bán Hàng', 'Hỗ Trợ Sản Lượng', 'Phụ Cấp Khác',
+                'Thưởng Nóng', 'Thưởng', 'Thưởng Chuyên Cần', 'Thu Nhập Khác', 'Các Khoản Thu Khác',
+                'Nhận Xét', 'Tạm Ứng', 'Thanh Toán Lương', 'Đã Trả', 'Phạt Quy Định', 'Chi Phí Bảo Hành'
+            ];
+            const thuongKhac = userBPs.filter(b => !excludeBonusTypes.includes(b.type) && cleanNumber(b.amount) > 0).reduce((sum, b) => sum + cleanNumber(b.amount), 0);
+
+            // 3. Hoa hồng Sản xuất (Khâu 1 & Khâu 2)
+            let prodSalary = 0;
+            allProduction.forEach(p => {
+                const isStock = p.fulfilledFromStock === true || String(p.fulfilledFromStock).toUpperCase() === 'TRUE';
+                if (isStock) return;
+                const isDone = p.status === 'Done' || String(p.status).toUpperCase() === 'ĐÃ XONG' || String(p.status).toUpperCase() === 'HOÀN KHO ĐẠT';
+                if (!isDone) return;
+
+                const pChannel = String(p.channel || p.orderChannel || '').toUpperCase();
+                const isIntl = isExportChannel(pChannel);
+
+                const k1User = p.phases?.phase1?.user || p.p1_user;
+                const k1Status = p.phases?.phase1?.status || p.p1_status;
+                const k1Reward = p.phases?.phase1?.reward_vnd !== undefined ? p.phases.phase1.reward_vnd : p.p1_reward_vnd;
+                const k1Time = p.phases?.phase1?.endTime || p.p1_endTime || p.p1_start || p.date || p.deadline;
+                if (isUserMatch(k1User, u) && (k1Status === 'Done' || isDone) && isDateInFilter(k1Time)) {
+                    let r1 = 0;
+                    if (typeof getSopAndReward === 'function') {
+                        const kInfo = getSopAndReward(p, p.phases?.phase1?.name || p.p1_name || 'phase1', kpiConfigList, pChannel);
+                        if (kInfo && kInfo.reward) r1 = cleanNumber(kInfo.reward);
+                    }
+                    if (r1 === 0) {
+                        r1 = cleanNumber(k1Reward);
+                        if (isIntl && r1 > 0) r1 = r1 * 3;
+                    }
+                    prodSalary += r1;
+                }
+
+                const k2User = p.phases?.phase2?.user || p.p2_user;
+                const k2Status = p.phases?.phase2?.status || p.p2_status;
+                const k2Reward = p.phases?.phase2?.reward_vnd !== undefined ? p.phases.phase2.reward_vnd : p.p2_reward_vnd;
+                const k2Time = p.phases?.phase2?.endTime || p.p2_endTime || p.p2_start || p.date || p.deadline;
+                if (isUserMatch(k2User, u) && (k2Status === 'Done' || isDone) && isDateInFilter(k2Time)) {
+                    let r2 = 0;
+                    if (typeof getSopAndReward === 'function') {
+                        const kInfo = getSopAndReward(p, p.phases?.phase2?.name || p.p2_name || 'phase2', kpiConfigList, pChannel);
+                        if (kInfo && kInfo.reward) r2 = cleanNumber(kInfo.reward);
+                    }
+                    if (r2 === 0) {
+                        r2 = cleanNumber(k2Reward);
+                        if (isIntl && r2 > 0) r2 = r2 * 3;
+                    }
+                    prodSalary += r2;
+                }
+            });
+
+            // 4. Thưởng đóng gói & chở kho
+            allPackings.forEach(pk => {
+                if (isUserMatch(pk.user, u) && pk.status === 'Done' && isDateInFilter(pk.endTime || pk.date || pk.start)) {
+                    if (String(pk.id).includes('PK_WH_')) {
+                        prodSalary += cleanNumber(pk.reward_vnd || 10000);
+                    } else {
+                        let pReward = cleanNumber(pk.reward_vnd);
+                        const pkChannel = String(pk.channel || pk.orderChannel || '').toUpperCase();
+                        const isIntl = isExportChannel(pkChannel);
+                        if (isIntl && pReward > 0) pReward = pReward * 3;
+                        prodSalary += pReward;
+                    }
+                }
+            });
+
+            // 5. KPI chức vụ THỰC TẾ ĐÃ ĐẠT (Claimed / Hoàn Thành) - Đồng bộ 100% với Bảng Lương HR
+            const devKpisClaimed = allKpis.filter(k => 
+                isUserMatch(k.user, u) && 
+                !isXuKPI(k) && 
+                (isDateInFilter(k.endTime) || isDateInFilter(k.lastUpdated) || isDateInFilter(k.startTime) || isDateInFilter(k.date) || (!k.startTime && !k.endTime)) &&
+                (k.isClaimed === true || String(k.isClaimed).toLowerCase() === 'true' || (Number(k.target) > 0 && Number(k.current) >= Number(k.target)))
+            );
+            const funcSalaryActual = devKpisClaimed.reduce((sum, k) => sum + cleanNumber(k.reward), 0);
+
+            // 6. Phụ cấp cấu hình
+            const allowanceConfig = cleanNumber(sal.allowance !== undefined ? sal.allowance : (sal['Phụ Cấp Xăng Xe'] || 0));
+            const tongPhuCapActual = funcSalaryActual + allowanceConfig + phuCapKhac;
+
+            // 7. Tổng Thu Nhập Thực Tế Trước Giảm Trừ
+            const tongThuNhapActual = luongChinh + luongLamThemGio + prodSalary + hoTroSanLuong + tongPhuCapActual + tongThuong + hoaHongBanHang + cacKhoanThuKhac + thuongKhac;
+
+            // 8. Các khoản giảm trừ thực tế (Phạt quy định, công đoàn 100k, đền bù bảo hành...)
+            const workDaysSet = new Set(userAtts.filter(a => cleanNumber(a.totalHours) >= 2 && a.shift !== 'Nghỉ Phép').map(a => String(a.date).slice(0, 10)));
+            const leaveDaysSet = new Set(userAtts.filter(a => (String(a.status || '').includes('Nghỉ') || String(a.shift || '').includes('Nghỉ') || a.leaveType) && !workDaysSet.has(String(a.date).slice(0, 10))).map(a => String(a.date).slice(0, 10)));
+            const soNgayNghi = leaveDaysSet.size;
+            const phatVuotNgayNghi = soNgayNghi > 2 ? (soNgayNghi - 2) * 200000 : 0;
+            const phatQuyDinh = Math.abs(userBPs.filter(b => b.type === 'Phạt Quy Định').reduce((sum, b) => sum + cleanNumber(b.amount), 0)) + userAtts.reduce((sum, a) => sum + cleanNumber(a.penalty), 0) + phatVuotNgayNghi;
+            const phiCongDoan = (totalGateHours > 0 || daysWorked > 0) ? 100000 : 0;
+            const chiPhiBaoHanh = Math.abs(userBPs.filter(b => b.type === 'Chi Phí Bảo Hành').reduce((sum, b) => sum + cleanNumber(b.amount), 0));
+            const excludeGiamTru = ['Phạt Quy Định', 'Chi Phí Bảo Hành', 'Tạm Ứng', 'Thanh Toán Lương', 'Đã Trả'];
+            const giamTruKhac = Math.abs(userBPs.filter(b => !excludeGiamTru.includes(b.type) && cleanNumber(b.amount) < 0).reduce((sum, b) => sum + cleanNumber(b.amount), 0));
+            const tongGiamTru = phatQuyDinh + phiCongDoan + chiPhiBaoHanh + giamTruKhac;
+
+            // 9. Lương thực tế phải trả (Net Payable Salary)
+            let userFinalSalary = Math.max(0, cleanNumber(tongThuNhapActual - tongGiamTru));
+
+            // 10. Kiểm tra nếu kỳ đã chốt sổ trong Monthly_Snapshots
+            const userLockedSnap = allSnapshots.find(s => isUserMatch(s.user, u) && String(s.month).trim() === String(filterMonth).trim());
+            if (userLockedSnap && userLockedSnap.totalSalary !== undefined && cleanNumber(userLockedSnap.totalSalary) > 0) {
+                userFinalSalary = cleanNumber(userLockedSnap.totalSalary);
+            }
+
+            totalSalaryExpense += userFinalSalary;
+        });
+
+        // Quét chi phí vận hành OPEX thực tế từ sổ quỹ Transactions (Tuyệt đối không lấy trùng lương)
         allTransactions.forEach(t => {
             const tDate = String(t.date || t.createdAt || '').slice(0, 10);
             if (!tDate) return;
             const tTime = new Date(`${tDate}T12:00:00`).getTime();
             if (isNaN(tTime) || tTime < sTime || tTime > eTime) return;
 
-            const cat = String(t.category || '').toLowerCase();
-            const type = String(t.type || '').toUpperCase();
-            const title = String(t.title || t.note || '').toLowerCase();
+            const cat = String(t.category || '').toLowerCase().trim();
+            const type = String(t.type || '').toUpperCase().trim();
+            const title = String(t.title || t.note || '').toLowerCase().trim();
             const amt = Math.abs(Number(t.amount || 0));
 
             if (amt <= 0) return;
 
-            // Bỏ qua giao dịch nội bộ / chuyển khoản / rút quỹ / tạm ứng chưa phân loại
+            // Bỏ qua giao dịch nội bộ / chuyển khoản / nạp rút ví / chờ phân bổ
             if (type === 'TRANSFER' || type === 'CHUYỂN KHOẢN' || cat.includes('chuyển khoản') || cat.includes('nội bộ') || cat.includes('rút tiền') || cat.includes('chờ xử lý') || cat.includes('chờ phân bổ')) {
                 return;
             }
 
-            // Chi phí lương
-            if (cat.includes('lương') || title.includes('lương') || cat.includes('trả lương') || cat.includes('tạm ứng')) {
-                totalSalaryExpense += amt;
+            // Bỏ qua các khoản chi nhập hàng, nhà cung cấp, trả nợ, cọc, đối tác (đã thuộc COGS/công nợ)
+            if (cat.includes('nhập hàng') || cat.includes('nhà cung cấp') || cat.includes('ncc') || cat.includes('trả nợ') || cat.includes('đối tác')) {
+                return;
             }
-            // Chi phí vận hành / mặt bằng / điện nước / marketing / chi phí khác
-            else if (
-                cat.includes('vận hành') || cat.includes('mặt bằng') || cat.includes('điện nước') || 
-                cat.includes('tiếp khách') || cat.includes('vật tư') || cat.includes('bao bì') || 
-                cat.includes('quảng cáo') || cat.includes('ads') || cat.includes('marketing') ||
-                ((type === 'EXPENSE' || type === 'CHI') && !cat.includes('nhập hàng') && !cat.includes('nhà cung cấp') && !cat.includes('trả nợ') && !cat.includes('đối tác') && !cat.includes('chờ'))
-            ) {
+
+            // Bỏ qua lương vì lương đã được tính chuẩn xác 100% từ Bảng Lương (Payroll Engine)
+            if (cat === 'lương' || cat === 'chi lương' || cat === 'trả lương' || cat === 'thanh toán lương' || cat.includes('lương nhân viên') ||
+                title.startsWith('trả lương') || title.startsWith('chi lương') || title.startsWith('lương tháng') || title.includes('thanh toán lương') || title.includes('tạm ứng')) {
+                return;
+            }
+
+            // Chi phí vận hành OPEX thực tế: Mặt bằng, Điện nước, Marketing/Ads, Tiếp khách, Sinh hoạt, Bao bì...
+            const isOpex = cat.includes('vận hành') || cat.includes('mặt bằng') || cat.includes('thuê') || 
+                           cat.includes('điện') || cat.includes('nước') || cat.includes('mạng') || cat.includes('internet') ||
+                           cat.includes('tiếp khách') || cat.includes('ăn uống') || cat.includes('sinh hoạt') || 
+                           cat.includes('quảng cáo') || cat.includes('ads') || cat.includes('marketing') ||
+                           cat.includes('bao bì') || cat.includes('văn phòng') || cat.includes('công cụ') ||
+                           title.includes('mặt bằng') || title.includes('tiền điện') || title.includes('tiền nước') || title.includes('quảng cáo') || title.includes('phí vận hành');
+
+            if (isOpex) {
                 totalOperationExpense += amt;
             }
         });
@@ -456,7 +689,7 @@ const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin,
             profitMargin,
             channelList
         };
-    }, [data?.Orders, data?.Transactions, data?.Production, startDateStr, endDateStr, filterChannel, extraCosts, reloadKey, getProductCOGS, normalizeChannelName, safeNum]);
+    }, [data?.Orders, data?.Transactions, data?.Production, data?.Config_NhanSu, data?.Attendance, data?.BonusPenalty, data?.KPI_Progress, data?.Packings, data?.Config_KPI, data?.Monthly_Snapshots, data?.monthlySnapshots, userConfigs, startDateStr, endDateStr, filterChannel, extraCosts, reloadKey, getProductCOGS, normalizeChannelName, safeNum]);
 
     // Format tiền tệ chuẩn dạng 66,235,282
     const formatMoney = (val) => {
@@ -588,6 +821,158 @@ const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin,
         );
     };
 
+    // HÀM IN BÁO CÁO TÀI CHÍNH P&L CHUẨN A4
+    const handlePrintPnLReport = () => {
+        const printDateStr = new Date().toLocaleString('vi-VN');
+        const periodStr = `${startDateStr.split('-').reverse().join('/')} đến ${endDateStr.split('-').reverse().join('/')}`;
+        
+        let channelRows = '';
+        (stats.channelList || []).forEach((ch, idx) => {
+            const chRevenuePct = stats.totalRevenue > 0 ? ((ch.revenue / stats.totalRevenue) * 100).toFixed(1) : '0.0';
+            channelRows += `
+                <tr>
+                    <td style="border: 1px solid #333; padding: 5px 6px; text-align: center;">${idx + 1}</td>
+                    <td style="border: 1px solid #333; padding: 5px 6px; font-weight: bold; text-align: left;">${ch.channel}</td>
+                    <td style="border: 1px solid #333; padding: 5px 6px; text-align: right; font-family: monospace;">${(ch.generated || 0).toLocaleString('vi-VN')}</td>
+                    <td style="border: 1px solid #333; padding: 5px 6px; text-align: right; font-family: monospace; font-weight: bold; color: #047857;">${(ch.sold || 0).toLocaleString('vi-VN')}</td>
+                    <td style="border: 1px solid #333; padding: 5px 6px; text-align: right; font-family: monospace; color: #b45309;">${(ch.returned || 0).toLocaleString('vi-VN')}</td>
+                    <td style="border: 1px solid #333; padding: 5px 6px; text-align: right; font-family: monospace; font-weight: bold;">${formatMoney(ch.revenue)}đ</td>
+                    <td style="border: 1px solid #333; padding: 5px 6px; text-align: right; font-family: monospace; color: #be123c;">${formatMoney(ch.platformFee)}đ</td>
+                    <td style="border: 1px solid #333; padding: 5px 6px; text-align: right; font-family: monospace; color: #b45309;">${formatMoney(ch.cogs)}đ</td>
+                    <td style="border: 1px solid #333; padding: 5px 6px; text-align: right; font-family: monospace; font-weight: bold; color: ${ch.profit >= 0 ? '#047857' : '#be123c'};">${formatMoney(ch.profit)}đ</td>
+                    <td style="border: 1px solid #333; padding: 5px 6px; text-align: center; font-family: monospace;">${chRevenuePct}%</td>
+                </tr>
+            `;
+        });
+
+        const printHtml = `
+            <div style="font-family: Arial, sans-serif; color: #000; padding: 15px; width: 100%; max-width: 210mm; margin: 0 auto; box-sizing: border-box;">
+                <div style="text-align: center; margin-bottom: 12px; border-bottom: 2px solid #000; padding-bottom: 8px;">
+                    <div style="font-size: 11px; font-weight: bold; text-transform: uppercase; color: #555; letter-spacing: 2px;">RICH FISH AQUARIUM — TRUNG TÂM PHÂN TÍCH TÀI CHÍNH</div>
+                    <div style="font-size: 20px; font-weight: 900; text-transform: uppercase; margin-top: 4px;">BÁO CÁO KẾT QUẢ KINH DOANH & PHÂN TÍCH P&L</div>
+                    <div style="font-size: 12px; margin-top: 4px; font-weight: bold;">Kỳ phân tích: ${periodStr} | Kênh: ${filterChannel} | Ngày in: ${printDateStr}</div>
+                </div>
+
+                <!-- 1. CHỈ SỐ SẢN LƯỢNG ĐƠN HÀNG -->
+                <div style="margin-top: 10px; margin-bottom: 10px;">
+                    <div style="font-size: 11px; font-weight: 900; text-transform: uppercase; margin-bottom: 4px; color: #333;">I. CHỈ SỐ SẢN LƯỢNG ĐƠN HÀNG</div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                        <thead>
+                            <tr style="background-color: #f3f4f6;">
+                                <th style="border: 1px solid #000; padding: 6px; text-align: center; width: 25%;">Đơn Phát Sinh</th>
+                                <th style="border: 1px solid #000; padding: 6px; text-align: center; width: 25%; color: #047857;">Đơn Đã Bán</th>
+                                <th style="border: 1px solid #000; padding: 6px; text-align: center; width: 25%; color: #b45309;">Trả Hàng / Hoàn</th>
+                                <th style="border: 1px solid #000; padding: 6px; text-align: center; width: 25%; color: #be123c;">Đơn Hủy</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold; font-family: monospace; font-size: 13px;">${stats.totalGenerated.toLocaleString('vi-VN')} đơn</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold; font-family: monospace; font-size: 13px; color: #047857;">${stats.totalSold.toLocaleString('vi-VN')} đơn (${stats.soldRate}%)</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold; font-family: monospace; font-size: 13px; color: #b45309;">${stats.totalReturned.toLocaleString('vi-VN')} đơn (${stats.returnRate}%)</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold; font-family: monospace; font-size: 13px; color: #be123c;">${stats.totalCancelled.toLocaleString('vi-VN')} đơn (${stats.cancelRate}%)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 2. BẢNG TỔNG HỢP TÀI CHÍNH P&L -->
+                <div style="margin-top: 12px; margin-bottom: 12px;">
+                    <div style="font-size: 11px; font-weight: 900; text-transform: uppercase; margin-bottom: 4px; color: #333;">II. CHỈ SỐ TÀI CHÍNH P&L THỰC TẾ (DOANH THU - COGS - PHÍ SÀN - LƯƠNG - VẬN HÀNH)</div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                        <tbody>
+                            <tr style="background-color: #f9fafb;">
+                                <td style="border: 1px solid #000; padding: 6px 8px; width: 50%; font-weight: bold;">1. Tổng Doanh Thu Bán Hàng (Gross Revenue):</td>
+                                <td style="border: 1px solid #000; padding: 6px 8px; text-align: right; font-weight: 900; font-family: monospace; color: #047857; font-size: 13px;">${formatMoney(stats.totalRevenue)} đ</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px 8px; font-weight: bold;">2. Chi Phí Nền Tảng / Sàn TMĐT (Platform Fees):</td>
+                                <td style="border: 1px solid #000; padding: 6px 8px; text-align: right; font-weight: 900; font-family: monospace; color: #be123c;">${formatMoney(stats.totalPlatformFee)} đ</td>
+                            </tr>
+                            <tr style="background-color: #f9fafb;">
+                                <td style="border: 1px solid #000; padding: 6px 8px; font-weight: bold;">3. Giá Vốn Hàng Nhập / Vật Tư (COGS):</td>
+                                <td style="border: 1px solid #000; padding: 6px 8px; text-align: right; font-weight: 900; font-family: monospace; color: #b45309;">${formatMoney(stats.totalCOGS)} đ</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px 8px; font-weight: bold;">4. Chi Phí Lương Thực Tế Phải Trả (Salary Expense - Bảng Lương HR):</td>
+                                <td style="border: 1px solid #000; padding: 6px 8px; text-align: right; font-weight: 900; font-family: monospace; color: #7e22ce;">${formatMoney(stats.totalSalaryExpense)} đ</td>
+                            </tr>
+                            <tr style="background-color: #f9fafb;">
+                                <td style="border: 1px solid #000; padding: 6px 8px; font-weight: bold;">5. Chi Phí Vận Hành & Khác (OPEX + Phụ Phí):</td>
+                                <td style="border: 1px solid #000; padding: 6px 8px; text-align: right; font-weight: 900; font-family: monospace; color: #0e7490;">${formatMoney(stats.totalOperationExpense + stats.totalExtraCosts)} đ</td>
+                            </tr>
+                            <tr style="background-color: #e5e7eb; border-top: 2px solid #000;">
+                                <td style="border: 1px solid #000; padding: 8px; font-weight: 900; font-size: 12px; text-transform: uppercase;">6. LỢI NHUẬN RÒNG TOÀN DIỆN (NET PROFIT):</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: right; font-weight: 900; font-family: monospace; font-size: 14px; color: ${stats.totalProfit >= 0 ? '#047857' : '#be123c'};">
+                                    ${formatMoney(stats.totalProfit)} đ (${stats.profitMargin}%)
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 3. PHÂN BỔ THEO KÊNH BÁN HÀNG -->
+                <div style="margin-top: 12px;">
+                    <div style="font-size: 11px; font-weight: 900; text-transform: uppercase; margin-bottom: 4px; color: #333;">III. CHI TIẾT HIỆU QUẢ THEO TỪNG KÊNH BÁN HÀNG</div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 10.5px;">
+                        <thead>
+                            <tr style="background-color: #f3f4f6; font-weight: 900; text-transform: uppercase;">
+                                <th style="border: 1px solid #000; padding: 5px 4px; text-align: center; width: 4%;">STT</th>
+                                <th style="border: 1px solid #000; padding: 5px 6px; text-align: left; width: 18%;">Kênh Bán</th>
+                                <th style="border: 1px solid #000; padding: 5px 4px; text-align: right; width: 8%;">Phát Sinh</th>
+                                <th style="border: 1px solid #000; padding: 5px 4px; text-align: right; width: 8%;">Đã Bán</th>
+                                <th style="border: 1px solid #000; padding: 5px 4px; text-align: right; width: 8%;">Hoàn</th>
+                                <th style="border: 1px solid #000; padding: 5px 6px; text-align: right; width: 14%;">Doanh Thu</th>
+                                <th style="border: 1px solid #000; padding: 5px 6px; text-align: right; width: 12%;">Phí Sàn</th>
+                                <th style="border: 1px solid #000; padding: 5px 6px; text-align: right; width: 12%;">Giá Vốn</th>
+                                <th style="border: 1px solid #000; padding: 5px 6px; text-align: right; width: 12%;">Lợi Nhuận</th>
+                                <th style="border: 1px solid #000; padding: 5px 4px; text-align: center; width: 6%;">Tỷ Trọng</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${channelRows}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; margin-top: 30px; font-size: 12px; font-weight: bold; page-break-inside: avoid;">
+                    <div style="width: 40%; text-align: center;">
+                        <div>Kế Toán Trưởng / Người Lập Biểu</div>
+                        <div style="font-weight: normal; font-size: 10px; color: #666; margin-top: 2px;">(Ký & ghi rõ họ tên)</div>
+                        <div style="margin-top: 45px;">${currentUser || 'Kế toán'}</div>
+                    </div>
+                    <div style="width: 40%; text-align: center;">
+                        <div>Giám Đốc Doanh Nghiệp</div>
+                        <div style="font-weight: normal; font-size: 10px; color: #666; margin-top: 2px;">(Phê duyệt)</div>
+                        <div style="margin-top: 45px;">...........................</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @media print {
+                @page { size: A4 portrait; margin: 12mm auto; }
+                body > *:not(#print-section) { display: none !important; }
+                body { background: white !important; margin: 0 !important; padding: 0 !important; color: #000 !important; }
+                #print-section { display: block !important; width: 100% !important; }
+                table { page-break-inside: auto; width: 100% !important; }
+                tr { page-break-inside: avoid; page-break-after: auto; }
+                thead { display: table-header-group; }
+                * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            }
+        `;
+        document.head.appendChild(style);
+        const printDiv = document.createElement('div');
+        printDiv.id = 'print-section';
+        printDiv.innerHTML = printHtml;
+        document.body.appendChild(printDiv);
+        window.print();
+        document.body.removeChild(printDiv);
+        document.head.removeChild(style);
+    };
+
     return (
         <div className="min-h-full bg-[#09090b] text-zinc-100 p-3 sm:p-5 space-y-5 custom-scrollbar animate-fade-in" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             
@@ -646,6 +1031,15 @@ const AnalyticsTab = React.memo(function AnalyticsTab({ data, pushData, isAdmin,
                             <option value="Bảo Hành" className="bg-[#121214] text-white">Bảo Hành</option>
                         </select>
                     </div>
+
+                    <button
+                        onClick={handlePrintPnLReport}
+                        className="h-10 px-3.5 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-400 border border-emerald-500/30 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 shrink-0"
+                        title="In Báo Cáo Tài Chính & Kết Quả Kinh Doanh P&L (Khổ A4)"
+                    >
+                        <i className="fas fa-print"></i>
+                        <span className="hidden sm:inline">In Báo Cáo P&L</span>
+                    </button>
 
                     <button
                         onClick={() => setShowCostModal(true)}

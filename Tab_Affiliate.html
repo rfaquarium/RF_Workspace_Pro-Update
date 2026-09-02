@@ -8,7 +8,7 @@
 // 3. Hoàn toàn cách ly, không ghi đè hay làm ảnh hưởng tới Tab Tài Chính.
 // =========================================================================
 
-function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToast, userRole, userConfigs, erpData, prodItems, configGiaLayout }) {
+function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser: propCurrentUser, triggerToast, userRole: propUserRole, hasPerm: propHasPerm, userConfigs, erpData, prodItems, configGiaLayout }) {
   const [selectedCTV, setSelectedCTV] = React.useState('');
   const [selectedMonth, setSelectedMonth] = React.useState(new Date().toISOString().substring(0, 7));
   const [showAddTx, setShowAddTx] = React.useState(false);
@@ -22,8 +22,21 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
   const [viewingDetailOrder, setViewingDetailOrder] = React.useState(null);
   const [orderSearchQuery, setOrderSearchQuery] = React.useState('');
 
-  const isCTV = userRole === 'CTV' || userRole === 'CỘNG TÁC VIÊN';
-  const isAdminOrKetoan = userRole === 'TỐI CAO' || userRole === 'KẾ TOÁN' || userRole === 'QUẢN LÝ BÁN HÀNG';
+  const currentRole = propUserRole || localStorage.getItem('rf_role') || '';
+  const currentUser = propCurrentUser || localStorage.getItem('rf_user') || '';
+  const isBoss = localStorage.getItem('rf_boss') === 'true' || currentRole === 'TỐI CAO' || currentUser.includes('Tiến');
+
+  const hasPerm = React.useCallback((actionCode) => {
+    if (isBoss || currentRole === 'TỐI CAO') return true;
+    if (typeof propHasPerm === 'function') return propHasPerm(actionCode);
+    if (typeof canUserDo === 'function') return canUserDo(actionCode, currentRole, currentUser);
+    return isBoss;
+  }, [propHasPerm, currentRole, currentUser, isBoss]);
+
+  const isCTV = currentRole === 'CTV' || currentRole === 'CỘNG TÁC VIÊN';
+  const isAdminOrKetoan = hasPerm('CTV_WITHDRAW_PAY') || hasPerm('CTV_CHANGE_COEFFICIENT');
+  const canWithdrawPay = hasPerm('CTV_WITHDRAW_PAY'); // Tiến, Trang
+  const canChangeCoefficient = hasPerm('CTV_CHANGE_COEFFICIENT'); // Tiến, Hương
 
   const ctvList = React.useMemo(() => {
       if (!userConfigs || !userConfigs.users || !userConfigs.roles) return [];
@@ -38,7 +51,7 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
       else if (ctvList.length > 0 && !selectedCTV) setSelectedCTV(ctvList[0]);
   }, [isCTV, currentUser, ctvList]);
 
-  // Lọc dữ liệu đơn hàng CTV
+  // Lọc dữ liệu đơn hàng CTV: Loại bỏ ĐƠN HỦY bằng normalizeStatus(), GIỮ LẠI ĐƠN HOÀN để đối soát
   const ctvOrders = React.useMemo(() => {
       if (!selectedCTV) return [];
       return (orders || []).filter(o => {
@@ -46,7 +59,12 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
           const isCtvChannel = ch.includes('CỘNG TÁC VIÊN') || ch === 'CTV';
           const orderMonth = (o.date || o.createdAt || '').substring(0, 7);
           const matchMonth = !selectedMonth || orderMonth === selectedMonth;
-          return matchMonth && isCtvChannel && (o.updatedBy === selectedCTV || o.createdBy === selectedCTV || o.responsibleUser === selectedCTV || o.customer === selectedCTV);
+          const isMyOrder = o.updatedBy === selectedCTV || o.createdBy === selectedCTV || o.responsibleUser === selectedCTV || o.customer === selectedCTV;
+          
+          // Loại bỏ đơn huỷ (bảo lưu đơn hoàn để tính phí ship hoàn & đối soát)
+          const isCancelled = typeof normalizeStatus === 'function' ? normalizeStatus(o.status) === 'Đơn Huỷ' : String(o.status || '').includes('Huỷ');
+          
+          return matchMonth && isCtvChannel && isMyOrder && !isCancelled;
       }).sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
   }, [orders, selectedCTV, selectedMonth]);
 
@@ -60,22 +78,25 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
       }).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
   }, [ctvFinance, selectedCTV, selectedMonth]);
 
-  // Tính chi phí phụ gắn với từng đơn hàng cụ thể
+  // Sửa hàm getOrderExtraExpenses: Nhận diện đúng type của CTV_Finance và không trừ lặp tiền thanh toán
   const getOrderExtraExpenses = React.useCallback((o) => {
       if (!ctvTxs || ctvTxs.length === 0 || !o) return 0;
-      const code = String(o.orderCode || '').toLowerCase();
-      const cust = String(o.customer || '').toLowerCase();
-      const id = String(o.id || '').toLowerCase();
+      const code = String(o.orderCode || '').toLowerCase().trim();
+      const id = String(o.id || '').toLowerCase().trim();
       
       return ctvTxs.filter(t => {
           const note = String(t.note || '').toLowerCase();
-          return (code && note.includes(code)) || (id && note.includes(id)) || (cust && note.includes(cust));
-      }).reduce((sum, t) => {
-          const amt = Number(t.amount) || 0;
+          // Chỉ so khớp 1:1 theo mã đơn hoặc orderId (đã bỏ quét tên khách cust)
+          const matchCode = (code && note.includes(code)) || (id && note.includes(id));
+          if (!matchCode) return false;
+
           const type = String(t.type || '').toUpperCase().trim();
-          if (type === 'THANH TOÁN' || type === 'CTV THANH TOÁN' || type === 'DƯ NỢ KỲ TRƯỚC (SHOP NỢ)') return sum - amt;
-          return sum + amt;
-      }, 0);
+          // Bỏ qua các khoản thanh toán/kết chuyển (vì sẽ được cấn trừ ở dòng Tổng Quyết Toán)
+          if (type === 'THANH TOÁN' || type === 'CTV THANH TOÁN' || type === 'XƯỞNG THANH TOÁN' || type === 'SHOP THANH TOÁN' || type.includes('DƯ NỢ KỲ TRƯỚC')) {
+              return false;
+          }
+          return true;
+      }).reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
   }, [ctvTxs]);
 
   // =========================================================================
@@ -86,7 +107,8 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
   // =========================================================================
   const getOrderDebtValue = React.useCallback((o) => {
       if (!o) return 0;
-      if (o.status === 'Đơn Huỷ') return 0;
+      const isCancelled = typeof normalizeStatus === 'function' ? normalizeStatus(o.status) === 'Đơn Huỷ' : String(o.status || '').includes('Huỷ');
+      if (isCancelled) return 0;
       
       const rev = Number(o.revenue) || 0;
       const cod = Number(o.cod) || 0;
@@ -94,8 +116,6 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
       const extraExp = getOrderExtraExpenses(o);
       
       // Công thức bất biến chuẩn: Dư Nợ = Giá Hàng + Phụ Phí - Thu COD - Cọc
-      // - Với Đơn Hoàn: COD = 0đ, Phụ Phí 66k -> Nợ = Giá + 66k (CTV nợ Shop tiền hàng & ship hoàn)
-      // - Với Đơn Đã Giao: Giá 400k, Phụ Phí 66k, COD 480k -> Nợ = 400k + 66k - 480k = -14.000đ (Shop dư 14k trả CTV)
       return (rev + extraExp - cod - prePaid);
   }, [getOrderExtraExpenses]);
 
@@ -118,7 +138,8 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
       let totalOrderExtraExp = 0;
       
       ctvOrders.forEach(o => {
-          if (o.status === 'Đơn Huỷ') return;
+          const isCancelled = typeof normalizeStatus === 'function' ? normalizeStatus(o.status) === 'Đơn Huỷ' : String(o.status || '').includes('Huỷ');
+          if (isCancelled) return;
           const rev = Number(o.revenue) || 0;
           const cod = Number(o.cod) || 0;
           const extra = getOrderExtraExpenses(o);
@@ -143,8 +164,7 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
           const isAttachedToOrder = ctvOrders.some(o => {
               const code = String(o.orderCode || '').toLowerCase();
               const id = String(o.id || '').toLowerCase();
-              const cust = String(o.customer || '').toLowerCase();
-              return (code && note.includes(code)) || (id && note.includes(id)) || (cust && note.includes(cust));
+              return (code && note.includes(code)) || (id && note.includes(id));
           });
           
           if (type === 'THANH TOÁN' || type === 'CTV THANH TOÁN') {
@@ -549,7 +569,7 @@ function TabAffiliate({ orders, ctvFinance, pushDeltas, currentUser, triggerToas
                                         </button>
                                     </div>
 
-                                    {(userRole === 'TỐI CAO' || localStorage.getItem('rf_role') === 'TỐI CAO' || userRole === 'KẾ TOÁN') && (
+                                    {(propUserRole === 'TỐI CAO' || localStorage.getItem('rf_role') === 'TỐI CAO' || propUserRole === 'KẾ TOÁN') && (
                                         <button
                                             onClick={() => handleAddExpenseForOrder(o)}
                                             className="text-[10px] font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500 hover:text-black border border-amber-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-all shadow-sm active:scale-95 cursor-pointer"

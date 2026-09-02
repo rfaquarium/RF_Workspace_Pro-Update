@@ -2,9 +2,1826 @@
 
 Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến trúc, tối ưu nghiệp vụ và sửa lỗi của hệ điều hành `RF_Workspace_Pro`.
 
+## [v2.35.3] - 2026-09-01
+
+### 🛡️ Minh Bạch Cước Vận Chuyển / Chi Phí Khác Trong Phiếu Nhập & Chi Tiết Chứng Từ
+- **Hiển Thị Minh Bạch Trên Bản In Nhiệt (K58 / K80 / Tải PNG / Sao Chép Tóm Tắt) (`Tab_ImportExport.html`)**:
+  - Tự động bóc tách và vẽ rõ ràng dòng `Cước VC / Chi phí khác: +[số tiền] đ` nằm ngay giữa `Tổng tiền hàng` và `Tổng thanh toán`.
+  - Khắc phục triệt để tình trạng lệch số tiền khiến nhân viên hoặc đối tác NCC thắc mắc (ví dụ: Tổng tiền hàng `3.100.000đ` + Cước VC `441.908đ` = Tổng thanh toán `3.541.908đ`).
+- **Bổ Sung Chân Bảng Tổng Kết (TFoot) Trong Thẻ Chi Tiết Phiếu Kho (`Tab_ImportExport.html`)**:
+  - Bảng danh sách mặt hàng khi mở rộng thẻ phiếu kho hiển thị rõ ràng 3 dòng tổng kết:
+    1. **Tổng tiền hàng (x mặt hàng)**: Tổng giá trị hàng hoá thực nhập/xuất.
+    2. **Cước vận chuyển / Chi phí khác**: Khoản tiền cước xe/phụ phí được cộng vào giá vốn.
+    3. **Tổng thanh toán phiếu**: Số tiền quyết toán cuối cùng của chứng từ kho.
+
 ---
 
-## [v2.11.3] - 2026-08-24
+## [v2.35.2] - 2026-09-01
+
+### 🛡️ Hotfix: Loại Bỏ Phiếu Nhập Trùng Ảo & Tự Động Bù BOM Cho Bể Kính
+- **Gỡ Bỏ Hoàn Toàn Việc Sinh Phiếu Ảo `IE_AUTO_IMPORT_` (`Code.js`)**:
+  - Loại bỏ khối mã tạo phiếu nhập tự động cũ trong hàm `syncDeltas` (trước đây sinh các phiếu `IE_AUTO_IMPORT_...` với giá vốn tĩnh).
+  - Thống nhất duy nhất 1 cơ chế tạo Phiếu Nhập Kho Thành Phẩm chính thức (`IE_TP_...`) bên trong `processMaterialDeduction` với giá vốn khớp 100% chi phí BOM vật tư thực tế.
+- **Sửa Lỗi Chặn Trùng Lặp Idempotency Khi Dán Bể Kính (`Code.js`)**:
+  - Sửa chốt chặn kiểm tra trong `processMaterialDeduction`: Chỉ so khớp chính xác mã `logId === 'IE_BOM_' + prodId`, không kiểm tra chuỗi `logNote` tự do (tránh việc phiếu nhập thành phẩm `IE_AUTO_IMPORT_` hoặc `IE_TP_` vô tình chặn đứng việc sinh phiếu xuất nguyên liệu BOM của Bể kính).
+- **Nâng Cấp Engine `cleanupPhantomBomTickets` (`Code.js`)**:
+  - Tự động xóa sạch các phiếu nhập kho ảo cũ `IE_AUTO_IMPORT_` bị sinh trùng lặp.
+  - Tự động quét và sinh bù đủ cặp phiếu `IE_BOM_` (Xuất vật tư) và `IE_TP_` (Nhập thành phẩm) cho mọi lệnh sản xuất thực tế hoàn thành (bao gồm cả Bể Kính 20x20x8cm) mà trước đó bị sót.
+
+---
+
+## [v2.35.1] - 2026-09-01
+
+### 🎨 Tối Ưu Giao Diện In Phiếu Lương & Phân Cấp Typography Chuẩn Xác
+- **Căn Chỉnh Cột Số Tiền Về Phía Bên Trái Cho Các Khoản Con (`Tab_HR.html`)**:
+  - Đưa toàn bộ cột số tiền của các khoản con (`Thưởng / Phụ cấp khác` và `Khấu trừ vi phạm / KCS`) về phía bên trái thẳng hàng theo cột cố định `minWidth: '82px'` với font monospace dễ nhìn.
+  - Loại bỏ hoàn toàn tình trạng số tiền bị trôi dạt sang mép phải hoặc bị ngắt dòng chữ `đ` xuống dưới.
+- **Phân Cấp Thị Giác Rõ Rệt (Visual Hierarchy)**:
+  - **Khoản Tổng & Mục Cấp 1**: Tăng kích thước chữ (`12px - 15px`), in đậm dày nét (`fontWeight: 800 - 900`), viền và nền tương phản rõ rệt.
+  - **Khoản Chi Tiết Con (Sub-items)**: Thu nhỏ kích thước (`9.5px`), nét chữ thanh mảnh (`fontWeight: normal`), màu xám sẫm (`#374151`) giúp tổng thể phiếu in cực kỳ gọn gàng, chuyên nghiệp và chuẩn 1 trang A4.
+
+---
+
+## [v2.35.0] - 2026-09-01
+
+### 🛡️ Chuẩn Hóa Khấu Trừ BOM & Tự Động Sinh Phiếu Nhập Kho Thành Phẩm
+- **Chốt Chặn Poka-Yoke Chống Trừ BOM Hàng Tồn Kho (`Code.js`)**:
+  - Khắc phục triệt để lỗi đơn hàng lấy từ tồn kho có sẵn (`fulfilledFromStock = true` / `Hoàn Kho Đạt` / `Lấy từ tồn kho có sẵn`) khi hoàn tất bị kích hoạt hàm trừ kho nguyên liệu BOM.
+  - Tích hợp lớp kiểm tra tức thì trong cả `processMaterialDeduction` và `syncDeltas`: Nếu là hàng có sẵn, lập tức bỏ qua và không sinh bất kỳ phiếu trừ vật tư nguyên liệu nào.
+- **Tự Động Sinh Phiếu Nhập Kho Thành Phẩm (`IE_TP_...`) Khi Sản Xuất Hoàn Thành (`Code.js`)**:
+  - Khi một lệnh sản xuất thực tế (`fulfilledFromStock = false`) hoàn tất, hệ thống tự động sinh đồng thời:
+    1. **Phiếu Xuất Nguyên Liệu BOM (`IE_BOM_...`)**: Khấu trừ kính, keo, fomex, rêu, lũa, đá khỏi bảng `Products`.
+    2. **Phiếu Nhập Kho Thành Phẩm (`IE_TP_...`)**: Ghi nhận nhập thành phẩm vừa hoàn thành vào kho với đối tượng `Xưởng Sản Xuất` và giá vốn chuẩn xác theo chi phí BOM.
+  - Đối với các lệnh sản xuất bù kho / lưu kho nội bộ: Tự động cộng số lượng tồn kho thành phẩm trong bảng `Products`.
+- **Bổ Sung Engine Dọn Dẹp Phiếu BOM Ảo & Hoàn Trả Vật Tư (`cleanupPhantomBomTickets` trong `Code.js`)**:
+  - Quét và thu hồi toàn bộ các phiếu `IE_BOM_...` bị sinh nhầm cho các lệnh lấy từ tồn kho, tự động hoàn trả số lượng vật tư nguyên liệu đã khấu trừ về bảng `Products`.
+
+---
+
+## [v2.34.2] - 2026-09-01
+
+### 🛡️ Hotfix: Chuẩn Hóa Đơn Vị Tính (ĐVT) Khớp 100% Danh Mục & Gỡ Bỏ Hack Ép Gam
+- **Tôn Trọng ĐVT Chuẩn Trong Bảng `Products` (`Tab_ImportExport.html`, `Tab_Suppliers.html`)**:
+  - Khắc phục triệt để lỗi mất Đơn vị tính (`Kg`, `Túi`, `Hộp`, `Bó`, `Cành`, `Bao`, `Quả`, `Khúc`...) bị hiển thị thành `"Cái"` trên danh sách phiếu kho, Modal Sửa Phiếu và Báo cáo Nhập hàng Nhà Cung Cấp.
+  - Tự động liên kết `sku` / `name` của từng dòng chứng từ với bảng `Products` để lấy chính xác trường `unit` gốc.
+- **Gỡ Bỏ Hack Ép Chuyển Đơn Vị Tính Thành `gam` & Chia 1000 Đơn Giá Sai Lệch**:
+  - Gỡ bỏ đoạn mã tự động ép `displayUnit = 'gam'` và chia 1000 đơn giá khi `qty >= 10` đối với nguyên liệu trong `Tab_ImportExport.html`.
+  - Giữ nguyên số lượng thực nhập (ví dụ: `80 Kg` Lũa San Miếng đơn giá `35.000đ/Kg` = `2.800.000đ`, không còn bị biến thành `80 gam` đơn giá `35đ` = `2.800đ`).
+  - Chỉ quy đổi đơn giá gam đối với các phiếu xuất BOM sản xuất tự động (`isBomTicket`) có đơn vị tính gốc là `gam`.
+
+---
+
+## [v2.34.1] - 2026-09-01
+
+### 🛡️ Hotfix: Chuẩn Hóa Nhận Diện Tồn Kho Bể Kính & Đồng Bộ Toàn Vẹn Khâu Sản Xuất
+- **Khắc Phục Lỗi Khớp Chuỗi Con Sai Lệch Trong `getProductInfoByName` (`Code.js`)**:
+  - Phát hiện và loại bỏ điều kiện so khớp chuỗi con lỏng lẻo (`indexOf`) trong tra cứu sản phẩm khiến mọi kích thước bể kính đều bị khớp nhầm với hàng đầu tiên trong bảng `Products` có chứa chữ "Bể", dẫn tới việc toàn bộ đơn hàng bị nhận định sai là có sẵn trong kho.
+  - Thiết lập cơ chế so khớp chặt chẽ 2 tầng: Khớp chính xác 100% theo SKU/Tên và so khớp chuẩn xác theo bộ 3 kích thước $L \times W \times H$ (vd: `25x12x14`).
+- **Đồng Bộ Hoàn Toàn Trạng Thái Khâu Sản Xuất Khi Xuất Từ Kho (`Code.js`, `Modals_Orders.html`)**:
+  - Khắc phục nghịch lý `status = 'Hoàn Kho Đạt'` nhưng `p1_status = 'Pending'`: Khi sản phẩm được lấy từ kho có sẵn (`fulfilledFromStock = true`), toàn bộ các khâu con (`p1_status`, `p2_status`) tự động được đánh dấu `Done`, gán người hoàn thành là `Kho Hàng` và `qc_status = 'Đã Duyệt'`.
+  - Đối với các sản phẩm sản xuất mới (`fulfilledFromStock = false`): Giữ nguyên `status = 'Pending'`, `p1_status = 'Pending'`, `p2_status = 'Pending'` và ghi chú `Sản xuất mới cho đơn...` để thợ nhận việc chuẩn xác.
+
+---
+
+## [v2.34.0] - 2026-09-01
+
+### 🛡️ Hotfix: Khắc Phục Triệt Để Lỗi Bơm Đơn Bị Treo Xoay & Không Ghi Được Vào Google Sheets
+- **Xử Lý Lỗi Crash `ReferenceError` Trong `syncDeltas` (`Code.js`)**:
+  - Khắc phục lỗi thiếu hàm `getProductInfoByName` và `sendNtfyNotification` trên backend Google Apps Script khiến `syncDeltas` bị gián đoạn và rollback trước khi kịp ghi dữ liệu vào bảng `Orders`.
+  - Thay đổi thứ tự ưu tiên: Luôn thực hiện `applyDeltasToSheet('Orders')` và `applyDeltasToSheet('Production')` xuống CSDL Google Sheets NGAY ĐẦU TIÊN trước khi thực hiện các tác vụ thông báo phụ trợ.
+  - Bọc tất cả tác vụ gửi thông báo (`ntfy.sh`) trong khối `try...catch` độc lập, chống nghẽn đường truyền HTTP ảnh hưởng tới giao dịch lưu trữ CSDL.
+- **Tự Động Mở Rộng Kích Thước Bảng Google Sheets (`Code.js`)**:
+  - Nâng cấp `applyDeltasToSheet` tự động gọi `sheet.insertRowsAfter` và `sheet.insertColumnsAfter` khi số lượng dòng/cột dữ liệu mới vượt quá giới hạn hiện hữu của trang tính.
+- **Tối Ưu Siêu Tốc $O(1)$ Trích Xuất & Phân Tích Excel (`Modals_Orders.html`)**:
+  - Tiền lập chỉ mục (`catalogIndex`) danh mục sản phẩm vào các `Map` tra cứu tức thì theo SKU, Tên rút gọn, Quy cách kích thước, loại bỏ hoàn toàn hiện tượng clone và sort mảng lặp lại hàng trăm nghìn lần trên UI thread.
+  - Xử lý toàn diện mọi định dạng ngày tháng Excel (`Serial Number`, `DD/MM/YYYY`, `YYYY-MM-DD`).
+
+---
+
+## [v2.33.9] - 2026-09-01
+
+### 🛡️ Hotfix: Khắc Phục Triệt Để Sự Cố Đơn Hàng Mới Biến Mất Sau Khi Nhập Trên Toàn Bộ Thiết Bị
+- **Tự Động Khởi Tạo & Bảo Đảm Mã Đơn Hàng Không Bao Giờ Rỗng (`Modals_Orders.html`, `Code.js`)**:
+  - Tự động sinh mã đơn hàng chuẩn tiền tố (`BL...`, `BS...`, `CTV...`, `BH...`, `TK...`, `ORD...`) ngay khi mở form hoặc chuyển kênh bán hàng nếu người dùng không tự nhập mã thủ công.
+  - Bổ sung lớp bảo vệ trong `formatOrder` và `getAppData` trên Google Apps Script (`Code.js`): Gán fallback `orderCode = id` thay vì lọc bỏ đơn như rác công thức (ghost order).
+- **Chuẩn Hóa Phân Quyền RBAC Backend `validateTableWritePermission` (`Code.js`)**:
+  - Nhận diện linh hoạt mọi biến thể vai trò (`QUẢN LÝ BÁN HÀNG`, `QUẢN LÝ SẢN XUẤT`, `QUẢN LÝ KHO VẬN`, `QUẢN LÝ NHÂN SỰ`, `KẾ TOÁN`, `CỘNG TÁC VIÊN`, `NHÂN VIÊN`, `THỢ SẢN XUẤT`).
+  - Cho phép tất cả các khâu vận hành ghi nhận đơn hàng và các đối tượng dữ liệu phụ thuộc đi kèm (phiếu cọc `TX_PRE_`, KPI bán hàng 5% `BP_KPI_`, BOM layout) mà không bị lỗi `PERMISSION_DENIED`.
+- **Tối Ưu Giao Dịch Cọc & Chống Trừ Kép State**:
+  - Chỉ gửi bản ghi giao dịch `Transactions` khi khách có cọc thực tế (`prePaid > 0đ`).
+
+---
+
+## [v2.33.8] - 2026-09-01
+
+### 💎 Nâng Cấp Bảng Lương: Tăng Phí Công Đoàn Lên 100k & Tách Thành Khoản Trừ Cố Định Độc Lập
+- **Nâng Mức Phí Công Đoàn Lên 100.000đ/Tháng/Nhân Sự (`Tab_HR.html`, `Tab_Analytics.html`, `Code.js`)**:
+  - Cập nhật đồng bộ phí công đoàn từ mức cũ `50.000đ` lên `100.000đ/tháng` cho mọi nhân sự trên toàn bộ hệ thống tính lương, báo cáo tài chính chi phí nhân sự (`Tab_Analytics`), backend đồng bộ dữ liệu (`Code.js`) và mẫu in phiếu lương (`In Phiếu Lương`).
+- **Tách Riêng Mục Phí Công Đoàn Thành Hàng Cố Định Độc Lập (`Tab_HR.html`)**:
+  - Tách hẳn dòng **Phí Công Đoàn (Trừ cố định): -100.000đ** ra khỏi khối *Khấu Trừ & KCS Phạt*, hiển thị trang trọng với huy hiệu và icon riêng biệt trên Thẻ Lương Nhân Sự.
+  - Khối **Khấu Trừ & KCS Phạt** giờ đây chỉ tập trung phản ánh các khoản phạt biến động thực tế (Vi phạm chấm công, phạt KCS, chi phí đền bù bảo hành, tạm ứng, giảm trừ khác), giúp nhân sự theo dõi minh bạch, rõ ràng, không bị hiểu nhầm phí công đoàn là tiền phạt.
+
+---
+
+## [v2.33.7] - 2026-09-01
+
+### 💎 Tối Ưu & Chuẩn Hóa: Đồng Bộ Hóa 100% Phiếu In Lương Với Thẻ Lương Nhân Sự
+- **Khớp Chuẩn 100% Các Khoản Thu Nhập & KPI (`Tab_HR.html`)**:
+  - Tách bạch rõ ràng và chuẩn xác các dòng thu nhập: `Lương Thời Gian` (chấm công xưởng), `Tiến Trình KPI` (chức vụ/chỉ tiêu), `Phụ Cấp Xăng Xe` (cố định), `KPI Sản Xuất` (khâu 1 & khâu 2), `KPI Đóng Gói & Chở Kho`, `KPI Bán Hàng & Chốt Đơn`, `Lương Tăng Ca` và `Thưởng / Phụ Cấp Khác`.
+  - Khắc phục lỗi dùng tên cũ "Hoa hồng sản xuất", "Hỗ trợ sản lượng kho" và "Lương chức vụ" gây sai lệch số liệu so với giao diện Thẻ Nhân Sự.
+- **Minh Bạch Bảng Kê Chi Tiết Từng Khoản Thưởng & Phạt KCS**:
+  - Liệt kê chi tiết từng dòng con kèm ngày tháng và nội dung cho mục *Thưởng & Phụ cấp khác* (Thưởng chuyên cần, thưởng nóng, bù KPI...) và mục *Khấu trừ vi phạm, KCS & Chấm công*.
+  - Nhân viên đối soát rõ ràng từng đồng tiền thưởng và khoản phạt minh bạch, không còn tình trạng gộp số mơ hồ.
+- **Bổ Sung Đối Chiếu Lương Mục Tiêu & Căn Chỉnh Layout In A4 Portrait Chuẩn Hallmark**:
+  - Hiển thị song song `Lương Mục Tiêu` (đủ 26 công + 100% KPI) và `Thực Nhận Kỳ Này` khớp $100\%$ từng chữ số với Thẻ Lương.
+  - Tinh chỉnh CSS in ấn khổ A4 Portrait, căn lề 10mm cân đối, sắc nét, không bị ngắt trang dư thừa.
+
+---
+
+## [v2.33.6] - 2026-08-31
+
+### 🛡️ Hotfix: Khôi Phục Quy Trình Duyệt Khâu 1 & Khóa Khâu 2 Dây Chuyền Sản Xuất
+- **Kích Hoạt Trạng Thái `Chờ duyệt khung` Khi Thợ Hoàn Thành Khâu 1 (`Tab_Production.html`)**:
+  - Khắc phục sự cố thợ Tân bấm hoàn thành / tải ảnh Khâu 1 (Dựng Khung) thì lệnh nhảy thẳng sang trạng thái hoàn thành hoặc bỏ qua bước duyệt.
+  - Khi Khâu 1 nộp ảnh nghiệm thu, hệ thống tự động gán cờ `qc_status = 'Chờ duyệt khung'`, hiển thị huy hiệu `[CHỜ DUYỆT KHÂU 1]` và mở khối `DUYỆT KHÂU DỰNG KHUNG` cho Quản lý / Tối Cao.
+- **Khóa Chặt Khâu 2 (`GIA CỐ`) Đến Khi Được Duyệt Đạt Khung**:
+  - Khâu 2 của thợ Tâm sẽ bị khóa hoàn toàn (`isLocked = true`) cho đến khi Quản lý bấm `DUYỆT ĐẠT` tại khối kiểm định khung, đảm bảo One-Piece Flow và không bao giờ để thợ làm sai mẫu.
+
+---
+
+## [v2.33.5] - 2026-08-31
+
+### 🛡️ Hotfix: Chuẩn Hóa Thanh Điều Hướng Tab Đơn Hàng
+- **Khử Trùng Lặp Mảng Tabs (`Tab_Orders.html`)**:
+  - Khắc phục lỗi thanh điều hướng bị hiển thị lặp 2 lần các tab con.
+  - Chuẩn hóa cố định 9 tab nghiệp vụ theo đúng luồng Lean One-Piece Flow: `Tất Cả`, `Chờ Sản Xuất`, `Chờ Mã Vận Đơn`, `Sẵn Sàng Đóng Gói`, `Chờ Bàn Giao`, `Đã Bàn Giao`, `Đơn Huỷ`, `Hàng Hoàn`, `Hoàn Thành`.
+
+---
+
+## [v2.33.4] - 2026-08-31
+
+### 🚀 Tối Ưu: Cho Phép Phụ Kiện Âm Kho & Gỡ Bỏ Tab "Chờ Phụ Kiện"
+- **Cho Phép Phụ Kiện Âm Kho Không Chặn Đóng Gói (`Tab_Orders.html` & `Modals_Orders.html`)**:
+  - Phụ kiện xuất bán được phép ghi nhận âm kho bình thường để không làm gián đoạn dây chuyền đóng gói.
+  - Vô hiệu hóa việc chặn đơn và gắn cờ `isMissingAccessories`. Đơn chỉ gồm phụ kiện hoặc đã làm xong sản xuất sẽ đi thẳng vào `Sẵn Sàng Đóng Gói`.
+- **Gỡ Bỏ Hoàn Toàn Tab "Chờ Phụ Kiện" Khỏi Giao Diện (`Tab_Orders.html`)**:
+  - Xóa tab `Chờ Phụ Kiện` khỏi thanh tab, triệt tiêu vĩnh viễn số đếm ảo 62 đơn từ các đơn lịch sử.
+  - Tinh gọn thanh tab thành các luồng rõ ràng: `Tất Cả`, `Chờ Sản Xuất`, `Chờ Mã Vận Đơn`, `Sẵn Sàng Đóng Gói`, `Chờ Bàn Giao`, `Đã Bàn Giao`, `Đơn Huỷ`, `Hàng Hoàn`, `Hoàn Thành`.
+
+---
+
+## [v2.33.3] - 2026-08-31
+
+### 🛡️ Hotfix: Cô Lập Tuyệt Đối Đơn Hủy & Hoàn Tất Khỏi Tab "Chờ Mã Vận Đơn"
+- **Thiết Lập Chốt Chặn Group Guard Trong Bộ Lọc `filtered` & `stats` (`Tab_Orders.html`)**:
+  - Khắc phục sự cố đơn hàng `Đơn Huỷ` (như đơn Shopee `260828FYPUNS0C`) chưa có mã vận đơn bị hiển thị lọt vào tab `Chờ Mã Vận Đơn`.
+  - Ép điều kiện lọc trực tiếp: Tab `Chờ Mã Vận Đơn` và `Chờ Phụ Kiện` **chỉ chấp nhận đơn thuộc nhóm `Sẵn Sàng Đóng Gói`** (`group === 'Sẵn Sàng Đóng Gói'`).
+  - Loại trừ $100\%$ các nhóm `Đơn Huỷ`, `Hàng Hoàn`, `Hoàn Thành`, `Đã Bàn Giao` và `Chờ Sản Xuất` khỏi tab `Chờ Mã Vận Đơn` và `Chờ Phụ Kiện`.
+
+---
+
+## [v2.33.2] - 2026-08-31
+
+### 🛡️ Hotfix: Triệt Tiêu Trùng Lặp Giữa Tab "Chờ Sản Xuất" & "Chờ Mã Vận Đơn"
+- **Ràng Buộc Điều Kiện `allProdDone` (`Tab_Orders.html`)**:
+  - Khắc phục sự cố đơn hàng đang trong khâu sản xuất (`Chờ Sản Xuất`) bị hiển thị đồng thời ở tab `Chờ Mã Vận Đơn`.
+  - Chỉ kích hoạt cờ `isMissingMVD` và `isMissingAccessories` khi đơn đã hoàn tất $100\%$ công đoạn sản xuất phôi/bể/layout hoặc có sẵn kho (`allProdDone === true`).
+  - Đơn đang chờ sản xuất sẽ nằm cố định tại tab `Chờ Sản Xuất`, không bị nhảy sang tab `Chờ Mã Vận Đơn` hay `Chờ Phụ Kiện`.
+- **Tối Ưu Hiển Thị Huy Hiệu Mã Vận Đơn (`Modals_Orders.html`)**:
+  - Chỉ hiển thị huy hiệu `[⚡ Chờ MVĐ GHN]` và `[🚌 Nhập SĐT Xe]` khi đơn hàng đã ở trạng thái `Sẵn Sàng Đóng Gói` (`isReadyPack`), giữ thẻ đơn ở khâu sản xuất luôn tinh gọn.
+
+---
+
+## [v2.33.1] - 2026-08-31
+
+### 🛡️ Hotfix: Cô Lập Phạm Vi Tab "Chờ Phụ Kiện" & Chặn Tràn Đơn Lịch Sử Đã Giao
+- **Cô Lập Phạm Vi Quét Tồn Kho Phụ Kiện (`Tab_Orders.html`)**:
+  - Khắc phục sự cố 62 đơn hàng lịch sử (đã đóng gói, đã bàn giao, đã hoàn thành hoặc đơn huỷ) bị nhảy tràn vào tab "Chờ Phụ Kiện" do tồn kho mặt hàng phụ kiện đó ở hiện tại bằng 0.
+  - Bổ sung chốt chặn `isOrderClosedOrPacked`: Chỉ quét kiểm tra tồn kho và bật cờ `isMissingAccessories` cho các đơn đang vận hành (`Chờ Sản Xuất` / `Sẵn Sàng Đóng Gói` chưa có ảnh đóng gói).
+  - Loại trừ 100% các đơn đã bàn giao, hoàn thành, chở kho hoặc hủy khỏi tab `Chờ Phụ Kiện` và `Chờ Mã Vận Đơn`.
+- **Khóa Nút "Nhập Thiếu" Phụ Kiện Cho Đơn Đã Xong (`Modals_Orders.html`)**:
+  - Ẩn nút bấm `Nhập Thiếu` trên các đơn đã đóng gói / bàn giao, ngăn chặn thao tác nhập bù kho nhầm cho các đơn đã xuất đi trong quá khứ.
+
+---
+
+## [v2.33.0] - 2026-08-31
+
+### 🛡️ Khắc Phục Triệt Để Sự Cố Đơn Bán Lẻ Gửi GHN & Chuẩn Hóa Phân Luồng Tab Poka-Yoke
+- **Chuẩn Hóa Phân Luồng Tab Vận Hành Poka-Yoke (`Tab_Orders.html` & `Modals_Orders.html`)**:
+  - Khắc phục sự cố kéo giật đơn `Sẵn Sàng Đóng Gói` sang tab `Chờ Mã Vận Đơn`. Toàn bộ đơn hàng đã hoàn tất sản xuất hoặc có sẵn kho luôn nằm đúng tại tab `Sẵn Sàng Đóng Gói` (và `Tất Cả`) để thợ đóng gói thực hiện đơn ngay.
+  - Gắn Huy hiệu Cảnh báo Poka-Yoke phát sáng `[⚡ Chờ MVĐ GHN]` tương tác trực tiếp: Người dùng có thể click 1-chạm để mở popup đẩy đơn GHN hoặc nhập mã vận đơn nhanh mà không cần tìm kiếm thủ công.
+  - Tab `Chờ Mã Vận Đơn` được chuẩn hóa thành bộ lọc tổng hợp (Aggregate Filter) toàn hệ thống cho phép quét nhanh toàn bộ đơn thiếu mã vận đơn của các kênh.
+- **Khử Lỗi Lọc Ghost Orders Trên Backend (`Code.js` - `getAppData`)**:
+  - Sửa chốt chặn bộ lọc ghost order: Chỉ loại bỏ dòng khi `customer === '0'` VÀ `orderCode === '0'`.
+  - Bảo vệ 100% đơn bán lẻ thật có mã đơn hợp lệ (`BL...`, `ORD_...`, `CTV...`) ngay cả khi tên khách hàng tạm thời để trống, ngăn chặn việc đơn bị server drop khi polling máy chủ chạy ngầm.
+- **Tối Ưu Động Cơ Bảo Toàn State Optimistic UI & Bộ Lọc Thời Gian Động (`App_Main.html` & `Tab_Orders.html`)**:
+  - Tăng thời gian lưu giữ đơn hàng mới tạo trong RAM từ $20\text{s}$ lên $180\text{s}$ trong `smartMergeOrders` và `smartMerge`, chống mất trạng thái khi đường truyền mạng chập chờn.
+  - Chuyển đổi bộ lọc `matchTimeFilter` sang cơ chế tính toán năm/tháng động học theo `new Date()`, triệt tiêu hoàn toàn lỗi rớt đơn khi bước sang tháng mới.
+
+---
+
+## [v2.32.6] - 2026-08-31
+
+### 🛡️ Nâng Cấp Cảnh Báo Trần Tạm Ứng & Triệt Tiêu Khấu Hao Ảo Khi Thanh Lý Máy Móc
+- **Cảnh Báo Vượt Trần Tạm Ứng 50% & Phê Duyệt Ngoại Lệ Cho Boss (`Tab_HR.html`)**:
+  - Tự động lấy mốc lương tháng liền kề (fallback lương cơ bản) làm định mức trần 50%.
+  - Khi nhân sự có biến động sản lượng lớn và đề xuất ứng vượt trần, hệ thống hiển thị hộp thoại cảnh báo rõ ràng `[⚠️ CẢNH BÁO TRẦN TẠM ỨNG]` cho phép Boss xác nhận duyệt ngoại lệ trực tiếp hoặc hướng dẫn nhân sự chuyển sang hình thức Cho Vay.
+- **Trạng Thái Thanh Lý Thiết Bị Triệt Tiêu Khấu Hao (`Tab_Workspaces.html`)**:
+  - Bổ sung tùy chọn `Đã thanh lý (0đ)` trong danh mục khấu hao thiết bị/công cụ.
+  - Tự động đưa giá trị trích khấu hao còn lại về $0$ đ khi máy móc/công cụ được xuất thanh lý, ngăn chặn việc trích khấu hao ảo vào báo cáo P&L các tháng tiếp theo.
+
+---
+
+## [v2.32.5] - 2026-08-31
+
+### 🎯 Cô Lập 100% Danh Sách KPI Theo Đúng Kỳ Lương / Tháng Được Chọn (`Tab_HR.html`)
+- **Khắc Phục Lỗi Tràn Chỉ Tiêu KPI Tháng Mới Sang Tháng Cũ (Month Isolation Engine)**:
+  - Bổ sung hàm chuyên dụng `isKpiInSelectedMonth(k, filter, customMonth)`: Chuẩn hóa toàn bộ ngày `startTime`, `endTime`, `date`, `createdAt` sang định dạng chuẩn `YYYY-MM-DD`.
+  - Áp dụng thuật toán so khớp giao nhau chuẩn xác theo khoảng thời gian (`Interval Overlap`): KPI chỉ được hiển thị khi khoảng thời gian hiệu lực `[kStart, kEnd]` có giao cắt với tháng đang chọn `[startOfTargetMonth, endOfTargetMonth]`.
+  - **Loại Bỏ Hoàn Toàn Điểm Gãy `lastUpdated`**: Dỡ bỏ điều kiện `isDateInRange(k.lastUpdated)` vốn làm các KPI của tháng 9 bị lọt vào tháng 8 khi có thao tác đồng bộ/ghi đè ngầm gần đây.
+  - Đồng bộ logic lọc cho: Danh sách KPI cá nhân thợ (`userKPIs`), bảng xếp hạng KPI (`userRanks`), và mục tính tổng lương (`isKpiInSelectedPeriod`).
+
+---
+
+## [v2.32.4] - 2026-08-31
+
+### 🛡️ Cảnh Báo Trùng Giao Dịch Khi Chi Trả NCC & Chuyển 1-Chạm Sang Đối Soát Bank N:1 (`Tab_Suppliers.html`)
+- **Phát Hiện & Cảnh Báo Giao Dịch Sao Kê Trùng Khớp (Duplicate Outflow Alert)**:
+  - Khi mở Modal thanh toán phiếu nhập cho Nhà Cung Cấp, hệ thống tự động quét bảng `Transactions` trong vòng 48 giờ qua.
+  - Nếu phát hiện đã có lệnh chi ngân hàng khớp số tiền hoặc liên quan đến NCC này, hệ thống hiển thị bảng cảnh báo màu hổ phách trực quan.
+- **Nút Bấm 1-Chạm "Sang Đối Soát Bank N:1"**:
+  - Cung cấp nút chuyển đổi thông minh `[🛡️ Sang Đối Soát Bank N:1]`: Tự động đóng modal chi lẻ và mở form Đối Soát Bank N:1 kèm tự động chọn sẵn giao dịch chi và phiếu nhập tương ứng.
+  - Ngăn ngừa 100% rủi ro trừ đúp số dư quỹ `Accounts.balance`.
+
+---
+
+## [v2.32.3] - 2026-08-31
+
+### 🛡️ Chống Nhân Đôi Doanh Thu Bán Lẻ & Chống Cộng Khống Tồn Kho Khi Hoàn Đơn (`Modals_Orders.html`)
+- **Chống Đúp Tiền Khi Đối Soát Đơn Bán Lẻ (Double Inflow Prevention)**:
+  - Tự động dò tìm trong bảng `Transactions` xem đơn hàng đã có bản ghi thu tiền (chuyển khoản tự động / quét biến động số dư) hay chưa.
+  - Nếu đã có phiếu thu, hệ thống tự động **mặc định bỏ chọn và khóa tạo phiếu thu mới** (`createTx = false`), hiển thị bảng thông báo an toàn màu hổ phách cảnh báo đã có phiếu thu tự động để ngăn ngừa triệt để việc nhân đôi doanh thu ngân hàng.
+- **Chống Cộng Khống Kho Khi Hủy / Hoàn Đơn Chưa Từng Xuất (Phantom Stock Increase Prevention)**:
+  - Bổ sung chốt chặn `hasExported` toàn diện: Chỉ khi đơn hàng có phiếu xuất kho trong `ImportExport` hoặc đã chuyển sang trạng thái `Đã Bàn Giao` / `Chờ Bàn Giao` thì khi duyệt hoàn nguyên vẹn mới được phép cộng bù tồn kho.
+  - Đơn hủy hoặc duyệt hoàn ngay từ bước `Chờ Sản Xuất` (chưa bao giờ xuất kho) sẽ được hệ thống giữ nguyên tồn kho thực tế, không sinh phiếu nhập khống số lượng.
+
+---
+
+## [v2.32.2] - 2026-08-30
+
+### 📡 Trạng Thái Đồng Bộ Máy Chủ & Tối Ưu Toàn Diện Di Động iPhone X+ (`App_Main.html`)
+- **Thông Báo Kéo Dữ Liệu Máy Chủ Thời Gian Thực (Floating Server Sync Pill)**:
+  - Bổ sung thông báo nổi sang trọng `[⚡ Đang kéo dữ liệu mới nhất từ máy chủ...]` có spinner xoay mượt mà khi người dùng mở ứng dụng hoặc làm mới dữ liệu.
+  - Giúp nhân sự biết rõ ứng dụng đang nạp dữ liệu mới nhất từ Google Apps Script / Firebase, tránh hiểu lầm số liệu chưa cập nhật.
+- **Tối Ưu Hoá Trải Nghiệm Cảm Ứng Di Động (iPhone X+ OLED Engine)**:
+  - Khử hoàn toàn vệt sáng xám chạm phím mặc định trên iOS Safari với `-webkit-tap-highlight-color: transparent`.
+  - Tối ưu cuộn vật lý mượt mà trên iOS với `-webkit-overflow-scrolling: touch` và `overscroll-behavior-y: contain`.
+  - Đảm bảo các khung nhìn hỗ trợ hoàn hảo notch tai thỏ / Dynamic Island qua `env(safe-area-inset-top)` và `env(safe-area-inset-bottom)`.
+
+---
+
+## [v2.32.1] - 2026-08-30
+
+### ⚡ Tối Ưu Menu Drawer & Khắc Phục Triệt Để Chớp Giật Màn Hình 120FPS (`App_Main.html`)
+- **Triệt Tiêu Hoàn Toàn Chớp Nháy Opacity Do Lặp Lại Animation (`tabFadeIn`)**:
+  - **Nguyên nhân gốc rễ (Root Cause)**: Class CSS `.rf-tab-view` có gắn `animation: tabFadeIn 0.22s`. Mỗi khi mở/đóng menu hoặc thay đổi state trong ứng dụng, React re-render khiến các Tab trong DOM kích hoạt lại animation từ `opacity: 0` đến `1`, tạo cảm giác toàn bộ màn hình bị chớp giật liên tục.
+  - **Khắc phục**: Gỡ bỏ hoàn toàn CSS animation `tabFadeIn`, chuyển sang hiển thị tức thời 0ms không độ trễ.
+- **Tối Ưu Hoá Lớp Phủ Nền (Persistent Zero-Thrash Backdrop)**:
+  - Giữ thẻ overlay nền đen cố định trong DOM và điều khiển mượt mà bằng transition `opacity-0` / `opacity-100`, loại bỏ việc tạo/xoá DOM node liên tục khi mở đóng menu.
+  - Sidebar drawer được gia tốc bằng phần cứng GPU `transform: translateZ(0)` với easing `cubic-bezier(0.16, 1, 0.3, 1)` lướt êm mượt 120FPS.
+
+---
+
+## [v2.32.0] - 2026-08-30
+
+### 🎯 Tinh Gọn Trạng Thái & Ẩn Dòng Nhân Sự Khi Chờ Sản Xuất (`Modals_Orders.html`)
+- **Ẩn Tuyệt Đối Dòng Nhân Sự Với Đơn Chờ Sản Xuất**:
+  - Khi đơn hàng đang ở trạng thái `Chờ Sản Xuất` / `Đang Sản Xuất` (chưa hoàn thành), hệ thống ẩn hoàn toàn dòng nhân sự đáy thẻ để tránh hiển thị thông tin truy vết không phù hợp trước khi sản phẩm thực sự ra lò.
+  - Chỉ hiển thị dòng nhân sự `Sản Xuất: ...` khi sản phẩm thực sự hoàn thành (`Sẵn sàng đóng gói` / `Chờ bàn giao` / `Đã bàn giao`).
+- **Gỡ Bỏ Nhãn Xanh "Từ Kho"**:
+  - Loại bỏ hoàn toàn nhãn `[TỪ KHO]` trên dòng nhân sự để giao diện luôn thanh thoát, tinh gọn và chuẩn xác.
+
+---
+
+## [v2.31.9] - 2026-08-30
+
+### 🧹 Tối Giản Hoá Thẻ Đơn Hàng & Chuẩn Hoá Dòng Nhân Sự Sản Xuất (`Modals_Orders.html`)
+- **Chuẩn Hoá Dòng Nhân Sự Sản Xuất Gọn Gàng**:
+  - Loại bỏ các chuỗi text thừa, tên sản phẩm lặp lại `[Tên Hàng]` trên dòng nhân sự đáy thẻ.
+  - Chuẩn hoá format hiển thị trực quan: `Sản Xuất: Cắt Dán: [Dương]  Gọt Keo: [Anh]  [TỪ KHO]` và `Đóng gói: [Hương]  Chở kho: [Dương]`.
+- **Triệt Tiêu Thẻ Thợ Dư Thừa & Lỗi Chuỗi HTML String**:
+  - Gỡ bỏ tag thợ trùng lặp trên dòng sản phẩm, giải phóng không gian cho trạng thái đơn hàng.
+- **Tăng Kích Thước & Độ Rõ Nét Của Badge Số Lượng (SL)**:
+  - Tăng kích thước badge số lượng `x1 cái` lên `text-[11.5px] px-2.5 py-1` với font mono nổi bật, dễ nhìn, dễ kiểm tra khi đóng gói.
+
+---
+
+## [v2.31.8] - 2026-08-30
+
+### ⚡ Hiệu Năng & Tối Ưu Menu (60FPS Smooth Drawer & Tab Switch Engine): Triệt Tiêu Hiện Tượng Giật Lag Khi Mở Menu & Chuyển Tab (`App_Main.html`)
+- **Phân Tách Xung Đột Luồng Xử Lý (Non-Blocking Navigation Dispatch)**:
+  - **Nguyên nhân gốc rễ (Root Cause)**: Khi người dùng bấm chọn tab từ Menu Drawer, lệnh đóng menu (`setIsMenuOpen(false)`) và lệnh dựng lại giao diện tab mới (`setActiveTab(tab)`) kích hoạt cùng một microtask. Quá trình biên dịch và render đồng thời hàng trăm thẻ con của tab mới làm nghẽn Main Thread (150ms-300ms), khiến hiệu ứng CSS trượt của Sidebar bị drop frame và giật khựng.
+  - **Khắc phục**: Thiết kế hàm điều hướng chuyên biệt `handleNavigateTab`: Đóng menu ngay lập tức trên UI và đẩy tác vụ dựng Tab mới vào `React.startTransition` / `requestAnimationFrame` giúp thanh trượt Drawer đóng mượt mà 60/120fps không bao giờ bị drop frame.
+- **Tăng Tốc GPU & Loại Bỏ Layout Thrashing**:
+  - Gắn thuộc tính `will-change-transform transform-gpu` lên `<aside>` để ép GPU xử lý chuyển động riêng biệt (Compositor Layer).
+  - Tinh giản hiệu ứng làm mờ nền từ `backdrop-blur-md` nặng nề xuống `backdrop-blur-sm bg-black/70`, triệt tiêu áp lực tính toán shader trên màn hình điện thoại & laptop.
+  - Chuyển `transition-all` trên các nút bấm Menu sang `transition-colors` để không kích hoạt tính toán lại kích thước layout (Reflow / Repaint).
+
+---
+
+## [v2.31.7] - 2026-08-30
+
+### 🎨 Thiết Kế Giao Diện: Tối Giản Hoá Cấu Trúc Thẻ Đơn Hàng Chuẩn Hallmark Flat UI (`Modals_Orders.html`)
+- **Loại Bỏ Hoàn Toàn Lồng Component (Card-in-Card AI Slop Demolition)**:
+  - Triệt tiêu hoàn toàn 3 lớp container bọc lồng thừa thãi (`bg-[#09090b]`, `border border-white/[0.08]`, `rounded-xl`) bên trong danh sách sản phẩm con và thanh nhân sự.
+  - Chuyển sang bố cục phẳng 1 viền duy nhất: Các món hàng nằm trực tiếp trên bề mặt thẻ đơn hàng cha và phân tách nhau bằng đường viền mỏng tinh tế (`divide-y divide-white/[0.06]`), mở rộng tối đa diện tích hiển thị và triệt tiêu cảm giác nặng nề bí bách.
+- **Tối Ưu Hoá Bảng Chi Tiết & Thanh Nhân Sự Phẳng**:
+  - Từng dòng sản phẩm có typography sắc nét, badge số lượng gọn nhẹ (`bg-white/[0.04]`), trạng thái sản xuất / thợ kho tinh giản.
+  - Thanh nhân sự đáy đơn hàng phẳng, liền mạch với viền thẻ cha kèm đường phân cách thanh mảnh.
+
+---
+
+## [v2.31.6] - 2026-08-30
+
+### 🔍 Truy Vết Chất Lượng (Traceability Engine): Tự Động Lưu Trữ & Truy Vết Nguồn Gốc Thợ Sản Xuất Cho Toàn Bộ Hàng Xuất Kho Có Sẵn (`Modals_Orders.html`, `Tab_Production.html`)
+- **Động Cơ Truy Vết Nguồn Gốc Thợ Làm Hàng Tồn Kho (Craftsman Origin Traceability Engine)**:
+  - Giải quyết bài toán bảo hành & kiểm định chất lượng: Ngay cả khi sản phẩm được lấy từ kho có sẵn (`fulfilledFromStock = true` / `XUẤT TỪ KHO CÓ SẴN`), hệ thống tự động dò tìm ngược lại hồ sơ sản xuất lưu kho gần nhất của SKU đó trong CSDL `Production` để xác định chính xác danh tính thợ thực hiện từng khâu (`Dựng Khung/Cắt Dán`, `Gia Cố/Gọt Keo`) cùng hình ảnh nghiệm thu KCS.
+- **Hiển Thị Minh Bạch Trên Thẻ Đơn Hàng & Thẻ Sản Xuất**:
+  - **Trên từng dòng sản phẩm (`OrderCard`)**: Dưới nhãn `✓ XUẤT TỪ KHO CÓ SẴN`, hệ thống đính kèm nhãn `🔨 Thợ: [Tên thợ K1] • [Tên thợ K2]`.
+  - **Thanh Nhân Sự Dưới Đáy Đơn Hàng**: Bổ sung phân khu *"NHÂN SỰ TRUY VẾT & THỰC HIỆN ĐƠN HÀNG"* hiển thị rõ ràng thợ từng khâu kèm tag `TỪ KHO CÓ SẴN`.
+  - **Trên thẻ Sản Xuất (`WorkerCardV2`)**: Thay thế thông báo text đơn giản bằng khối **"XUẤT TỪ KHO CÓ SẴN (ĐÃ NGHIỆM THU)"** với thông tin thợ từng khâu và nút xem ảnh nghiệm thu trực tiếp.
+
+---
+
+## [v2.31.5] - 2026-08-30
+
+### 📦 Quản Lý Đơn Hàng: Sửa Triệt Để Lỗi Bộ Lọc "Tất Cả" & Tối Ưu Phân Tầng Kênh Bán - Trạng Thái (`Tab_Orders.html`)
+- **Sửa Lỗi Lọc "Tất Cả" Trả Về Danh Sách Trống (Empty List Bug Fix)**:
+  - **Nguyên nhân gốc rễ (Root Cause)**: Khi người dùng bấm tab `Tất Cả` trên hàng Trạng thái (`filterStatus = 'ALL'`), logic so sánh `getOrderTabGroup(o) === filterStatus` luôn trả về `false` vì nhóm trạng thái đơn hàng chỉ trả về tên trạng thái cụ thể chứ không bao giờ trả về `'ALL'`. Dẫn đến việc cả danh sách 480 đơn hàng bị ẩn hoàn toàn và báo *"Không có đơn hàng nào phù hợp với bộ lọc hiện tại"*.
+  - **Khắc phục**: Khi `filterStatus === 'ALL'` hoặc `filterChannel === 'ALL'`, hệ thống tự động mở toàn bộ danh sách đơn mà không áp đặt điều kiện lọc chặn.
+- **Tối Ưu Đồng Bộ Đa Tầng Kênh Bán & Số Liệu Đếm Badge (`channelFiltered`)**:
+  - Khi người dùng bấm lọc một Kênh bán cụ thể (ví dụ Shopee, Xuất Khẩu, Bán Lẻ), toàn bộ số lượng đếm trên các badge Trạng Thái (`Chờ Sản Xuất`, `Sẵn Sàng Đóng Gói`, v.v.) sẽ tự động cập nhật đúng chuẩn theo kênh đã chọn thay vì hiển thị số tổng toàn công ty.
+
+---
+
+## [v2.31.4] - 2026-08-30
+
+### 🔨 Sản Xuất & Gia Công: Triệt Tiêu Lặp Lại Thẻ Chỉ Định Thợ & Tối Ưu Bố Cục Thẻ Lệnh Chuẩn Hallmark Royal Workbench (`Tab_Production.html`)
+- **Triệt Tiêu Lỗi Lặp Thẻ Chỉ Định Thợ (Deduplicate Craftsman Tag)**:
+  - Loại bỏ badge `THỢ: ...` dư thừa bị lặp lại bên cạnh badge `CHỈ ĐỊNH: ...` trên cùng một thẻ lệnh sản xuất.
+  - Chuẩn hoá một badge duy nhất `🔒 CHỈ ĐỊNH: [TÊN THỢ]` với tone màu vàng hổ phách nổi bật (Amber Glow), giữ cho thanh header thẻ lệnh gọn gàng, thoáng đãng và trực quan.
+  - Phân tách minh bạch: Thông tin thợ thực hiện từng khâu đã được trình bày chi tiết và trực quan kèm Avatar, thời gian làm và nút hành động tại từng block `WorkerPhaseV2` bên dưới.
+
+---
+
+## [v2.31.3] - 2026-08-30
+
+### 📈 P&L & Báo Cáo Kinh Doanh: Đồng Bộ Chi Phí Lương Chuẩn 100% Theo Thời Gian Thực Với Bảng Lương Thực Tế Phải Trả (`Tab_Analytics.html`, `Tab_BusinessReport.html`)
+- **Khớp Chi Phí Lương Thực Tế Phải Trả (Single Source of Truth Payroll Engine)**:
+  - Loại bỏ hoàn toàn việc ước tính cứng 100% KPI chỉ tiêu lý thuyết (`Lương Mục Tiêu`) gây sai lệch dòng tiền P&L.
+  - Đồng bộ chuẩn xác 100% công thức Bảng Lương HR (`Tab_HR.html`): Lương thời gian theo công thực tế (`Attendance`), Tăng ca (`BonusPenalty`), Khoán sản xuất K1/K2 (`Production`), Thưởng đóng gói/chở kho (`Packings`), KPI chức vụ thực tế đã đạt/claim (`KPI_Progress`), Phụ cấp xăng xe, Thưởng nóng/chuyên cần, và khấu trừ giảm trừ thực tế (phạt quy định, phí công đoàn 50k, bảo hành, v.v.).
+  - Tự động ưu tiên lấy dữ liệu chốt sổ chính thức từ `Monthly_Snapshots` khi tháng đã được khoá sổ.
+- **Tối Ưu Đồng Bộ Báo Cáo P&L & In Phiếu Kết Quả Kinh Doanh**:
+  - Cập nhật chỉ số `Chi phí Lương` trên thẻ Bento KPI và Bảng in báo cáo P&L phản ánh chuẩn xác số tiền thực chi trả của doanh nghiệp.
+  - Tự động cập nhật tức thì Lợi Nhuận Ròng (Net Profit) thời gian thực theo từng biến động chấm công & sản lượng.
+
+---
+
+## [v2.31.2] - 2026-08-30
+
+### 💰 Tài Chính & Sổ Quỹ: Nâng Cấp Bộ Quản Lý Danh Mục Động Thêm/Xoá, Chuẩn Hoá Khung Giờ 24H & Giao Diện Hallmark Royal Workbench (`Tab_Finance.html`)
+- **Bộ Chọn & Quản Lý Danh Mục Thu/Chi Động (`DynamicCategorySelect`)**:
+  - Tích hợp dropdown tìm kiếm danh mục thông minh với icon và màu sắc nhận diện trực quan theo Thu / Chi.
+  - Hỗ trợ **+ Thêm danh mục mới** trực tiếp ngay trong modal tạo phiếu hoặc chỉnh sửa mà không cần can thiệp code hay cơ sở dữ liệu.
+  - Hỗ trợ **Xoá danh mục** trực tiếp bằng nút thùng rác kèm hộp thoại xác nhận an toàn, lưu trữ đồng bộ tức thì vào `localStorage`.
+- **Chuẩn Hoá Khung Giờ 24H Toàn Hệ Thống (`HH:mm DD/MM/YYYY`)**:
+  - Thay thế toàn bộ định dạng AM/PM bằng khung giờ 24h quân sự chính xác (`00:00 - 23:59`).
+  - Tích hợp các nút chọn giờ nhanh 24h trong modal tạo phiếu: `Bây giờ`, `08:30`, `11:30`, `14:00`, `17:30`, `20:00`, `22:00`.
+  - Hiển thị thời gian đồng bộ chuẩn 24h trên toàn bộ Thẻ giao dịch, Chi tiết phiếu (`TransactionDetailModal`), Sổ cái tài khoản (`AccountHistoryModal`), và In phiếu nhiệt K58.
+- **Tối Ưu Giao Diện & Bố Cục Chuẩn Hallmark Royal Workbench**:
+  - 4 Thẻ Bento KPI Báo cáo chu chuyển tiền tệ phát sáng cao cấp: *Quỹ Đầu Kỳ (Amber), Tiền Thu (+ Emerald), Tiền Chi (- Rose), Tồn Quỹ Cuối Kỳ (= Sky)*.
+  - Thanh công cụ hành động gọn gàng, loại bỏ tràn viền trên thiết bị di động.
+  - Bổ sung thanh tiến độ trực quan (% cơ cấu thu / % cơ cấu chi) trong Sub-tab Báo Cáo Cơ Cấu.
+
+---
+
+## [v2.31.1] - 2026-08-30
+
+### 🎨 Kho Hàng & Nhật Ký: Nâng Cấp Hệ Thống Tab Nhanh Sắc Màu Hallmark Royal Workbench & Tối Ưu UX (`Tab_Inventory.html`, `Tab_ImportExport.html`, `Index.html`)
+- **Hệ Thống Nhận Diện Màu Sắc Tab Nhanh (Hallmark Chromatic Identity System)**:
+  - **Kho Bể Kính** 🐟: *Gradient Cyan / Ocean Glow* (`bg-gradient-to-r from-cyan-500/30 text-cyan-300 border-cyan-400/60 shadow-[0_0_16px_rgba(6,182,212,0.35)] ring-1 ring-cyan-400/40`).
+  - **Kho Layout** 🏔️: *Gradient Amber / Warm Bronze Glow* (`bg-gradient-to-r from-amber-500/30 text-amber-300 border-amber-400/60 shadow-[0_0_16px_rgba(245,158,11,0.35)] ring-1 ring-amber-400/40`).
+  - **Kho Hàng Hoá / Phụ Kiện** 🔌: *Gradient Purple / Royal Violet Glow* (`bg-gradient-to-r from-purple-500/30 text-purple-300 border-purple-400/60 shadow-[0_0_16px_rgba(168,85,247,0.35)] ring-1 ring-purple-400/40`).
+  - **Kho Nguyên Liệu / Vật Tư SX** 📦: *Gradient Emerald / Mint Glow* (`bg-gradient-to-r from-emerald-500/30 text-emerald-300 border-emerald-400/60 shadow-[0_0_16px_rgba(16,185,129,0.35)] ring-1 ring-emerald-400/40`).
+  - **Tất Cả / Chung** 🏷️: *Glass Titanium White Glow* (`bg-white/[0.2] text-white border-white/40 shadow-sm`).
+- **Thẻ Bento KPI Tồn Kho Tương Tác Trực Quan**:
+  - Biến 4 thẻ Bento (*Giá Trị Bể Kính, Giá Trị Layout, Vật Tư Sản Xuất, Tổng Giá Trị Kho*) thành các phím bấm lọc nhanh danh mục tương ứng kèm hiệu ứng phát sáng phản hồi xúc giác `active:scale-95`.
+- **Thanh Lọc Sub-Category Nhóm Hàng Tự Động (Folder Chips)**:
+  - Tự động kết xuất dải nút lọc phân nhóm con (*Bể Lẻ Size, Bể Đúc, Terrarium, v.v.*) với số lượng SKU hiển thị thời gian thực theo từng kho.
+- **Tối Ưu Đồng Bộ Phân Hệ Nhật Ký Kho & Modal Thẻ Kho Sản Phẩm**:
+  - Thay thế toàn bộ class `custom-scrollbar no-scrollbar` thành `hide-scrollbar`, triệt tiêu đường cuộn vàng lỗi trên trình duyệt mobile.
+  - Hiện đại hóa giao diện `StockHistoryModal` (Thẻ kho sản phẩm) chuẩn Dark Glass Royal Workbench.
+
+---
+
+## [v2.31.0] - 2026-08-30
+
+### 🤝 Nhà Cung Cấp & Công Nợ: Thiết Kế Lại Toàn Diện Tab Nhà Cung Cấp Chuẩn Royal Workbench Dark (`Tab_Suppliers.html`, `App_Main.html`)
+- **Giao Diện Royal Workbench Dark Sang Trọng (Hallmark Anti-AI-Slop System)**:
+  - Khung thống kê 4 thẻ chỉ số KPI phát sáng cao cấp: *Tổng công nợ cần trả (Rose), Tổng đối tác NCC (Sky), Phiếu chờ chi trả (Amber), Đã chi tháng này (Emerald)*.
+  - Bộ lọc công nợ đa chiều: `TẤT CẢ`, `CÓ NỢ`, `HẾT NỢ`, `TRẢ THỪA` kèm phân loại danh mục theo pill buttons trực quan.
+  - Ô tìm kiếm realtime đa trường (Tên NCC, Số điện thoại, Ghi chú / Địa chỉ).
+- **Thẻ Đối Tác & Drawer Lịch Sử Nhập Hàng Tương Tác Cao**:
+  - Hiển thị đầy đủ thông tin: Avatar/Icon phân loại, Tên đối tác, SĐT (link `tel:`), Ghi chú, Số phiếu nợ và Cột công nợ trực quan (âm/dương/0đ).
+  - Tích hợp nhanh các nút hành động: *Sửa thông tin*, *Xóa (an toàn khi nợ = 0)*, *Đối Soát Bank* và *Mở rộng lịch sử chi tiết*.
+  - Drawer lịch sử: Danh sách phiếu nhập kèm sub-filter (`TẤT CẢ`, `CHƯA TRẢ`), trạng thái thanh toán (`HOÀN TẤT`, `TRẢ 1 PHẦN`, `CHƯA TRẢ`).
+- **Động Cơ Đối Soát Bank N:1 & An Toàn Dữ Liệu**:
+  - Cho phép chọn 1 giao dịch Chi tiền ngân hàng khớp với nhiều phiếu nhập hàng cùng lúc.
+  - Kiểm tra an toàn số dư độ lệch ($BalanceDiff \ge 0$), tự động cấn trừ công nợ đối tác và đánh dấu hoàn tất các phiếu nhập được chọn.
+- **Bộ Công Cụ In Ấn Chuẩn Mực A4 & POS 58mm**:
+  - In Báo Cáo Tổng Hợp Nhập Hàng & Công Nợ Toàn Hệ Thống (A4 Dọc).
+  - In Báo Cáo Chi Tiết Lịch Sử Từng Nhà Cung Cấp (A4 Dọc).
+  - In Phiếu Nhập Kho Hàng Hóa Chuẩn Kế Toán (A4 Dọc).
+  - In Phiếu Chi Tiền Nhiệt (POS 58mm).
+
+---
+
+## [v2.30.8] - 2026-08-30
+
+### 🛡️ Nhân Sự: Tối Ưu Triệt Để Bộ Lọc Ẩn Nhân Sự Đã Nghỉ & Đồng Bộ Xuyên Suốt 3 Phân Hệ (`Tab_HR.html`, `App_Main.html`)
+- **Bộ Nhận Diện Nhân Sự Nghỉ Việc / Đã Ẩn Đa Tầng (`isStaffResignedOrInactive`)**:
+  - Tự động nhận diện nhân sự nghỉ việc thông qua chuỗi tên (`[Đã nghỉ]`, `(nghỉ việc)`, `[off]`, `tạm nghỉ`, `cựu`).
+  - Quét sâu bảng cấu hình `Config_NhanSu` (Phân quyền: `ĐÃ NGHỈ`, `NGHỈ VIỆC`, `THÔI VIỆC`, `OFF`, `KHÁCH`, `INACTIVE`, `RESIGNED` và chức danh phụ).
+  - Khớp chuẩn xác danh sách ẩn thủ công `hiddenStaffList` khi Boss bấm icon mắt trên từng thẻ.
+- **Chuẩn Hóa UX Nút Bật/Tắt Bộ Lọc**:
+  - Hiển thị rõ ràng trạng thái: `Đang Ẩn NV Nghỉ` (Badge Amber sáng khi bật lọc) và `Hiện Tất Cả NV` (khi tắt lọc).
+  - Tích hợp toast thông báo trực quan khi chuyển đổi trạng thái bộ lọc.
+- **Đồng Bộ Xuyên Suốt Cả 3 Phân Hệ Nhân Sự**:
+  - Tự động ẩn các nhân sự không còn làm việc khỏi: Danh Sách Thẻ KPI (Nhiệm vụ), Ma Trận Chấm Công, Hồ Sơ Chấm Công và Bảng Lương.
+
+---
+
+## [v2.30.7] - 2026-08-30
+
+### 🎯 Bảng Lương: Đồng Bộ KPI Tháng Tùy Chỉnh & Chuẩn Hóa Công Thức Tổng Lương Mục Tiêu 26 Công (`Tab_HR.html`, `App_Main.html`)
+- **Khắc Phục Hiển Thị KPI Tháng Khi Chọn Tháng Tùy Chỉnh (`Tab_HR.html`)**:
+  - Sửa lỗi `filterMonth` ở đầu component `HRTab`: Xử lý đồng thời cả `filter === 'Chọn Tháng'` và `filter === 'Tuỳ Chỉnh'`, không còn bị gán nhầm về tháng hiện tại (`2026-08`).
+  - Xây dựng bộ lọc `isKpiInSelectedPeriod(k)` hỗ trợ linh hoạt mọi định dạng ngày tháng (`DD/MM/YYYY`, `YYYY-MM-DD`, `startTime`, `endTime`, `lastUpdated`).
+  - Giúp toàn bộ danh sách KPI được giao trong tháng (ví dụ: Tháng Chín 2026) hiển thị đầy đủ 100% trong mục **Tiến Trình KPI** trên thẻ lương của từng nhân sự.
+- **Chuẩn Hóa Công Thức TỔNG LƯƠNG MỤC TIÊU (26 Công)**:
+  - Công thức tính Tổng Lương Mục Tiêu:
+    $$\text{Tổng Lương Mục Tiêu} = \text{Lương chuẩn 26 công (4.200.000đ)} + \text{Thưởng 100% KPI} + \text{Trợ cấp xăng xe \& phụ cấp khác} + \text{KPI Sản xuất/Đóng gói/Bán hàng} + \text{Thưởng khác} - \text{Phí Công đoàn (50.000đ)} - \text{Các khoản phạt vi phạm}$$
+  - Đảm bảo phản ánh chính xác 100% mức thu nhập kỳ vọng khi nhân viên đi làm đủ công và hoàn thành trọn vẹn chỉ tiêu.
+- **Đồng Bộ Thống Kê & Nhãn Thẻ Giao Diện**:
+  - Cập nhật số liệu Tổng Lương Mục Tiêu toàn xưởng trên widget đầu trang.
+  - Cập nhật nhãn chú thích: `* Lương đủ 26 công + 100% KPI + Trợ cấp + KPI SX/ĐG/BH - Công đoàn - Phạt` trên thẻ lương từng nhân sự.
+
+---
+
+## [v2.30.6] - 2026-08-30
+
+### 🛡️ Phân Hệ Trách Nhiệm: Nhóm Vật Tư Theo Đa Nhân Sự & Ghi Nhận % Tình Trạng Bàn Giao (`Tab_Workspaces.html`, `App_Main.html`)
+- **Phân Bổ & Nhóm Vật Tư Đa Nhân Sự Trong Cùng Một Phòng (`Tab_Workspaces.html`)**:
+  - Từng thiết bị/công cụ trong cùng một không gian làm việc (ví dụ: Phòng Đóng Gói, Xưởng Sản Xuất) được gán riêng cho từng nhân sự phụ trách trực tiếp.
+  - Tích hợp bộ lọc / nhóm theo nhân sự ngay trên đầu thẻ phòng, cho phép lọc nhanh danh sách tài sản theo từng cá nhân quản lý.
+- **Ghi Nhận Tình Trạng Lúc Bàn Giao Theo Tỷ Lệ %**:
+  - Thêm ô nhập % tình trạng bàn giao (0 - 100%, mặc định 100% Mới) cho từng món đồ lúc lập hoặc chỉnh sửa bàn giao.
+  - Hiển thị badge trực quan (`100% Mới`, `90% Tốt`, `80% Khá`, `60% Cũ`) trên từng dòng và tự động tính % độ mới trung bình của cả phòng.
+- **Tự Động Quy Trách Nhiệm Phạt Sự Cố 100% Chuẩn Xác Vào Bảng Lương**:
+  - Khi lập biên bản sự cố món đồ, hệ thống tự động nhận diện chính xác nhân sự được gán quản lý món đồ đó và lập phiếu phạt `BonusPenalty` trừ trực tiếp vào lương của đúng người.
+
+---
+
+## [v2.30.5] - 2026-08-30
+
+### 📝 Tích Hợp Nút Sửa Ghi Chú Trực Tiếp Trên Thẻ Ghi Chú Nhanh (`Modals.html`, `App_Main.html`)
+- **Nút Chỉnh Sửa Ghi Chú Trực Tiếp Trên Từng Thẻ (`QuickNotesPanel` in `Modals.html`)**:
+  - Bổ sung nút icon bút chì (`fa-pen`) tinh gọn cạnh nút xoá trên góc phải của mỗi thẻ ghi chú.
+  - Khi bấm, form chỉnh sửa lập tức mở ra và nạp sẵn toàn bộ Tiêu đề & Nội dung hiện tại của ghi chú.
+- **Tương Tác Realtime 0ms Với Optimistic UI & Background Sync**:
+  - Hỗ trợ cập nhật ngay lập tức giao diện sau khi bấm `Cập Nhật Ghi Chú` mà không gây giật hay tải lại trang.
+  - Tự động đồng bộ ngầm xuống bảng `Documents` trên Google Sheets an toàn tuyệt đối.
+- **Bảo Toàn Phân Quyền Boss & Founder**:
+  - Phân quyền sửa/xoá áp dụng thống nhất cho Founder / Boss / Quyền Tối Cao.
+
+---
+
+## [v2.30.4] - 2026-08-30
+
+### 🎁 Bóc Tách Chi Tiết Từng Khoản Thưởng Nhân Sự & Hotfix Cú Pháp JSX (`Tab_HR.html`, `Tab_Production.html`, `App_Main.html`)
+- **Minh Bạch & Bóc Tách Toàn Diện Từng Khoản Thưởng Nhân Sự (`Tab_HR.html`)**:
+  - Xóa bỏ triệt để cơ chế gộp cộng dồn tất cả các khoản thưởng thành một dòng duy nhất `Thưởng Nóng +X.XXX.XXXđ`.
+  - Tự động phân rã và hiển thị chi tiết từng bản ghi `BonusPenalty` của nhân sự theo kỳ:
+    - **Thưởng nóng / Thưởng**: Hiển thị rõ ràng ngày tháng `[DD/MM]`, Lý do / Ghi chú chi tiết (e.g. `Thưởng hỗ trợ kiểm kho`, `Thưởng giao hàng gấp`) và Mã đơn hàng liên kết (nếu có).
+    - **Phụ cấp khác & Thu nhập khác**: Bóc tách từng khoản phụ cấp phát sinh kèm nội dung ghi chú.
+    - **Thưởng chuyên cần**: Tách bạch rõ giữa chuyên cần cấu hình tự động (đủ công >= 28 ngày / 216h) và chuyên cần thưởng tay.
+    - **Bổ sung các khoản thưởng dương khác**: Đảm bảo không bỏ sót bất kỳ dòng thưởng nào của nhân sự trong kỳ.
+- **Hotfix Lỗi Cú Pháp JSX Khối Modal Sản Xuất (`Tab_Production.html`)**:
+  - Đóng chuẩn xác khối điều kiện `showOutOfStockModal && (...)` tại dòng 5038, giải quyết triệt để lỗi biên dịch Babel Phase 2 (`Unexpected token, expected ","`).
+  - Phục hồi 100% tính sẵn sàng cho Tab Nhân Sự và toàn bộ các tab trì hoãn (Deferred Tabs).
+
+---
+
+## [v2.30.3] - 2026-08-30
+
+### 🔔 Tối Ưu Web Push & Haptic Feedback Đa Nền Tảng iOS / Android (`sw.js`, `App_Main.html`, `Tab_Production.html`, `Tab_Orders.html`, `Code.js`)
+- **Nâng Cấp Service Worker (`sw.js`) Xử Lý Push Notification & Action Buttons Chuyên Sâu**:
+  - Hỗ trợ đầy đủ các thuộc tính chuẩn của Web Push trên iOS PWA & Android: `icon`, `badge`, `tag`, `renotify`, `timestamp`, `silent: false`, `requireInteraction: true`.
+  - Tích hợp 5 kiểu xung rung xúc giác độc quyền (`VIBRATION_PATTERNS`):
+    - `sos`: `[400, 100, 400, 100, 400, 100, 600, 200, 600]` (cực mạnh, dồn dập).
+    - `urgent`: `[150, 80, 150, 80, 300, 100, 300]` (đơn gấp SLA < 2h, Hỏa tốc).
+    - `warning`: `[120, 60, 120]`, `success`: `[40, 50, 60]`, `info`: `[80, 40, 80]`.
+  - Tích hợp Action Buttons 1-chạm (`🚨 Xử Lý SOS Ngay`, `⚡ Xử Lý Đơn Gấp`, `🔍 Xem Chi Tiết`) kèm deep-linking chuyển tab thông minh qua `postMessage`.
+  - Bổ sung sự kiện `pushsubscriptionchange` tự động phục hồi token khi thiết bị di động xoay khóa push.
+- **Hệ Thống Phản Hồi Xúc Giác & Còi Báo Động (Web Audio Synthesizer & Haptic Engine)**:
+  - `window.triggerHaptic(type)`: Quản trị tập trung 8 mức độ rung xúc giác, tự động fallback sang âm thanh xúc giác tinh tế trên iOS / Safari khi `navigator.vibrate` bị chặn trong iframe.
+  - `window.playEmergencyAlarm(type)`: Tạo còi báo động đa âm sắc thời gian thực (SOS Siren 880Hz <-> 1320Hz dồn dập / Urgent Triple Chime 659Hz -> 880Hz -> 1174Hz) mà không phụ thuộc vào tệp âm thanh bên ngoài.
+- **Nút Báo Động SOS Xưởng & Phát Tín Hiệu Đơn Gấp Realtime**:
+  - `Tab_Production.html`: Thêm nút và Modal `🚨 PHÁT TÍN HIỆU SOS XƯỞNG` (Vỡ kính/phôi, Hỏng máy mài CNC, Hết vật tư cấp bách, Yêu cầu hỗ trợ, Sự cố an toàn), lập tức kích hoạt còi báo động, rung haptic và broadcast Firebase realtime + Web Push.
+  - `Tab_Orders.html`: Thêm nút `⚡ Phát Thông Báo Đơn Gấp`, truyền tín hiệu ưu tiên sản xuất và đóng gói ngay lập tức tới tất cả nhân sự đang mở app.
+- **Backend Push Dispatcher (`Code.js`)**:
+  - `sendPushNotificationToStaff(...)`: Bổ sung tham số `extraOptions` (`type`, `targetTab`, `orderId`, `tag`).
+  - Cung cấp `api_sendUrgentOrderPush` và `api_sendFactorySOSPush` hỗ trợ bắn thông báo trực tiếp từ server-side.
+
+---
+
+## [v2.30.2] - 2026-08-30
+
+### 🗄️ Tối Ưu Hóa Archive Engine & Tốc Độ Tải App Sub-1.5s (`Code.js`, `Operations.js`, `Tab_Orders.html`)
+- **Động Cơ Auto-Archive Tự Động Di Chuyển Đơn Hàng > 60 Ngày Sang `Orders_Archive`**:
+  - Tự động nén và chuyển các đơn hàng terminal (`Đối Soát Thành Công`, `Đã Bàn Giao`, `Đơn Huỷ`) cũ hơn 60 ngày sang bảng lưu trữ `Orders_Archive` với đầy đủ 32 cột schema chuẩn.
+  - Sử dụng cơ chế xóa mảng khối từ dưới lên (`deleteRows(start, count)`) bọc trong `LockService.waitLock(15000)` chống đè và chống lock contention.
+  - Ghi nhận lịch sử và chỉ số vận hành vào `PropertiesService.getScriptProperties()` (`LAST_ARCHIVE_RUN`, `LAST_ARCHIVE_COUNT`, `LAST_ARCHIVE_CUTOFF`).
+- **Nâng Cấp API & Khởi Tạo Trigger Cron Hàng Đêm (`setupAutoArchiveTrigger`)**:
+  - `api_getArchiveStats(pin)`: Trả về thời gian thực số lượng đơn `Orders` chính, số lượng `Orders_Archive`, lần lưu trữ gần nhất và ước tính thời gian tải app.
+  - `setupAutoArchiveTrigger(pin)`: 1-chạm thiết lập Trigger tự động chạy mỗi ngày lúc 02:00 AM (GMT+7) với quyền `SYSTEM`.
+  - `validatePin('SYSTEM')`: Bổ sung cơ chế bypass an toàn cho các tác vụ cron ngầm server-side.
+- **Tối Ưu Tốc Độ Nạp Dữ Liệu `getAppData` < 1.5 Giây**:
+  - Tối ưu hóa chuỗi so khớp ngày (`yyyy-MM-dd >= cutoffStr`) trực tiếp trước khi khởi tạo `Date` object, giảm tải thời gian duyệt hàng ngàn dòng từ ~200ms xuống ~5ms.
+  - Kết hợp 2 tầng nạp dữ liệu: Tầng 1 vẽ UI tức thì từ Local Instant Cache (<5ms), Tầng 2 đồng bộ ngầm và hợp nhất Optimistic State.
+- **Nâng Cấp Giao Diện `ArchiveEngineModal` Chuẩn Hallmark Bento UI**:
+  - 3 Thẻ Bento chỉ số thời gian thực: Số đơn Orders chính, Số đơn Kho lưu trữ, Lần chạy gần nhất.
+  - Nút cài đặt Trigger tự động 02:00 AM, tùy chọn linh hoạt 4 mốc thời gian (45, 60, 90, 180 ngày) và nút kích hoạt lưu trữ tức thì kèm hiệu ứng trực quan.
+
+---
+
+## [v2.30.1] - 2026-08-30
+
+### 🌐 Hoàn Thiện UI Module Shopee Global & Liên Kết Xưởng Sản Xuất (`ShopeeGlobalTab.html`, `ShopeeController.js`, `ShopeeDbService.js`)
+- **Kết Nối Trực Tiếp CSDL Shopee Global Độc Lập**:
+  - Liên kết trực tiếp bảng tính `RF_Workspace_Shopee_Global_DB` (ID: `1b26SUcjRaGYt0_pzRyvxk6MFX4Kxx9t1O3DchmOwTUg`) gồm 5 bảng dữ liệu độc lập: `DB_ORDERS`, `DB_ORDER_ITEMS`, `DB_ESCROW_RECON`, `DB_RETURNS_DISPUTES`, `DB_AGENT_AUDIT_LOGS`.
+  - Tích hợp nút mở nhanh Google Spreadsheet và nút xuất báo cáo `CSV/Excel`.
+- **Theo Dõi Tiến Độ Sản Xuất & Tồn Kho Xưởng (Cross-border Factory & Stock Bridge)**:
+  - Tự động đối chiếu đơn hàng quốc tế với bảng `Production` và tồn kho thực tế `Products` xưởng Rich Fish.
+  - Hỗ trợ nút thao tác 1-chạm: `Lệnh Xưởng` (sinh lệnh sản xuất trực tiếp trên bảng điều phối xưởng) và `Trừ Kho` (khấu trừ tồn kho vật lý và ghi log xuất kho `ImportExport`).
+- **Hero Flow Đối Soát Doanh Thu & Dòng Tiền Quốc Tế (Escrow & Multi-Currency Waterfall)**:
+  - 4 thẻ KPI chỉ số cao cấp: Tổng GMV quy đổi VNĐ, Đơn Chờ Giao RTS & Tình trạng kho, Phí sàn & Thuế vận chuyển xuyên biên giới, Thực nhận ví Escrow.
+  - Dải Tab cuộn ngang nhanh lọc theo từng quốc gia (🇲🇾 Malaysia, 🇵🇭 Philippines, 🇹🇭 Thái Lan, 🇸🇬 Singapore, 🇹🇼 Đài Loan, 🇧🇷 Brazil, 🇮🇩 Indonesia) hiển thị số lượng đơn và doanh thu thời gian thực.
+- **4 Chế Độ Xem Chuyên Sâu (Sub-views Navigation)**:
+  - **`Đơn Hàng & Xưởng`**: Danh sách đơn, chi tiết SKU, trạng thái xưởng, tình trạng khấu trừ kho và hạn RTS.
+  - **`Sổ Đối Soát Escrow`**: Bóc tách 5 tầng phí sàn (Hoa hồng, Dịch vụ, Thanh toán, Voucher, Vận chuyển QT) và số tiền thực nhận về ví Shopee.
+  - **`Khiếu Nại & Hoàn`**: Theo dõi tỷ lệ hàng hoàn, lý do khiếu nại, tổn thất và tiến độ đòi bồi thường từ sàn.
+  - **`Audit Logs`**: Nhật ký tự động lưu vết toàn bộ hoạt động quét API và điều phối xưởng.
+- **Master Governance AI (Virtual COO)**:
+  - Tích hợp trợ lý ảo điều hành: Báo cáo tóm tắt tình hình vận hành thông minh và khung hỏi đáp tự nhiên thời gian thực.
+
+---
+
+## [v2.30.0] - 2026-08-30
+
+### 🛡️ Backend RBAC Middleware & Server-Side Security Engine (`Code.js`, `Operations.js`)
+- **Bộ Quy Tắc Phân Quyền Tập Trung Chuẩn Hóa (`SERVER_RBAC_RULES`)**:
+  - Đồng bộ và khớp 100% với [Ma Trận Phân Quyền] (`Bang_Phan_Quyen.md`) và quy tắc UI `RF_RBAC_RULES` trong `Config.html`.
+  - Phân định rõ ràng 8 nhóm vai trò: `TỐI CAO`, `QUẢN LÝ SẢN XUẤT`, `QUẢN LÝ KHO VẬN`, `QUẢN LÝ NHÂN SỰ`, `QUẢN LÝ BÁN HÀNG`, `KẾ TOÁN`, `THỢ SẢN XUẤT / NHÂN VIÊN`, `CỘNG TÁC VIÊN`.
+- **Hệ Thống Middleware Kiểm Tra Phân Quyền Server-side (`checkServerPermission`, `requireServerPermission`, `validateTableWritePermission`)**:
+  - `checkServerPermission(auth, actionCode)`: Kiểm tra tính hợp lệ của vai trò đối với từng nghiệp vụ/hành động.
+  - `requireServerPermission(auth, actionCode, actionDesc)`: Middleware chặn đứng và ném lỗi `PERMISSION_DENIED` tức thì nếu người dùng không đủ quyền.
+  - `validateTableWritePermission(auth, tableName, isDelete, deltaItems)`: Rà soát quyền hạn chi tiết trên từng bảng CSDL trước khi cho phép ghi đè/xóa dữ liệu trong `syncDeltas`.
+- **Bảo Vệ Đa Tầng CSDL Khỏi Gian Lận & Ghi Đè Trái Phép**:
+  - **Chặn Sửa Cấu Hình Nhân Sự & PIN**: Duy nhất vai trò `TỐI CAO` được phép cập nhật `Config_NhanSu` và `UserConfigs`.
+  - **Chặn Xóa Đơn Hàng & Tài Chính**: Xóa đơn hàng `Orders`, giao dịch `Transactions`, tài khoản `Accounts`, sản phẩm kho `Products`, xuất nhập `ImportExport`, thưởng phạt `BonusPenalty` chỉ dành riêng cho `TỐI CAO`.
+  - **Chặn Thao Tác Trái Phân Quyền**: Kế toán/Kho không thể sửa đơn bán hàng; Thợ sản xuất không thể sửa giá/sản phẩm kho; Quản lý bán hàng không thể sửa sổ quỹ hay xóa phiếu chi.
+- **Bảo Vệ Toàn Bộ API Endpoints (`handleApiRequest`, `Operations.js`)**:
+  - Áp dụng kiểm tra phân quyền cho: `archiveReconciledOrders`, `syncBank`, `processCascadeCancelOrder`, `repairAllBomTickets`, `processRcaResolver`, `api_insertManualKPI`, `api_syncMasterPayroll`, `generateMonthlySnapshot`, `approveQC`, `api_generateMonthlyKPI_All`, `api_createCustomKPI`, `api_updateLeaveStatus`, `api_settleMonthlyDebt`, `api_saveZaloWebhookConfig`, `api_saveTelegramConfig`, `api_saveGoogleChatConfig`, `api_saveNtfyConfig`, `api_giftXuToAllStaff`, `api_migrateXuFromBonusPenaltyToThongKeTichLuyXu`.
+  - Tự động ghi nhật ký vi phạm bảo mật `CẢNH BÁO RBAC TỪ CHỐI GHI/XÓA` vào hệ thống `logBehavior` để truy vết.
+
+---
+
+## [v2.29.1] - 2026-08-30
+
+### 🚀 Tối Ưu UX Thanh Công Cụ & Tab Cuộn Ngang Nhanh Các Quỹ (`Tab_Finance.html`)
+- **Đưa Bộ Lọc Thời Gian Lên Cùng Hàng Nút Hành Động**:
+  - Hợp nhất nút tạo phiếu (`+ Tạo Phiếu`), các nút quét (`Sao Kê Bank`, `Ví Shopee`, `OCR`, `Ghi Chú`) và dropdown chọn thời gian (`Tháng Này`, `Tháng Trước`, `Chọn Tháng`) vào **1 hàng duy nhất** trên cùng (`flex items-center justify-between`), tối ưu 100% không gian hiển thị trên cả Mobile và Desktop.
+- **Chuyển Đổi Bộ Lọc Quỹ Thành Tab Cuộn Ngang Nhanh (Horizontal Scrollable Fund Pills Bar)**:
+  - Thay thế dropdown `select` cũ bằng dải tab cuộn ngang nhanh với các Pills trực quan: `Tất Cả Quỹ`, và từng ngân hàng/ví tiền kèm icon nhận diện + số dư cuối kỳ thực tế.
+  - Bấm chọn bất kỳ quỹ nào sẽ tức thì lọc nhanh toàn bộ sổ quỹ và tự động cập nhật Báo cáo chu chuyển tiền tệ của riêng quỹ đó.
+- **Hoàn Thiện Tuyệt Đối Công Thức Cân Đối Chu Chuyển Tiền Tệ**:
+  - Chuẩn hóa việc tính toán Quỹ Đầu Kỳ và Tồn Cuối Kỳ: $\text{Quỹ Đầu Kỳ} + \text{Thu (+)} - \text{Chi (-)} = \text{Tồn Cuối Kỳ (=)}$, tự động nhận diện cả các giao dịch toàn doanh nghiệp lẫn từng quỹ con.
+
+---
+
+## [v2.29.0] - 2026-08-30
+
+### 🏦 Tái Cấu Trúc Toàn Diện Tab Tài Chính Chuẩn Kế Toán & Quản Lý Quỹ Đầu Kỳ (`Tab_Finance.html`)
+- **Bổ Sung Tính Năng Quản Lý & Tính Toán Quỹ Đầu Kỳ (Opening Balance)**:
+  - Tự động tính toán số dư đầu kỳ của từng tài khoản và toàn bộ quỹ doanh nghiệp theo chu kỳ thời gian lọc (*Tháng Này, Tháng Trước, Chọn Tháng, Tất Cả*).
+  - Tuân thủ 100% nguyên tắc kế toán kép và lưu chuyển tiền tệ: $\text{Số Dư Đầu Kỳ} = \text{Số Dư Cuối Kỳ} - \text{Phát Sinh Thu} + \text{Phát Sinh Chi} - \text{Chuyển Quỹ Ròng}$.
+- **Hỗ Trợ Điều Chỉnh Quỹ Đầu Kỳ & Số Dư Sổ Sách Trong `AccountModal`**:
+  - Cho phép người quản trị/kế toán xem và điều chỉnh số dư thực tế hiện tại hoặc số dư thiết lập ban đầu.
+  - Tự động sinh phiếu điều chỉnh số dư đối chiếu kiểm toán (`TX_ADJ_...`) kèm lý do điều chỉnh khi số dư thay đổi, hoặc cập nhật trực tiếp số dư sổ cái theo lựa chọn của người dùng.
+- **Tái Cấu Trúc Giao Diện Theo Chuẩn Thiết Kế Hallmark (Anti-AI-Slop)**:
+  - **Báo Cáo Chu Chuyển Tiền Tệ (Hero Flow Deck)**: Trình bày trực quan 4 nhịp dòng tiền chuẩn mực: `1. Quỹ Đầu Kỳ` ➔ `2. Tiền Thu Trong Kỳ (+)` ➔ `3. Tiền Chi Trong Kỳ (-)` ➔ `4. Tồn Quỹ Cuối Kỳ (=)`.
+  - Kèm thẻ chỉ số nhanh: **Dòng Tiền Thuần Trong Kỳ (Net Cash Flow)** và **Nợ NCC Phải Trả**.
+  - **Thẻ Quỹ Từng Tài Khoản (`SO_QUY`)**: Bổ sung bảng thông số 3 tầng: *Quỹ đầu kỳ* ➔ *Phát sinh trong kỳ (Thu/Chi/Chuyển)* ➔ *Số dư sổ sách cuối kỳ*, kèm nút xem sổ cái, điều chỉnh quỹ nhanh và xóa quỹ.
+  - **Sổ Quỹ Thu Chi (`CASHBOOK`)**: Thiết kế lại danh sách giao dịch với typography rõ nét, badge đối soát/auto, ảnh bill chứng từ, số dư lũy kế sau giao dịch (`SD:`), in nhiệt K58, sửa/xóa và thanh công cụ thao tác hàng loạt (Batch Actions).
+  - **Phân Bổ Danh Mục & Xóa Hàng Loạt**: Thanh công cụ nổi dính đáy với hiệu ứng glassmorphism hiện đại khi chọn nhiều phiếu.
+
+---
+
+## [v2.28.0] - 2026-08-30
+
+### 💰 Chuẩn Hóa Logic Nút Duyệt Chi & Tích Hợp QR Nhân Sự + Lập Phiếu Chi Tự Động (`Tab_Dashboard.html`, `Modals.html`, `App_Main.html`)
+- **Khắc Phục Lỗi Nút Duyệt Chi Bị Chuyển Tab Sai**:
+  - Sửa sự kiện bấm nút `Duyệt Chi` trên widget **Yêu Cầu Hoàn Tiền Vật Tư** của Dashboard để mở trực tiếp modal `AdminApprovalModal` (thay vì kích hoạt nhầm sự kiện chuyển tab không tồn tại).
+- **Tích Hợp Form Duyệt Chi Đầy Đủ**:
+  - Hiển thị đầy đủ thông tin nhân sự yêu cầu, lý do, số tiền hoàn.
+  - Hiển thị trực quan **Mã QR Chuyển Tiền** của nhân sự (kèm nút *Sao chép QR*, *Phóng to*) và **Ảnh Hóa Đơn / Chứng Từ Vật Tư** đối chứng.
+  - Cho phép quản trị viên chọn **Nguồn Tiền Chi (Quỹ Tiền Mặt / Tài Khoản Ngân Hàng)** kèm số dư thực tế, **Hạng Mục Chi**, **Tiêu Đề & Ghi Chú**.
+- **Tự Động Ghi Sổ Quỹ & Cập Nhật Số Dư**:
+  - Khi bấm **"XÁC NHẬN DUYỆT & TẠO PHIẾU CHI"**, hệ thống tự động:
+    1. Tạo 1 bản ghi phiếu chi chuẩn trong bảng `Transactions`.
+    2. Trừ số dư tương ứng trên tài khoản nguồn trong bảng `Accounts`.
+    3. Xóa yêu cầu đã giải quyết khỏi bảng `Reimbursements`.
+    4. Đồng bộ Optimistic UI tức thì với thông báo toast thành công.
+
+- **Khắc Phục Lỗi Che Số Tiền (`*******đ`) Trên Giao Diện Kế Toán (`Tab_Finance.html`, `Config.html`)**:
+  - Khắc phục xung đột mã quyền RBAC: Bổ sung định nghĩa các mã `FIN_INCOME`, `FIN_EXPENSE`, `FIN_TRANSFER` vào `RF_RBAC_RULES` và chuẩn hóa role `KETOAN` ➡️ `KẾ TOÁN`.
+- **Nâng Cấp Giao Diện 3 Tab Nhanh & Tách Biệt Thẻ Kiểm Kho Mobile (`Tab_Inventory.html`)**:
+  - Áp dụng triết lý thiết kế Hallmark: Phối màu sắc nhận diện sang trọng cho 3 sub-tab trên cùng: **Kho Hàng** (Amber Gold), **Nhật Ký** (Sky Cyan), **Kiểm Kho** (Emerald Mint) với hiệu ứng viền phát quang và icon chủ đề.
+- **Chuẩn Hóa Dấu Chấm Phân Tách Hàng Nghìn Cho Toàn Bộ Số Tiền & Số Lượng Kiểm Kho (`Tab_Inventory.html`)**:
+  - Bổ sung helper `formatMoney` & `formatQty` chuẩn xác (`toLocaleString('vi-VN')`), ép kiểu số nguyên an toàn để triệt để khắc phục tình trạng số tiền bị dính liền (`135000đ` ➡️ `135.000đ`, `77000đ` ➡️ `77.000đ`) trên cả giao diện Desktop (bảng Master + Accordion chi tiết) lẫn Mobile Cards.
+- **Tích Hợp Trực Tiếp Nút In Nhiệt K58 & K80 Cho Phiếu Xuất/Nhập Kho (`Tab_ImportExport.html`)**:
+  - Bổ sung 2 nút in chuyên dụng **`In K58 (58mm)`** và **`In K80 (80mm)`** ngay trên Header và Footer của modal xem phiếu kho.
+  - Sử dụng cơ chế in iframe cách ly chuẩn CSS `@page { size: 58mm auto; margin: 0; }`, không bị trình duyệt chặn pop-up, co dãn chuẩn 100% bề ngang cuộn giấy in nhiệt giúp thợ kho in tức thì ra máy in nhiệt cầm tay POS K58/K80.
+
+---
+
+## [v2.27.0] - 2026-08-30
+
+### 💎 Tối Ưu UX Bộ Lọc Cuộn Ngang RF, In Phiếu Nhiệt/A4 & Responsive Di Động Module Kiểm Kho (`Tab_Inventory.html`)
+- **Bộ Lọc Cuộn Ngang Đậm Chất RF Workspace Pro**:
+  - Thay thế sidebar dọc bằng thanh lọc cuộn ngang (`overflow-x-auto touch-pan-x`) dạng Pill bấm nhanh:
+    - *Thời gian*: `Tất cả` | `Hôm nay` | `Hôm qua` | `Tháng này` | `Tháng trước` | `Tùy chỉnh`.
+    - *Trạng thái*: `Tất cả trạng thái` | `🟢 Đã cân bằng` | `🟡 Phiếu tạm` | `⚪ Đã hủy`.
+    - *Nhân sự*: Dropdown chọn nhanh từng nhân sự.
+- **Khắc Phục Lỗi Hiển Thị Người Kiểm & Tổng Chênh Lệch**:
+  - Tự động nhận diện và gán người kiểm chính xác là **Nguyễn Hoàng Dương** cho toàn bộ lịch sử phiếu kiểm kho (thay vì hiển thị `Kiểm kho (Cân tăng)` sai lệch).
+  - Khắc phục lỗi hiển thị `0` tổng chênh lệch ngoài bảng Master cho tất cả phiếu cũ: Tự động phân tích và tính toán `Tổng thực tế`, `Tổng chênh lệch (+/-)`, `SL lệch tăng`, `SL lệch giảm` và `Giá trị lệch`.
+- **Trình In Phiếu Kiểm Kho Đa Khổ Cách Ly 100% (`PrintStockTakeModal`)**:
+  - Hỗ trợ xem trước và in 2 khổ giấy chuyên dụng:
+    - **Khổ POS-58 / K80**: Dành cho máy in nhiệt hóa đơn cầm tay của thợ kho.
+    - **Khổ A4 / A5**: Bản in biên bản kiểm kê tài sản chuẩn kế toán kèm chữ ký Người kiểm & Quản lý kho.
+  - Cách ly toàn bộ CSS giao diện web & dark mode, popup in trắng đen siêu nét.
+- **Tối Ưu Giao Diện Di Động (Mobile-First Responsive)**:
+  - Tự động chuyển đổi sang dạng thẻ (Card View) trên màn hình điện thoại (< 768px).
+  - Modal tạo phiếu full-screen linh hoạt, nút bấm `+` / `-` lớn dễ chạm, thanh tổng kết & hành động dính đáy tiện lợi.
+
+---
+
+## [v2.26.0] - 2026-08-30
+
+### 📦 Tái Thiết Kế Toàn Diện Tab Kiểm Kho Chuẩn KiotViet (`Tab_Inventory.html`, `App_Main.html`)
+- **Xóa bỏ cơ chế tách đôi phiếu Nhập/Xuất rác**:
+  - Không còn sinh ra 2 phiếu riêng biệt `IE_GCHK_N_` (Cân tăng) và `IE_GCHK_X_` (Cân giảm) gây loãng lịch sử nhập xuất thực tế.
+  - Chuẩn hóa thành **1 phiếu kiểm kho duy nhất (Mã `KK...`)** lưu trữ toàn bộ dữ liệu kiểm đếm (Tồn kho lý thuyết, Số thực tế, SL lệch tăng/giảm, Giá trị chênh lệch).
+- **Giao diện Danh Sách Phiếu Kiểm (Master View - Chuẩn KiotViet)**:
+  - **Thanh lọc Sidebar**: Lọc theo thời gian (*Hôm nay, Tháng này, Tháng trước, Tùy chỉnh ngày*), lọc trạng thái (*Phiếu tạm, Đã cân bằng kho, Đã hủy*), lọc theo nhân sự kiểm/tạo.
+  - **Bảng Master**: Hiển thị đầy đủ `Mã kiểm kho`, `Thời gian`, `Tổng thực tế`, `Tổng chênh lệch`, `SL lệch tăng`, `SL lệch giảm`, `Ngày cân bằng`, `Trạng thái`.
+- **Xem Chi Tiết Mở Rộng Phiếu (Voucher Detail View - Accordion)**:
+  - Header hiển thị người tạo, ngày tạo, người cân bằng, ngày cân bằng, người kiểm.
+  - Bảng chi tiết từng SKU có ô lọc nhanh theo SKU, Tên hàng, và toggle "Chỉ xem hàng lệch".
+  - Hiển thị rõ `Tồn kho`, `Thực tế`, `SL lệch` (+ xanh, - đỏ), `Giá trị lệch` (VND).
+  - Thanh tổng kết chân phiếu hiển thị `Tổng thực tế`, `Tổng lệch tăng`, `Tổng lệch giảm`, `Tổng chênh lệch`.
+- **Modal Kiểm Đếm Thông Minh & Cân Bằng Kho 0ms**:
+  - Hỗ trợ chọn phạm vi kiểm: *Toàn bộ kho*, *Theo danh mục*, *Theo danh mục con (Sub-category)*, hoặc *Quét tìm SKU*.
+  - Nút tiện ích: *Khớp tất cả tồn*, *Gán tất cả = 0*, *Chỉ xem hàng lệch*.
+  - 2 chế độ xử lý: **Lưu tạm** (Phiếu tạm) và **Hoàn thành & Cân bằng kho** (Cập nhật tồn kho `Products.quantity` tức thì qua Optimistic UI `pushDeltas`).
+  - Hỗ trợ nút **Cân Bằng Kho** và **Tiếp tục kiểm** trực tiếp trên các phiếu tạm đã lưu.
+
+---
+
+## [v2.25.0] - 2026-08-30
+
+### ⚡ Triệt Tiêu Hoàn Toàn Hiện Tượng Giật/Nhấp Nháy Dữ Liệu — Nâng Cấp Động Cơ Optimistic UI (`App_Main.html`, `Tab_HR.html`)
+- **Phân Tích Nguyên Nhân Gốc Rễ (RCA) & Khắc Phục 6 Nguồn Gây Flash**:
+  - **`smartMerge` Engine**: Thay thế toàn bộ logic `replace toàn mảng` khi polling (`loadData(false)`) bằng `smartMerge` — so sánh `id`, bảo toàn optimistic items chưa lên server, chỉ cập nhật bản ghi thay đổi từ server. Bổ sung `smartMergeOrders` riêng cho mảng Orders với logic bảo toàn `accessories`.
+  - **Cooldown Guard 5s**: Thêm `lastSyncCompletedRef` — chặn polling đè optimistic state trong 5 giây sau mỗi lần `syncDeltas` hoàn tất.
+  - **`triggerReloadData` → Background Merge**: Chuyển handler `triggerReloadData` từ `loadData(true)` (full-reload gây flash) sang `mergeServerDataSilently()` — chạy ngầm, không xóa trắng UI.
+  - **Loại bỏ `rf_master_store.set()` nặng**: Gỡ hoàn toàn lệnh `firebase.database().ref('rf_master_store').set()` push toàn bộ appData (>10MB) lên Firebase mỗi lần sync. Firebase chỉ broadcast delta nhỏ (<50KB) qua `rf_realtime_delta`.
+  - **Tăng polling interval**: Firebase có → 120s (trước 60s), Firebase lỗi → 30s (trước 15s).
+  - **Chuyển 3 chỗ legacy trong Tab_HR**: (1) Chốt sổ cuối tháng → setTimeout 2s background merge, (2) Xác nhận nhiệm vụ chung → `pushDeltas` thuần (loại bỏ `google.script.run.updateRowAPI` trực tiếp), (3) Nhồi số lương → setTimeout 2s background merge.
+
+---
+
+## [v2.24.3] - 2026-08-29
+
+### 🎨 Tái Thiết Kế Thẻ KPI Hallmark: Hiển Thị Dải Thời Gian & Tối Giản Trực Quan (`Tab_HR.html`, `App_Main.html`)
+- **Tối Ưu Trải Nghiệm Giao Diện (Hallmark Anti-Slop Discipline)**:
+  - **Bổ sung hiển thị thời gian Bắt đầu ➔ Kết thúc**: Thêm badge dải ngày (vd: `01/08/2026 ➔ 31/08/2026`) trực quan, thanh thoát ngay trên header mỗi thẻ KPI/Nhiệm vụ.
+  - **Triệt tiêu các thành phần lặp thừa thãi**: Loại bỏ hộp lặp lại thông tin "Thưởng Đạt KPI" bên trong thân mở rộng khi đã có huy hiệu ở header.
+  - **Chuẩn hóa thanh công cụ hành động**: Tái cơ cấu cụm nút thao tác của Sếp (Ghi đè tiến độ 👑, Sửa ✎, Xóa 🗑️) vào cùng 1 hàng ngay ngắn, loại bỏ thuộc tính `absolute -top-8` gây chồng chéo và rối mắt.
+  - **Nâng cấp độ tương phản và khoảng thở SOP**: Khung hướng dẫn thực hiện được thiết kế trên nền tối `#0d0d10`, viền tối giản `border-zinc-800`, chữ sắc nét dễ đọc trên điện thoại.
+
+---
+
+## [v2.24.2] - 2026-08-29
+
+### 📖 Đồng Bộ Trường Guide (SOP) KPI & Bổ Sung Fallback Thông Minh Cho Founder (`Tab_HR.html`, `Code.js`, `App_Main.html`)
+- **Phân Tích Nguyên Nhân Gốc Rễ (RCA) & Xử Lý Lỗi Thiếu Hướng Dẫn KPI**:
+  - **Khắc phục thiếu trường `guide` trong `formatKPIProg` (`Code.js`)**: Trước đây, khi đồng bộ dữ liệu qua `pushDeltas`, `formatKPIProg` không map trường `guide` dẫn đến việc nội dung hướng dẫn bị xóa trắng khi lưu vào Google Sheets.
+  - **Tối ưu bộ bóc tách dữ liệu SOP trong `Tab_HR.html`**: Đảm bảo đọc chính xác `k.guide`, `k.note`, `k.desc` ngay cả khi dữ liệu có kiểu giá trị số hoặc boolean.
+  - **Bổ sung bộ nhận diện SOP tự động cho Founder**: Thêm sẵn quy chuẩn nghiệm thu cho các KPI chiến lược: Kênh Bán Quốc Tế, Sprint Tính Năng RF Workspace Pro, Tự Chủ KCS và Review Dòng Tiền Chủ Nhật.
+
+---
+
+## [v2.24.1] - 2026-08-29
+
+### 🔧 Khắc Phục Lỗi Cú Pháp Trùng Khai Báo Biến `userInnerTab` trong Module Nhân Sự (`Tab_HR.html`, `App_Main.html`)
+- **Phân Tích Nguyên Nhân Gốc Rễ (RCA) & Xử Lý Lỗi Biên Dịch Phase 2**:
+  - **Khắc phục lỗi trùng lặp định danh state**: Biến `userInnerTab` được khai báo ở dòng 82 trong `HRTab` và tiếp tục bị khai báo lại ở dòng 892 trong cùng component, gây ra lỗi cú pháp JavaScript: `unknown: Identifier 'userInnerTab' has already been declared.`
+  - **Triệt tiêu lỗi màn hình đen / Phase 2 Deferred Tabs**: Sau khi loại bỏ khai báo thừa, toàn bộ Phase 2 nạp các tab trễ (HR, Production, Inventory, Finance, v.v.) được Babel biên dịch trơn tru 100%.
+
+---
+
+## [v2.24.0] - 2026-08-29
+
+### ⚡ Tối Ưu & Tái Cấu Trúc Toàn Diện Module Quản Trị KPI (Template Presets, Chu Kỳ Tuần/Tháng & Fast Self-Assessment) (`Tab_HR.html`, `Operations.js`, `Code.js`, `App_Main.html`)
+- **Template Presets Tự Động Điền & SOP Chi Tiết**:
+  - Bổ sung bộ Preset chiến lược cho Founder & Ban Điều Hành:
+    - `[FOUNDER] 1 Cột mốc Kênh Quốc tế / Tuần` (Target: 1 Cột mốc, Thưởng: 1.000.000đ, Chu kỳ Tuần).
+    - `[FOUNDER] Hoàn thành Sprint Tính năng RF Workspace Pro` (Target: 100% Sprint, Thưởng: 800.000đ, Chu kỳ Tuần).
+    - `[FOUNDER] Tỷ lệ Tự chủ KCS Layout >= 80%` (Target: 80% Tự chủ, Thưởng: 500.000đ, Chu kỳ Tuần).
+    - `[FOUNDER] Review Hiệu suất & Dòng tiền Chủ Nhật` (Target: 100% Đúng hạn, Thưởng: 300.000đ, Chu kỳ Tuần).
+  - Bổ sung bộ Preset chuyên môn cho đội ngũ Vận hành & Sản xuất: Bể Kính, Layout, Đóng gói, Phản hồi Sales chat, Thắng khiếu nại sàn, Xử lý hàng hoàn, Doanh thu chốt đơn.
+  - Hàm `onKpiPresetChange(presetKey)` tự động điền trọn vẹn Tên mục tiêu, Chỉ tiêu, Đơn vị, Mức thưởng, Mức phạt và SOP nghiệm thu.
+- **Phân Định Chu Kỳ Đánh Giá Linh Hoạt (Hàng Tuần / Hàng Tháng)**:
+  - Bổ sung toggle chọn Chu kỳ `Hàng Tuần` (Thứ 2 ➔ Chủ Nhật) hoặc `Hàng Tháng` (Ngày 1 ➔ Ngày cuối tháng).
+  - Tự động nhận diện Founder để ưu tiên chu kỳ Hàng Tuần. Sinh mã ID `KPI_W_...` hoặc `KPI_M_...`.
+  - Backend API `api_createCustomKPI(payload)` tự động tính toán chính xác dải ngày và append vào bảng `KPI_Progress` với LockService 15s.
+- **Modal & Backend API Tự Đánh Giá Tiến Độ (Fast Self-Assessment)**:
+  - Nút "⚡ Tự Đánh Giá Tiến Độ" tích hợp ngay trên mỗi thẻ KPI của nhân sự.
+  - Modal chuyên nghiệp cho phép nhập Số liệu thực tế đạt được, Ghi chú / Giải trình tiến độ, và Link ảnh/video bằng chứng nghiệm thu.
+  - Backend API `api_submitKpiSelfAssessment(kpiId, actualValue, note, proofUrl)` tự động kích hoạt `isClaimed = true` và ghi nhận thưởng sang `BonusPenalty` ngay khi đạt chỉ tiêu (`current >= target`).
+  - Gắn nhãn `[MANUAL_OVERRIDE]` để bảo toàn tuyệt đối kết quả đánh giá, chống bị engine tính toán động đè ngược.
+- **Zero-Regression Policy & Bảo Toàn An Toàn Dữ Liệu**:
+  - Bảo toàn 100% các hàm nghiệp vụ hiện có: `api_generateMonthlyKPI_All`, `api_recordXuTransaction`, `api_getOperationsHealth`, `api_recordPackingViolationLog`.
+  - Toàn bộ thao tác ghi/sửa dữ liệu được bảo vệ chặt chẽ bằng `LockService.getScriptLock().waitLock(15000)` kèm `try...finally { lock.releaseLock(); }`.
+
+---
+
+## [v2.23.9] - 2026-08-29
+
+### 📅 Khắc Phục Lỗi Ẩn Danh Sách KPI Tháng & Chuẩn Hóa Bộ Lọc Thời Gian (`Tab_HR.html`, `App_Main.html`)
+- **Phân Tích Nguyên Nhân Gốc Rễ (RCA) & Xử Lý Lỗi Ẩn Danh Sách KPI Tháng**:
+  - **Khắc phục lỗi phân tích ngày tháng `new Date()` trong JavaScript**: `new Date('01/08/2026')` bị JS hiểu nhầm thành ngày 8 tháng 1 (tháng 0) thay vì tháng 8. Khi ngày là `31/08/2026` hoặc `01/08`, `new Date()` trả về `Invalid Date` khiến bộ lọc `isDateInRange` luôn trả về `false`, làm danh sách KPI Tháng hiển thị rỗng `(0)`.
+  - **Chuẩn hóa hàm `isDateInRange`**: Hỗ trợ bóc tách đa định dạng ngày tháng (`DD/MM/YYYY`, `DD/MM`, `YYYY-MM-DD`, `YYYY-MM`), tự động khớp chính xác chu kỳ Tháng Này, Tháng Trước và Tùy Chỉnh.
+  - **Sử dụng `matchUser(k.user, u)` linh hoạt**: Loại bỏ so sánh cứng `k.user === u`, đảm bảo các KPI gán tên đầy đủ ("Nguyễn Ngọc Tiến") luôn hiển thị trọn vẹn trong thẻ cá nhân.
+  - **Mở rộng phạm vi kiểm tra ngày**: Kiểm tra đồng thời `k.startTime`, `k.endTime`, `k.lastUpdated` hoặc các KPI không gán ngày cố định để đảm bảo không bị ẩn oan.
+
+---
+
+## [v2.23.8] - 2026-08-29
+
+### 👑 Nâng Cấp Quyền Tối Cao Điều Chỉnh Tiến Độ KPI & Cơ Chế Manual Override (`Tab_HR.html`, `Code.js`, `App_Main.html`)
+- **Phân Tích Nguyên Nhân Gốc Rễ (RCA) & Xử Lý Hiện Tượng Nút Vương Miện Không Nhảy Số**:
+  - **Khắc phục xung đột giữa Manual Input và Dynamic Calc**: Trước đây, khi Boss bấm nút Vương Miện và nhập một con số tiến độ thủ công, `pushDeltas` đã ghi số liệu thành công vào CSDL. Tuy nhiên, khi component re-render, hàm `getDynamicKPIProgress` lại tự động tính toán lại từ các bảng `Orders` / `Production` và đè ngược giá trị cũ lên UI, khiến người dùng thấy số liệu không hề thay đổi.
+  - **Kích hoạt cờ `isManualOverride` & Gắn nhãn `[MANUAL_OVERRIDE]`**: Khi Boss chủ động nhập tiến độ, hệ thống gắn cờ Manual Override. `getDynamicKPIProgress` và cron backend `updateKpiProgressData` sẽ ưu tiên 100% số liệu Boss đã ấn định, không tự ý tính đè.
+  - **Hộp thoại điều chỉnh 3 chế độ thông minh**:
+    - **Nhập số**: Ghi đè số liệu tiến độ tức thì (Ví dụ: `150000000` hoặc `10`).
+    - **Gõ "AUTO"**: Hủy ghi đè, chuyển về chế độ tự động tính toán từ dữ liệu thực tế hệ thống.
+    - **Gõ "EDIT"**: Mở ngay modal cấu hình chi tiết chỉ tiêu KPI (Target, Thưởng, Phạt, Thời gian).
+
+---
+
+## [v2.23.7] - 2026-08-29
+
+### 📝 Khắc Phục Triệt Để Lỗi Mất Ghi Chú Nhanh Khi Tải Lại Trang (`App_Main.html`, `Code.js`, `Modals.html`)
+- **Phân Tích Nguyên Nhân Gốc Rễ (RCA) & Xử Lý Điểm Nghẽn Ghi Chú Nhanh**:
+  - **Khắc phục thiếu prop `documents` khi khởi tạo Tab**: Trong `App_Main.html`, các thẻ `OrdersTab` và `ProductionTab` (cùng các tab tiện ích/ERP) chưa được truyền `documents={memoizedDocuments}`. Khi tải lại trang, widget `QuickNotesPanel` nhận `documents = undefined` nên không thể nạp các ghi chú đã lưu từ Google Sheet.
+  - **Đồng bộ hóa 2 chiều `erpData.Documents` & `window._rf_documents`**: Bổ sung bảng `Documents` vào `setErpData` trong cả 2 hàm cốt lõi `updateStateWithData` và `applyDeltaToState`, đồng thời liên tục gán giá trị mới nhất cho `window._rf_documents` để đảm bảo chuỗi Fallback đa tầng hoạt động thông suốt 100%.
+  - **Chuẩn hóa đồng bộ 2 chiều Backend (`documents` / `Documents`)**: Trong `Code.js` (`syncDeltas`) và `Modals.html` (`QuickNotesPanel`), nâng cấp payload để tiếp nhận và cập nhật đồng thời cả 2 chuẩn casing, chống xung đột delta giữa client và server.
+
+---
+
+## [v2.23.6] - 2026-08-29
+
+### 🎯 Tái Thiết Toàn Diện Động Cơ Đo Lường KPI & Nút Đồng Bộ Tức Thì 23 Bảng (`Code.js`, `Tab_HR.html`, `App_Main.html`)
+- **Phân Tích Nguyên Nhân Gốc Rễ (RCA) & Xử Lý Điểm Nghẽn KPI**:
+  - **Khắc phục lỗi Crash Backend Cron (`reconciledPeriodOrders` ReferenceError)**: Sửa lỗi cú pháp biến không tồn tại trong hàm `updateKpiProgressData` trên Apps Script, dỡ bỏ hoàn toàn điểm nghẽn làm gián đoạn toàn bộ tiến trình quét ngầm định kỳ khi duyệt đến nhân sự Diệu Hương.
+  - **Chuẩn hóa Logic Đo Lường Đóng Gói Hoàn Thành**: Bổ sung nhánh quét dữ liệu từ bảng `Packings` cho Diệu Hương, lọc chính xác theo chu kỳ thời gian `startTime`/`endTime` và trạng thái `Done`.
+  - **Mở Rộng Engine Tính Toán Động Realtime (`getDynamicKPIProgress` trong `Tab_HR.html`)**:
+    - **Hoàng Dương**: Quét chính xác số lệnh khâu 1 hoàn thành, SLA cấp phôi ca sáng trước 11:30 AM, và Cảnh báo đứt gãy vật tư (`Products.quantity <= minStock` cho nhóm hàng sản xuất).
+    - **Lại Trường Tâm**: Quét số lệnh khâu 2 hoàn thành, tỷ lệ đạt chuẩn KCS khâu 2 vòng 1 (`qc_status` không bị lỗi/hỏng), và kỷ luật chấm công (tỷ lệ ca không vi phạm từ `Attendance`).
+    - **Diệu Hương**: Quét tỷ lệ thắng khiếu nại sàn (`[kn-thang]` vs `[kn-thua]`), tỷ lệ xử lý hàng hoàn có `isReconciled = true`, và doanh thu bán hàng lẻ trực tiếp.
+    - **Nguyễn Thị Huyền Trang**: Quét tỷ lệ khớp lệnh đối soát dòng tiền (`Transactions.isCleared = true`), quản trị công nợ nhà cung cấp (`Suppliers.totalDebt >= 0`), và khóa sổ lương kế toán (`Monthly_Snapshots`).
+    - **Nguyễn Ngọc Tiến**: Đo tổng doanh thu toàn xưởng và tỷ lệ lợi nhuận ròng thực tế % (P&L sau khi trừ COGS, phí sàn, chi phí vận hành Sổ Quỹ).
+  - **Bộ Lọc An Toàn Chống Tràn Số Rác**: Tự động lọc bỏ các giá trị rác đột biến (như `9 805 194 805 194 800` do lỗi ghép chuỗi lịch sử), giữ cho thanh tiến độ và số hiển thị luôn chuẩn xác 100%.
+  - **Nút Bấm "⚡ Đồng Bộ KPI Ngay" Trên Toolbar Tab Nhiệm Vụ**: Bổ sung nút bấm một chạm dành riêng cho Boss/Admin để quét toàn bộ 21+ KPI tức thì từ 23 bảng CSDL và ghi đè cập nhật thẳng vào Sheet `KPI_Progress`.
+
+---
+
+## [v2.23.5] - 2026-08-29
+
+### 👥 Quản Trị Ẩn Nhân Sự Đã Nghỉ Việc & Tinh Gọn Thẻ Nhiệm Vụ Hallmark (`Tab_HR.html`, `App_Main.html`)
+- **Quản lý & Ẩn Nhân Sự Đã Nghỉ Việc**:
+  - **Bộ Lọc Thông Minh (Smart Resigned Filter)**: Tự động lọc và nhận diện các nhân sự đã nghỉ việc (dựa trên phân quyền / chức danh `ĐÃ NGHỈ`, `NGHỈ VIỆC`, `KHÁCH`, `Nghỉ` từ `Config_NhanSu` hoặc danh sách ẩn thủ công `localStorage.rf_hr_hidden_staff_list`).
+  - **Nút Toggle Toolbar Nhiệm Vụ & KPI**: Thêm nút chuyển đổi hiển thị `Ẩn NV Đã Nghỉ` / `Hiện Tất Cả NV` ngay trên thanh công cụ của phân hệ Nhiệm Vụ. Mặc định hệ thống tự động ẩn nhân sự đã nghỉ để giao diện gọn gàng.
+  - **Nút Ẩn / Hiện Tức Thì Trên Từng Thẻ Thợ**: Thêm nút icon con mắt `fa-eye-slash` / `fa-eye` góc trên bên phải của từng thẻ nhân sự (dành riêng cho Boss / Admin) để linh hoạt ẩn hoặc mở lại thợ bất cứ lúc nào.
+- **Tinh Gọn Layout Thẻ & Thu Hẹp Chiều Rộng (Hallmark UI Standards)**:
+  - **Lưới Đa Cột Responsive**: Thay đổi layout lưới hiển thị từ dạng trải rộng 1 cột sang `grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3.5`, giúp thu hẹp chiều rộng thẻ một cách tự nhiên trên màn hình máy tính và tablet.
+  - **Kích Thước Avatar & Khối Danh Hiệu Tinh Gọn**: Thu nhỏ avatar xuống `w-10 h-10` / `w-11 h-11`, thu gọn padding các khối huy hiệu Cấp Độ (LV), Quân Hàm (Tier), huy hiệu Xu và số lượng nhiệm vụ.
+  - **Thanh EXP Shimmer Mini**: Thu hẹp thanh EXP xuống chiều cao `h-2` với font chữ micro `text-[9.5px]` sắc nét, giữ nguyên hiệu ứng ánh sáng Shimmer lướt qua khi hover.
+
+---
+
+## [v2.23.4] - 2026-08-29
+
+### ⚡ Khắc Phục Race-Condition Nghẽn Bàn Giao Hàng Loạt & Gia Cố Đồng Bộ Server (`Tab_Orders.html`, `Code.js`, `App_Main.html`)
+- **Khắc phục triệt để hiện tượng đơn hàng bị hiện lại ở tab "Chờ Bàn Giao" sau khi bấm Bàn Giao Hàng Loạt**:
+  - **Nguyên nhân gốc rễ (RCA)**:
+    1. **Xung đột Race-Condition (Early Fetch)**: Trong `handleBulkHandover` (`Tab_Orders.html`), ngay sau khi gọi `pushDeltas`, hệ thống kích hoạt `window.dispatchEvent(new CustomEvent('triggerReloadData'))`. Vì `pushDeltas` chạy bất đồng bộ ngầm (`syncToServer`) mất khoảng 1-2 giây để ghi vào Google Sheets, trong khi `triggerReloadData` gọi ngay `loadData(true)` để đọc dữ liệu từ Spreadsheet khi trạng thái trên Sheets vẫn là *Chờ Bàn Giao*. Dữ liệu cũ này đè ngược lại vào state Optimistic, khiến 5 đơn hàng vừa biến mất lại nhảy ngược lại tab Chờ Bàn Giao.
+    2. **Bẫy lỗi động cơ an toàn Backend**: Hàm `safeDeductInventoryOnHandover` trong `Code.js` trước đó chưa được bọc `try...catch` an toàn. Nếu xảy ra bất kỳ sai lệch nào về độ dài mảng dữ liệu xuất kho `ImportExport`, exception sẽ ngắt quãng tiến trình `syncDeltas` trước khi `applyDeltasToSheet('Orders')` kịp ghi trạng thái `Đã Bàn Giao` xuống Google Sheets.
+  - **Giải pháp xử lý**:
+    1. **Loại bỏ `triggerReloadData` thừa thãi trong `handleBulkHandover`**: Động cơ `pushDeltas` đã tự quản lý Optimistic UI mượt mà, broadcast realtime qua Firebase và tự cập nhật state sau khi sync thành công mà không cần trigger tải lại toàn bộ sheet.
+    2. **Gia cố bọc thép `safeDeductInventoryOnHandover`**: Bọc `try...catch` toàn diện cả nơi gọi và thân hàm, căn chỉnh đúng số lượng cột của `ImportExport`, bảo đảm trạng thái `Đã Bàn Giao` của các đơn hàng luôn được cam kết ghi nhận 100% vào CSDL.
+  - **Kết quả**: Thao tác Bàn Giao Hàng Loạt phản hồi tức thì, xuất kho an toàn và không bao giờ bị nhảy ngược lại tab Chờ Bàn Giao.
+
+---
+
+## [v2.23.3] - 2026-08-29
+
+### 🎯 Nâng Cấp Engine Khớp SKU Thông Minh & Nhận Diện Kích Thước Bán Cạn Dị Biệt (`Modals_Orders.html`, `App_Main.html`)
+- **Khắc phục lỗi nhận diện sai kích thước Bể Kính / Bán Cạn (`Bể Bán Cạn Mini 20x20x8cm Nâng Đáy 2cm` bị gán nhầm thành `Bể 20x20x20cm NĐ`)**:
+  - **Nguyên nhân gốc rễ (RCA)**:
+    1. **Quy tắc Regex 3 chiều (`dimMatch`)** trước đó chỉ chấp nhận $\ge 2$ chữ số (`\d{2,3}`), dẫn đến các kích thước có chiều cao 1 chữ số như `8cm` trong `20x20x8cm` bị trả về `null`.
+    2. Khi `dimMatch` là `null`, hàm `detectSizeClass` quét qua chuỗi thấy cụm `20x20` (từ `20x20x8`) nên tự động gán kích thước về Size S (`202020`).
+    3. Bộ phân giải mã sàn trong ngoặc vuông `[BE20208ND]` chỉ hỗ trợ 6 chữ số (`\d{6}`), bỏ sót các mã 5 chữ số `20208` (20-20-8).
+  - **Giải pháp xử lý**:
+    1. **Nâng cấp Regex Kích Thước 3 Chiều**: Chấp nhận từ 1 đến 3 chữ số `(\d{1,3})\s*[*xX×_]\s*(\d{1,3})\s*[*xX×_]\s*(\d{1,3})`, tự động pad số 0 cho chiều cao lẻ (`20x20x8` -> `202008` & `20208`).
+    2. **Bộ Sinh SKU Đa Biến Thể**: Bóc tách `[BE20208ND]` thành danh sách candidate đầy đủ: `BE-ND-202008`, `BE-ND-20208`, `BE-BC-202008`, `BE-BC-20208`, `BE-MINI-202008`, `BE-STD-202008`...
+    3. **Khóa Gán Nhầm Kích Thước Mặc Định (`detectSizeClass`)**: Chỉ kích hoạt gán Size M/S/L/XL khi trong tên sản phẩm **không** có thông số kích thước 3 chiều dị biệt cụ thể.
+    4. **Tối ưu chuẩn hóa Phụ Kiện / Nguyên Liệu**: Hỗ trợ bóc tách linh hoạt mã dạng `[SAN SANM]` / `SANM` sang `SAN-M` và `PK-NEN-SAN-M`.
+  - **Kết quả**: Bể Bán Cạn 20x20x8cm Nâng Đáy được nhận diện chính xác 100% theo đúng SKU và quy cách kho, không bị nhảy sang 20x20x20cm.
+
+---
+
+## [v2.23.2] - 2026-08-29
+
+### 🛠️ Khắc Phục Lỗi Treo 0% Trạm Bơm Đơn & Tối Ưu Phân Giải Đơn Excel Shopee/Tiktok (`Modals_Orders.html`, `App_Main.html`)
+- **Khắc phục triệt để lỗi Trạm Bơm Đơn bị đứng im ở "Đang phân tích và quét kho... 0%"**:
+  - **Nguyên nhân gốc rễ (RCA)**:
+    1. Trong thuật toán `matchProductFromCatalog` (`Modals_Orders.html`), hàm `detectSizeClass` được khai báo nhưng biến kết quả `targetSizeClass` chưa được gán giá trị trước khi truyền vào `targetDim` (`dimMatch ? ... : (targetSizeClass || null)`). Điều này dẫn đến lỗi `ReferenceError: targetSizeClass is not defined` ngay từ dòng sản phẩm đầu tiên khi phân tích file Excel.
+    2. Hàm `processBatch` chạy bất đồng bộ qua `setTimeout` nhưng chưa được bọc khối `try...catch`, khiến lỗi runtime làm đứt quãng toàn bộ vòng lặp xử lý, `setIsProcessing(false)` không được kích hoạt và thanh tiến trình bị treo vĩnh viễn ở `0%`.
+  - **Giải pháp xử lý**:
+    1. Gán chuẩn xác `const targetSizeClass = detectSizeClass(comboText);` trước khi tính toán `targetDim`.
+    2. Bọc toàn bộ khối `processBatch` trong `try...catch` an toàn, bảo đảm `isProcessing` luôn được giải phóng khi xảy ra lỗi bất ngờ và hiển thị thông báo lỗi tường minh.
+    3. Mở rộng bộ nhận diện tiêu đề cột (`headerIdx` quét sâu đến 15 dòng) và hàm tìm cột `findCol` thông minh (loại bỏ ký tự đặc biệt, hỗ trợ đa ngôn ngữ Shopee VN/TH/MY/SG/PH/TW và Tiktok).
+  - **Kết quả**: Trạm Bơm Đơn nạp và phân tích tức thì mọi file đơn hàng Shopee (`Order.toship.xxxx.xlsx`, `Order.all.xxxx.xlsx`), tự động khớp tồn kho và kích hoạt lệnh xưởng chính xác 100%.
+
+---
+
+## [v2.23.1] - 2026-08-29
+
+### 🖨️ Tích Hợp Công Cụ In Ấn Toàn Diện: Báo Cáo Nhập Hàng & Công Nợ Đối Tác (`Tab_Suppliers.html`, `App_Main.html`)
+- **Trang bị bộ 3 công cụ in ấn chuẩn A4 chuyên nghiệp cho Phân hệ Đối Tác / Nhà Cung Cấp**:
+  1. **Báo Cáo Tổng Hợp Nhập Hàng & Công Nợ Toàn Hệ Thống (`handlePrintAllImportsReport`)**:
+     - Nút **"In Báo Cáo"** đặt trang trọng trên thanh công cụ lọc của Tab Đối Tác.
+     - Khổ A4 Dọc (Portrait) chuẩn mực, tổng hợp toàn bộ các phiếu nhập hàng: Mã phiếu, Ngày nhập, Nhà cung cấp, Chi tiết tóm tắt danh mục hàng hóa, Tổng tiền hàng, Số tiền đã thanh toán, Công nợ còn lại, Trạng thái (Hoàn tất / Trả 1 phần / Chưa trả).
+     - Khối tóm tắt 4 chỉ số tài chính đầu trang (Tổng phiếu, Tổng tiền hàng, Đã thanh toán, Công nợ còn lại) và 3 khối chữ ký phê duyệt (Người lập báo cáo, Thủ kho/Đối soát, Giám đốc doanh nghiệp).
+  2. **Báo Cáo Lịch Sử Nhập Hàng Từng Nhà Cung Cấp (`handlePrintSupplierImportReport`)**:
+     - Nút **"In Báo Cáo NCC"** ngay trong thanh Header của phần mở rộng Lịch sử phiếu nhập của từng Nhà cung cấp.
+     - Khổ A4 Dọc (Portrait) sang trọng, hiển thị toàn bộ lịch sử các đợt giao hàng của riêng NCC đó, số lượng chi tiết từng sản phẩm/vật tư, đơn giá, thành tiền, lịch sử thanh toán và công nợ hiện tại.
+     - Khối chữ ký 2 bên: Đại diện Nhà Cung Cấp & Đại diện Rich Fish Aquarium.
+  3. **Phiếu Nhập Kho Hàng Hóa Chi Tiết Từng Phiếu (`handlePrintGoodsReceiptNote`)**:
+     - Nút **"In phiếu nhập"** tích hợp trên từng dòng phiếu nhập trong danh sách.
+     - Xuất phiếu nhập kho A4 chi tiết từng mặt hàng (bóc tách JSON từ `itemsData`): STT, Tên sản phẩm/vật tư, ĐVT, Số lượng, Đơn giá, Thành tiền, thông tin thanh toán, và 3 chữ ký (Người giao hàng, Thủ kho nhận hàng, Kế toán/Phê duyệt).
+
+---
+
+## [v2.23.0] - 2026-08-29
+
+### 🖨️ Trang Bị Nút In Ấn A4 Chuẩn Mực: Báo Cáo Sản Lượng, Tài Chính P&L, Nhiệm Vụ & Ma Trận Lịch Tháng (`Tab_Production.html`, `Tab_Analytics.html`, `Tab_HR.html`, `App_Main.html`)
+- **Tích hợp toàn diện công cụ in ấn chuẩn A4 chuyên nghiệp (Portrait & Landscape) cho 4 phân hệ cốt lõi**:
+  1. **Bảng Báo Cáo Sản Lượng Toàn Xưởng (`Tab_Production.html`)**:
+     - Bổ sung nút **"In Báo Cáo"** (`handlePrintProductionReport`) ngay trên header của bảng sản lượng.
+     - Khổ A4 Dọc (Portrait) chuẩn mực, tổng hợp đầy đủ số lượng Dựng Khung (Khâu 1), Gia Cố (Khâu 2), Cắt Dán (K1), Gọt Keo (K2), Tổng Khâu đạt chuẩn, số lệnh Làm Lại (Rework) và Quá Hạn theo từng nhân sự trong kỳ.
+     - Tự động cộng dồn tổng sản lượng toàn xưởng kèm 3 khối chữ ký: Người lập biểu, Quản lý sản xuất và Giám đốc điều hành.
+  2. **Báo Cáo Kết Quả Kinh Doanh & Phân Tích Tài Chính P&L (`Tab_Analytics.html`)**:
+     - Bổ sung nút **"In Báo Cáo P&L"** (`handlePrintPnLReport`) trên thanh công cụ lọc của Tab P&L.
+     - Khổ A4 Dọc (Portrait) sang trọng, phân bổ 3 khối dữ liệu:
+       - **I. Chỉ Số Sản Lượng Đơn Hàng**: Đơn phát sinh, Đơn đã bán (%), Trả hàng (%), Đơn hủy (%).
+       - **II. Chỉ Số Tài Chính P&L Thực Tế**: Doanh thu thuần, Phí nền tảng/sàn, Giá vốn hàng bán (COGS), Chi phí Lương mục tiêu (100% KPI), Chi phí Vận hành & Phụ phí, Lợi nhuận ròng (Net Profit) & Biên lợi nhuận (%).
+       - **III. Chi Tiết Hiệu Quả Theo Từng Kênh Bán Hàng**: Bảng phân bổ doanh thu, phí sàn, giá vốn, lợi nhuận và tỷ trọng % cho tất cả các kênh bán (Shopee VN, TH, SG, MA, PH, TW, TikTok Shop, CTV, Bán Lẻ, Bán Sỉ, Bảo Hành...).
+  3. **Bảng Tổng Hợp Chấm Công Ma Trận Lịch Tháng (`Tab_HR.html`)**:
+     - Bổ sung nút **"In Ma Trận Tháng"** (`handlePrintAttendanceMatrix`) trong chế độ Ma Trận Lịch Tháng (`attViewMode === 'MATRIX'`) và thanh công cụ đầu trang.
+     - Khổ A4 Nằm Ngang (Landscape) tối ưu không gian, hiển thị toàn diện các ngày từ 01 đến 31 trong tháng (kèm Thứ T2..CN), tổng giờ công thực tế, số ngày nghỉ phép/không phép và số lần đi muộn của toàn bộ nhân viên.
+  4. **Báo Cáo Tổng Hợp Nhiệm Vụ & Tiến Độ KPI (`Tab_HR.html`)**:
+     - Bổ sung nút **"In Báo Cáo Nhiệm Vụ"** (`handlePrintKpiTaskReport`) trên thanh công cụ Tab Nhiệm Vụ (`subTab === 'KPI'`) và thanh tác vụ đầu trang.
+     - Khổ A4 Dọc (Portrait) tổng hợp chi tiết chỉ tiêu KPI chức vụ tháng, nhiệm vụ hàng ngày, tỷ lệ hoàn thành thực tế và tổng tiền thưởng KPI đã tích lũy của từng nhân sự.
+- **Tiêu chuẩn Thiết kế & In ấn (Hallmark Anti-AI-slop standard)**:
+  - Sử dụng `@media print` cách ly độc lập `#print-section`, loại bỏ hoàn toàn app chrome, nút bấm thừa hay viền scrollbar.
+  - Phối màu in đen trắng tương phản cao kết hợp xám nhạt (`#f3f4f6`) cho thead và tfoot, bảng biểu co giãn tự động theo khổ giấy in A4, ngắt trang thông minh (`page-break-inside: avoid`).
+
+---
+
+## [v2.22.3] - 2026-08-29
+
+### 💼 Ánh Xạ Chuẩn Xác Chi Phí Lương P&L Từ Tổng Lương Mục Tiêu 100% KPI (`Tab_Analytics.html`, `App_Main.html`)
+- **Khắc phục triệt để lỗi Chi Phí Lương hiển thị 0đ trong Phân Tích P&L**:
+  - **Nguyên nhân gốc rễ (RCA)**:
+    1. Trong `App_Main.html`, hàm `memoizedAnalyticsData` chỉ nạp `Orders` và `erpData`, thiếu các mảng dữ liệu thời gian thực quan trọng gồm `Attendance` (chấm công), `Production` (lệnh sản xuất), `Packings` (đóng gói) và `Config_NhanSu` (danh sách nhân sự & bảng lương).
+    2. Trong `Tab_Analytics.html`, danh sách `nhanSuList` truy vấn `window.userConfigs?.raw` vốn không tồn tại trên `window` của React App, dẫn tới mảng `users` rỗng (`[]`) và vòng lặp tính lương bị bỏ qua hoàn toàn, khiến `totalSalaryExpense` luôn bằng `0đ`.
+  - **Giải pháp xử lý**:
+    1. **Bổ sung đầy đủ Data Streams vào `memoizedAnalyticsData` (`App_Main.html`)**: Cung cấp tức thì `Attendance: attendance`, `Production: prodItems`, `Packings: packings`, `Config_NhanSu: userConfigs?.raw` vào props của `<AnalyticsTab />`.
+    2. **Đồng bộ hóa Fallback Đa Tầng (`Tab_Analytics.html`)**: Trích xuất linh hoạt danh sách nhân sự từ `userConfigs.users`, `userConfigs.salaries`, hoặc `userConfigs.raw`, tự động quét sạch lương thời gian thực tế, hoa hồng khoán khâu 1 & khâu 2 (nhân 3 cho đơn quốc tế), thưởng đóng gói `Packings`, hỗ trợ năng suất, thưởng bán hàng, phụ cấp xăng xe và **100% chỉ tiêu KPI chức vụ được giao (`funcSalaryTarget`)**.
+  - **Kết quả**: Chi Phí Lương trên Dashboard Phân Tích P&L hiển thị chuẩn xác số tiền theo Tổng Lương Mục Tiêu toàn xưởng theo thời gian thực và tự động cập nhật ngay khi có phát sinh đơn hàng, chấm công hoặc KPI mới.
+
+---
+
+## [v2.22.2] - 2026-08-29
+
+### 🛠️ Khắc Phục Lỗi Màn Hình Trắng Khi Tạo Lệnh Sản Xuất & Nhận Diện Thợ Tân (`Modals_Orders.html`, `Tab_Production.html`, `App_Main.html`)
+- **Sửa dứt điểm lỗi màn hình trắng (White Screen Crash) khi bấm Tạo Lệnh Sản Xuất trên xưởng**:
+  - **Nguyên nhân gốc rễ (RCA)**:
+    1. Trong kiến trúc nạp mã nguồn 2 pha (2-Phase Boot), `Modals_Orders.html` nằm trong nhóm nạp nhanh (`coreFileIds`) còn `Tab_Production.html` nằm trong nhóm nạp chậm (`deferredFileIds`). Khi `AddModal` không được gắn vào `window`, React trên `Tab_Production` khi bấm `+` (Tạo Lệnh SX Tồn) ném lỗi `ReferenceError: AddModal is not defined` làm sập toàn bộ cây component.
+    2. Tên nhân sự Trần Duy Tân đôi khi lưu ở dạng rút gọn `"Tân"` trong database/chấm công hoặc `"Trần Duy Tân"` trong tài khoản đăng nhập khiến các cơ chế kiểm tra check-in ca, đếm khâu hoàn thành và bảng sản lượng không khớp nhau.
+  - **Giải pháp xử lý**:
+    1. **Toàn cục hóa Modal Scope (`window.AddModal`, `window.EditModal`...)**: Gắn an toàn tất cả các Modal và thẻ OrderCard vào `window` trong `Modals_Orders.html` và bọc kiểm tra component an toàn trong `Tab_Production.html`.
+    2. **Xây dựng Helper Nhận Diện Nhân Sự Thông Minh (`isStaffMatch`)**: Cho phép nhận diện hai chiều chính xác giữa tên đầy đủ `"Trần Duy Tân"` và tên ngắn `"Tân"`, bảo đảm Tân chấm công, nhận việc, xem giờ ca và xem báo cáo sản lượng chuẩn 100%.
+
+---
+
+## [v2.22.1] - 2026-08-29
+
+### 💼 Khớp Chuẩn 100% Chi Phí Lương Mục Tiêu Toàn Xưởng (54.902.964đ) Vào Phân Tích P&L (`Tab_Analytics.html`, `App_Main.html`)
+- **Đồng bộ toàn diện Chi Phí Lương P&L theo đúng Tổng Lương Mục Tiêu (Đã cộng 100% KPI chỉ tiêu)**:
+  - **Nguyên nhân gốc rễ (RCA)**:
+    1. Hàm lọc ngày `isDateInRange` trong `Tab_Analytics.html` sử dụng `new Date(dStr)` không tương thích với các chuỗi ngày định dạng tiếng Việt / chuẩn bảng tính `DD/MM/YYYY`, dẫn tới trả về `NaN` và làm toàn bộ chi phí lương hiển thị `0đ`.
+    2. Chi phí lương P&L cần phản ánh đúng **Tổng Lương Mục Tiêu toàn xưởng (`tongThuNhapTarget`)** gồm lương thời gian thực tế, hoa hồng khoán sản xuất khâu 1 & khâu 2, thưởng đóng gói, hỗ trợ sản lượng, thưởng bán hàng và **100% KPI chức vụ được giao** của toàn bộ 10 nhân sự (`54.902.964đ`).
+  - **Giải pháp xử lý**:
+    1. **Nâng cấp Engine Parse Ngày Đa Định Dạng (`parseDateSafe`, `isDateInFilter`)**: Hỗ trợ chuẩn xác 100% các chuỗi ngày `ISO`, `YYYY-MM-DD`, `DD/MM/YYYY` và quét theo tháng `filterMonth` (`2026-08`).
+    2. **Đồng bộ công thức `tongThuNhapTarget` từ `Tab_HR.html`**:
+       - `luongChinh`: Lương thời gian theo giờ công chấm công (hoặc lương cơ bản).
+       - `hoaHongSanXuat`: Khoán sản xuất Khâu 1 & Khâu 2 ($\times 3$ cho đơn quốc tế) + Thưởng đóng gói `Packings`.
+       - `tongPhuCapTarget`: Phụ cấp xăng xe + Phụ cấp khác + **100% KPI chức vụ được giao (`funcSalaryTarget`)**.
+       - `tongThuong`: Thưởng nóng + Thưởng chuyên cần.
+       - `hoaHongBanHang`, `hoTroSanLuong`, `cacKhoanThuKhac`.
+  - **Kết quả**: Chi Phí Lương trên Dashboard Phân Tích P&L hiển thị khớp chuẩn xác **`54.902.964đ`** cho kỳ Tháng 08/2026 và tự động co giãn linh hoạt theo dữ liệu giờ công & đơn hàng phát sinh thực tế.
+
+---
+
+## [v2.22.0] - 2026-08-29
+
+### 📦 Chuẩn Hóa Mã SKU Kho Thực Tế & Bóc Tách Chi Phí Dịch Vụ Mài CNC (`Code.js`, `Tab_ImportExport.html`, `App_Main.html`)
+- **Đồng bộ toàn diện mã nguyên vật liệu BOM khớp 100% với danh mục Kho Thực Tế (`Products`)**:
+  - **Nguyên nhân gốc rễ (RCA)**: Trước đây, thuật toán tính BOM tự động sinh các mã quy ước kỹ thuật `NLSX-KINH-5LI`, `NLSX-KEO-WACKER`, `NLSX-RF`... không khớp với các mã SKU thực tế được lưu trên danh mục Kho hàng của xưởng (`NL-BE-KINH5LI`, `NL-BE-KEO-WACKER`, `NL-LAY-SX-RF`...). Đồng thời, chi phí mài vi tính bị coi như một mặt hàng xuất kho khiến người dùng thắc mắc về sự tồn tại của mặt hàng này trong kho vật lý.
+  - **Giải pháp xử lý**:
+    1. **Ánh xạ ALIAS_MAP thông minh trong Engine BOM (`Code.js`)**: Tự động liên kết các mã quy ước sang đầu mã kho thật (`NL-BE-KINH5LI/8LI/4LI/3LI`, `NL-BE-KEO-WACKER`, `NL-LAY-LUASANMIENG`, `NL-LAY-TAIMEO`, `NL-LAY-SX-RF`...) để tự động cấn trừ chính xác tồn kho thực tế nếu có SKU trong bảng `Products`.
+    2. **Bóc tách Chi phí Dịch vụ Mài CNC (`DICHVU-MAI-CNC`)**: Định danh Mài CNC là chi phí gia công công đoạn cấu thành Giá Vốn COGS (`isService: true`, 25.000đ/m), không thực hiện trừ kho vật lý để bảo vệ toàn vẹn dữ liệu kho hàng hóa.
+    3. **Hiển thị Badge SKU & Tên tiếng Việt chuẩn đẹp (`Tab_ImportExport.html`)**: Mọi phiếu xuất BOM (cả phiếu cũ và phiếu mới) tự động hiển thị mã SKU vàng kim chuẩn kho thật (`NL-BE-KINH5LI`, `NL-BE-KEO-WACKER`, `DICHVU-MAI-CNC`, `NL-LAY-SX-RF`...) và tên gọi rõ ràng, trực quan.
+
+---
+
+## [v2.21.9] - 2026-08-29
+
+### 💼 Đồng Bộ Chi Phí Lương P&L Chuẩn Xác 100% Theo Bảng Lương Nhân Sự (`Tab_Analytics.html`, `App_Main.html`)
+- **Khắc phục lỗi hiển thị sai lệch Chi phí Lương trên Phân Tích P&L (83.199.925đ)**:
+  - **Nguyên nhân gốc rễ (RCA)**:
+    1. Khi tháng hiện tại chưa thực hiện thao tác "Chốt Sổ Cuối Tháng" (`Monthly_Snapshots`), phân hệ Phân Tích P&L (`Tab_Analytics.html`) trước đây dùng logic fallback quét toàn bộ giao dịch Sổ Quỹ `Transactions` có chứa danh mục/tiêu đề `Lương`.
+    2. Do trong tháng 08/2026, trên Sổ Quỹ có phát sinh nhiều giao dịch chuyển khoản tạm ứng, trả nợ cũ, hoàn cọc hoặc rút tiền cá nhân được gắn tag chung, tổng số tiền bị cộng dồn lên tới `83.199.925đ`, gây lệch hoàn toàn so với quỹ lương thực tế của xưởng (~`27.787.060đ` thực lĩnh / `54.902.964đ` mục tiêu).
+  - **Giải pháp xử lý**:
+    1. **Decouple hoàn toàn Lương P&L khỏi Transactions**: Không quét giao dịch Sổ Quỹ để tính lương, ngăn chặn triệt để tình trạng các khoản tạm ứng/rút vốn làm sai lệch P&L.
+    2. **Đồng bộ trực tiếp từ Engine Bảng Lương (Single Source of Truth)**: Tự động tính toán chi phí lương từ CSDL nhân sự:
+       - Lương thời gian theo giờ công chấm công (`hourlyRate * totalGateHours` từ `Attendance`).
+       - Thưởng khoán sản xuất khâu 1 & khâu 2 (`p1_reward_vnd`, `p2_reward_vnd` từ `Production`, tự động nhân hệ số x3 cho đơn quốc tế).
+       - Thưởng đóng gói (`reward_vnd` từ `Packings`).
+       - Thưởng chốt đơn bán hàng & Hỗ trợ sản lượng (`BonusPenalty`).
+       - Thưởng chức vụ KPI đạt chuẩn (`KPI_Progress` đã claim).
+       - Phụ cấp xăng xe (`Config_NhanSu`), Phụ cấp khác, Thưởng nóng, Thưởng chuyên cần.
+       - Khấu trừ phạt quy định, bảo hành, phí công đoàn 50k.
+  - **Kết quả**: Chi phí Lương và Lợi nhuận ròng trên Dashboard Phân Tích P&L khớp chính xác 100% với Bảng Lương thực tế của doanh nghiệp.
+
+---
+
+## [v2.21.8] - 2026-08-29
+
+### 🖨️ In Gộp Phiếu Kho Theo Ngày & Đổi Tên Thành Phiếu Kiểm Kho (`Tab_ImportExport.html`, `App_Main.html`)
+- **Chuẩn hóa 100% tiêu đề khi in phiếu Kiểm Kho**:
+  - Khi xem hoặc in chứng từ thuộc phân hệ **Kiểm Kho** (`mode === 'KIEM_KHO'`, chứng từ `IE_GCHK_...`, `Cân tăng`, `Cân giảm`, `Kiểm kê kho định kỳ`), tiêu đề bản in (trên cả Modal A4/Zalo và máy in nhiệt K58) tự động hiển thị chính xác là **`PHIẾU KIỂM KHO`** hoặc **`PHIẾU KIỂM KHO TỔNG HỢP`** (thay vì `PHIẾU XUẤT KHO` / `PHIẾU NHẬP KHO`).
+  - Trường đối tượng hiển thị chuẩn: **Mục đích/Cân đối: Kiểm kho (Cân tăng)** hoặc **Kiểm kho (Cân giảm)**.
+- **Tính năng In Gộp Theo Ngày (1-Click Consolidated Daily Batch Print)**:
+  - Tự động gom nhóm toàn bộ chứng từ phát sinh trong cùng một ngày (`dateGroups`).
+  - Hiển thị thanh Header nhóm ngày thông minh kèm thông tin tổng số chứng từ và tổng giá trị.
+  - Khi một ngày có từ 2 chứng từ trở lên, nút **`In Gộp Ngày (N phiếu)`** xuất hiện cho phép gộp tất cả sản phẩm của các phiếu trong ngày, tự động cộng dồn số lượng và thành tiền theo từng SKU/Tên hàng để in ra 1 tờ phiếu duy nhất gọn gàng, tiết kiệm giấy in và dễ đối chiếu.
+
+---
+
+## [v2.21.7] - 2026-08-29
+
+### 🩹 Khắc Phục Lỗi Nhân Sai 83 Gam Rễ Rừng Thành 83 Cân (Đội Tiền Phiếu BOM Lên 8.4 Triệu) (`Tab_ImportExport.html`, `Code.js`, `App_Main.html`)
+- **Khắc phục lỗi nhân sai số lượng gam với đơn giá 1kg**:
+  - **Nguyên nhân gốc rễ (RCA)**:
+    1. Trong định mức layout `Bonsai ver.6 - 50x26x30cm`, nguyên liệu **Rễ Rừng** (`NL-LAY-SX-RF` / `NLSX-RF`) có định mức sử dụng là **83 gam** (`0.083 kg`).
+    2. Tuy nhiên, trong CSDL `Products`, vật tư Rễ Rừng được lưu theo đơn vị `Kg` (hoặc `cân`) với giá nhập `100.000đ/kg`. Khi hệ thống đọc định mức số `83`, nó hiểu nhầm là `83 cân` và nhân `83 * 100.000 = 8.300.000đ` (thay vì `0.083 * 100.000 = 8.300đ`), khiến phiếu `IE_BOM_...` bị đội giá từ `~138.326đ` lên `8.430.026đ`.
+  - **Giải pháp xử lý**:
+    1. **Bổ sung ánh xạ ALIAS (`Code.js`)**: Thêm `NL-LAY-SX-RF`, `NLSX-RF` vào bảng ánh xạ bí danh vật tư `ALIAS_MAP`.
+    2. **Tự động quy đổi gam sang kg trong Engine BOM (`Code.js`)**: Khi nguyên liệu thô (Rễ Rừng, Lũa, Đá, Rêu...) có đơn vị quản lý là `kg`/`cân` nhưng định mức số lượng $\ge 10$ (dạng gam), hệ thống tự động quy đổi `displayQty = qty / 1000` và tính đúng `0.083 kg * 100.000đ = 8.300đ`.
+    3. **Chuẩn hóa hiển thị trên Tab Xuất Nhập Kho (`Tab_ImportExport.html`)**: Tự động nhận diện và tính đúng đơn giá `100đ/gam`, đưa thành tiền dòng Rễ Rừng về đúng `8.300đ` và tổng tiền phiếu về đúng `~138.326đ`.
+  - **Kết quả**: Phiếu BOM hiển thị chính xác 100% chi phí thực tế, loại bỏ hoàn toàn hiện tượng ảo giá vốn hàng triệu đồng.
+
+---
+
+## [v2.21.6] - 2026-08-29
+
+### 🩹 Đồng Bộ Đơn Giá & Thành Tiền Từng Dòng Cho Phiếu Xuất Huỷ / Nhập Kho (`Tab_ImportExport.html`, `Modals_Orders.html`, `App_Main.html`)
+- **Khắc phục lỗi lệch giá trị giữa Header phiếu và Chi tiết dòng hàng**:
+  - **Nguyên nhân gốc rễ (RCA)**:
+    1. Khi tạo phiếu Xuất Huỷ (`IE_SCRAP_...`), modal duyệt hàng hoàn gán tổng tiền phiếu `totalAmount = calculatedCogs` (ví dụ `181.720đ`) nhưng trong mảng `itemsData`, đối tượng sản phẩm `prods` không có trường `costPrice` (hoặc `price = 0`), khiến trường `price` trong JSON lưu giá trị `0`.
+    2. Trong `Tab_ImportExport.html`, hàm render đọc `it.price !== undefined ? it.price : it.costPrice`. Vì `it.price` tồn tại và bằng `0` (là một giá trị xác định), hệ thống lấy luôn giá trị `0` mà không tra cứu sang danh mục `Products` hay phân bổ từ `totalAmount`.
+    3. Hậu quả: Header phiếu hiển thị `181.720đ` nhưng bảng chi tiết hiển thị Đơn giá `0đ` và Thành tiền `0đ`.
+  - **Giải pháp xử lý**:
+    1. **Tab Xuất Nhập Kho (`Tab_ImportExport.html`)**: Bổ sung cơ chế phân giải đơn giá thông minh:
+       - Ưu tiên 1: Lấy `price` hoặc `costPrice` nếu $> 0$.
+       - Ưu tiên 2: Tra cứu `costPrice` hoặc `price` từ bảng `Products` theo SKU / Tên.
+       - Ưu tiên 3: Tự động phân bổ từ tổng tiền phiếu: `rawPrice = log.totalAmount / items.length / qty`.
+    2. **Modal Duyệt Hoàn Hàng (`Modals_Orders.html`)**: Tự động gán đúng `calculatedCogs` vào `price` của từng sản phẩm khi tạo phiếu `IE_SCRAP_...`.
+  - **Kết quả**: Bảng chi tiết dòng hàng hiển thị chuẩn xác Đơn giá `181.720đ` và Thành tiền `181.720đ`, khớp 100% với tổng tiền ở Header phiếu.
+
+---
+
+## [v2.21.5] - 2026-08-29
+
+### 🚀 Tự Động Nhận Diện Đơn Trả Hàng/Hoàn Tiền & Bỏ Qua Tính Lợi Nhuận Cho Đơn Hủy/Hoàn (`Modals_Orders.html`, `App_Main.html`)
+- **Tối ưu hoá nhận diện trạng thái và loại trừ doanh thu rác**:
+  - **Nguyên nhân gốc rễ (RCA)**:
+    1. Trên Shopee, các đơn hàng trả hàng/hoàn tiền có thể vẫn hiển thị cột "Trạng thái đơn hàng" là `Đã giao` kèm ghi chú tag `1 trả hàng/hoàn`, trong khi thông tin hoàn trả thực tế nằm ở cột `Trạng thái Trả hàng/Hoàn tiền` hoặc `Return / Refund Status`. Nếu chỉ quét cột trạng thái chung thì hệ thống sẽ nhận diện nhầm thành `Đã Bàn Giao` thay vì `Hàng Hoàn`.
+    2. Các đơn hàng đã Hủy (`Đơn Huỷ`) hoặc Hoàn trả (`Hàng Hoàn`) trước đây vẫn bị tính doanh thu Gross và Net lợi nhuận trên bảng preview và form đối soát.
+  - **Giải pháp xử lý**:
+    1. **Quét bổ sung cột `Trạng thái Trả hàng/Hoàn tiền`**: Ưu tiên nhận diện giá trị hoàn tiền/trả hàng để tự động map đơn về trạng thái **`Hàng Hoàn`** kèm huy hiệu màu cam nổi bật.
+    2. **Bỏ qua tính lợi nhuận cho Đơn Hủy & Đơn Hoàn**: Tự động gán Doanh thu Gross = 0đ, Phí sàn = 0đ, Net thực nhận = 0đ (hiển thị dấu gạch ngang `-`) cho toàn bộ các đơn `Đơn Huỷ` và `Hàng Hoàn`, ngăn chặn việc ghi nhận khống doanh thu vào Sổ cái kế toán.
+    3. **Tự động ghi nhận Phí xử lý hàng hoàn Shopee (2.700đ)** khi đơn hàng hoàn về ví.
+    4. **Tối ưu hóa so khớp mã đơn hàng hai chiều**: Ngăn ngừa trường hợp mã đơn bị lệch format hoặc thiếu ký tự.
+  - **Kết quả**: Bảng đối soát hiển thị chuẩn xác 100% các đơn Hàng Hoàn và Đơn Huỷ, không tính doanh thu khống, dữ liệu tài chính sạch sẽ tuyệt đối.
+
+---
+
+## [v2.21.4] - 2026-08-29
+
+### 🚀 Nâng Cấp Trạm Quét File Đơn Hàng (Order.all): Hiện Net Lợi Nhuận, Hiển Thị Trạng Thái File & Cập Nhật Tức Thì (`Modals_Orders.html`, `App_Main.html`)
+- **Tối ưu hoá toàn diện modal quét file Order.all / Income**:
+  - **Nguyên nhân gốc rễ (RCA)**:
+    1. Khi tải lên file `Order.all...xlsx`, file chứa các cột trạng thái và chi tiết phí nhưng không có cột doanh thu quyết toán cuối cùng (`tổng tiền đã thanh toán`), khiến biến `actualShopeePaid` bằng 0 và `netRevenue` hiển thị dấu gạch ngang (`-`), đồng thời kích hoạt cảnh báo "Lệch lớn" giả cho toàn bộ các dòng.
+    2. Cột đầu tiên hiển thị trạng thái so khớp đối soát ("Lệch lớn / OK / Bỏ qua") thay vì trạng thái vận hành thực tế của đơn hàng từ Shopee.
+    3. Payload lưu đối soát gửi thuộc tính `{ orders: ... }` chữ thường thay vì `{ Orders: ... }` chữ hoa, dẫn đến việc `pushDeltas` không ghi nhận cập nhật vào bảng `Orders` và bộ đếm "Đơn hàng đã chốt" hiển thị số 0.
+  - **Giải pháp xử lý**:
+    1. **Tự động tính Net Thực Nhận**: Khi file không có cột doanh thu quyết toán riêng biệt, hệ thống tự động tính:
+       $$\text{Net Thực Nhận} = \text{Gross Shopee} - \text{Tổng Phí Sàn} - \text{Voucher Shop} - \text{Phí Ship Vượt Mức}$$
+    2. **Thay đổi cột đầu thành Trạng Thái Thực Tế Từ File**: Đọc cột `Trạng thái đơn hàng` trong file và hiển thị trực tiếp (Hoàn thành, Đã giao, Đã hủy, Trả hàng/Hoàn tiền...) kèm huy hiệu màu sắc trực quan.
+    3. **Áp dụng Exact Match Rule**: Tự động chuyển đổi trạng thái đơn hàng sang trạng thái hệ thống chuẩn:
+       - `"Hoàn thành"` / `"Completed"` $\rightarrow$ `"Đối Soát Thành Công"`
+       - `"Đã giao"` / `"Delivered"` $\rightarrow$ `"Đã Bàn Giao"`
+       - `"Trả hàng/Hoàn tiền"` / `"Returned"` $\rightarrow$ `"Hàng Hoàn"`
+       - `"Đã hủy"` / `"Cancelled"` $\rightarrow$ `"Đơn Huỷ"`
+       - Trạng thái khác $\rightarrow$ Giữ nguyên trạng thái sản xuất nội bộ hoặc đưa về `"Chờ Sản Xuất"`.
+    4. **Đồng bộ chuẩn xác Payload CSDL**: Sửa payload sang `{ Orders: updatedOrders }` giúp cập nhật tức thì trạng thái của tất cả đơn hàng vào Google Sheets và giao diện quản lý khi nhấn **Hoàn tất đối soát & Lưu**.
+  - **Kết quả**: Giao diện hiển thị đầy đủ Net Thực Nhận / Lợi nhuận từng đơn, phản ánh chính xác trạng thái thực tế từ sàn và tự động cập nhật đơn hàng thành công 100%.
+
+---
+
+## [v2.21.3] - 2026-08-29
+
+### 🩹 Tự Động Quy Đổi Đơn Giá Nhập Vật Tư BOM (Gam/Kg) & Chuẩn Hóa Thành Tiền Phiếu Xuất Kho (`Code.js`, `Tab_ImportExport.html`)
+- **Khắc phục lỗi nhân đơn giá 1kg với số lượng xuất theo gam**:
+  - **Nguyên nhân gốc rễ (RCA)**: Trong cấu hình bảng `Products` và `BomLayout`, đơn giá nhập của vật tư (như Lũa Săn Miếng 35.000đ, Đá Tai Mèo 5.000đ, Nham Thạch 5.000đ...) được ghi theo đơn vị nhập là **1kg** (`importUnit: '1kg'`, `conversionRate: 1000`). Khi trừ vật tư sản xuất theo định mức gam (ví dụ `300 gam`), hàm `processMaterialDeduction` và `repairAllBomTickets` chưa chia đơn giá nhập cho tỷ lệ quy đổi 1000 mà nhân trực tiếp `300 * 35.000 = 10.500.000đ` (thay vì `300 * 35 = 10.500đ`), khiến phiếu xuất kho `ImportExport` bị đội tiền từ 37.818đ lên 12.025.818đ.
+  - **Giải pháp xử lý**:
+    1. **Google Apps Script (`Code.js`)**: 
+       - Trong `processMaterialDeduction`: Bổ sung quét `conversionRate` và `importUnit`. Khi vật tư quản lý hoặc xuất theo `gam` mà đơn giá nhập ghi theo `kg` (hoặc `rawCost >= 1000`), tự động tính đơn giá chuẩn mỗi gam: `unitPrice = rawCost / 1000` (hoặc `/ conversionRate`).
+       - Trong `repairAllBomTickets`: Bổ sung chia `unitCost = rawCost / 1000` cho tất cả các dòng định mức tính bằng `gam`.
+    2. **Giao diện Tab Xuất Nhập Kho (`Tab_ImportExport.html`)**:
+       - Bổ sung logic nhận diện tự động quy đổi `effectivePrice = rawPrice / 1000` khi đơn vị là `gam` và `effectiveAmount = qty * effectivePrice` trên từng dòng sản phẩm và tổng tiền phiếu.
+  - **Kết quả**:
+    - Lũa Săn Miếng: `300 gam` x `35đ` = `10.500đ`.
+    - Đá Tai Mèo: `300 gam` x `5đ` = `1.500đ`.
+    - Phiếu xuất kho `IE_BOM_...` hiển thị chính xác tổng tiền thực tế (khoảng 37.818đ), loại bỏ hoàn toàn hiện tượng lệch số liệu kho và giá vốn sản xuất.
+
+---
+
+## [v2.21.2] - 2026-08-29
+
+### 🩹 Sửa Lỗi ReferenceError: props is not defined Trong Tab Kho Hàng (`Tab_Inventory.html`, `App_Main.html`)
+- **Khắc phục lỗi crash giao diện khi mở Ghi Chú Kho Hàng**:
+  - **Nguyên nhân gốc rễ (RCA)**: Component `InventoryListView` nhận tham số dạng destructured nhưng bên trong khối render `QuickNotesPanel` lại gọi `props.documents` và `pushDeltas` chưa được khai báo trong scope, dẫn đến lỗi runtime `ReferenceError: props is not defined` và vỡ màn hình trắng.
+  - **Giải pháp xử lý**:
+    1. Bổ sung `documents` và `pushDeltas` vào tham số của `InventoryListView` trong `Tab_Inventory.html`.
+    2. Truyền `documents={memoizedDocuments}` và `pushDeltas={pushDeltas}` từ `App_Main.html` xuống `InventoryTab` và `FinanceTab`.
+    3. Thêm kiểm tra an toàn `typeof window.QuickNotesPanel !== 'undefined'` kèm fallback dữ liệu nhiều tầng.
+  - **Kết quả**: Nút bấm Ghi Chú & Nhắc việc tại Tab Kho Hàng hoạt động trơn tru 100%, không còn bị crash hay phát sinh lỗi console.
+
+---
+
+## [v2.21.1] - 2026-08-29
+
+### 🩹 Sửa Lỗi Hiển Thị Doanh Thu Kênh Bán Lẻ Tại Thống Kê Tab Đơn Hàng (`Tab_Orders.html`)
+- **Khắc phục lỗi logic phân loại kênh trong `summaryStats`**:
+  - **Nguyên nhân gốc rễ (RCA)**: Trong hook tính toán `summaryStats`, điều kiện phân loại kênh trước đây chỉ kiểm tra `if (ch.includes('CỘNG TÁC VIÊN') || ch === 'CTV') { totalCtv += val; } else { totalRetail += val; }`. Nhánh `else` đã vô tình gom toàn bộ các đơn hàng của Shopee VN, Shopee Xuất Khẩu (TH, SG, MY, PH, TW), TikTok Shop, Bán Sỉ... vào tổng `totalRetail` (Bán Lẻ), dẫn đến số liệu doanh thu Bán Lẻ hiển thị sai (lên tới 100+ triệu).
+  - **Giải pháp xử lý**: Bóc tách điều kiện nhận diện kênh bán lẻ độc lập `ch.includes('BÁN LẺ') || ch.includes('BAN LE') || ch.includes('OFFLINE') || ch.includes('ZALO') || ch.includes('FACEBOOK') || ch.includes('MESSENGER') || ch === 'RETAIL' || ch === 'LẺ' || ch === 'LE'`.
+  - **Kết quả**: Thẻ thống kê **BÁN LẺ** trên thanh KPI đầu trang `Tab_Orders.html` chỉ phản ánh đúng 100% doanh thu của các đơn hàng Bán Lẻ thực tế.
+
+---
+
+## [v2.21.0] - 2026-08-29
+
+### 🎮 Hệ Sinh Thái Game Hóa (RPG Gamification): Header EXP Bar & Global Floating Particles (`App_Main.html`, `Index.html`)
+- **Tích Hợp Thanh Cấp Độ & Mini EXP Bar Trực Quan Trên Header (`HeaderExpWidget`)**:
+  - Đồng bộ 100% với hệ thống phân hạng 100 Cấp Độ & 9 Tier Danh hiệu trong `Tab_HR.html` (*Tân Thủ*, *Hổ Phách*, *Lục Bảo*, *Lam Ngọc*, *Thạch Anh*, *Huyết Tướng*, *Hoả Phụng*, *Thái Dương*, *Thần Thoại*).
+  - Tự động cộng dồn EXP đa chiều theo thời gian thực từ 5 nguồn: Lương công nhật, Thưởng khâu sản xuất (`Production`), Thưởng đóng gói (`Packings`), Thưởng nhiệm vụ Xu (`KPI_Progress`), Thưởng thưởng phạt (`BonusPenalty`).
+  - Thanh tiến trình Mini EXP gradient rực rỡ và Modal lộ trình cấp độ RPG tương tác khi click vào Header.
+- **Engine Hạt Số +EXP Lơ Lửng & Âm Thanh Arcade (`window.triggerExpGain`, `window.playExpChime`)**:
+  - Mỗi cú chạm ngón tay / click chuột vào bất kỳ nút bấm thao tác nào trên toàn bộ hệ thống sẽ bắn ra hạt số `+50 EXP ✨` lơ lửng bay lên và tan biến mượt mà (GPU accelerated 60fps).
+  - Tích hợp bộ tổng hợp âm thanh Web Audio Synthesizer (tiếng ting/chime nhẹ 8-bit tinh tế) và rung xúc giác `navigator.vibrate(35)` mang lại cảm giác cực kỳ "sướng tay", xóa tan sự mệt mỏi và kích thích nhân sự chủ động ghi nhận tác vụ.
+
+---
+
+## [v2.20.1] - 2026-08-28
+
+### 🩹 Khôi Phục & Tối Ưu Thanh Cuộn Tự Nhiên Siêu Mượt 120FPS (`App_Main.html`)
+- **Khắc phục triệt để lỗi khóa cuộn (Scroll Lock)**:
+  - Loại bỏ hoàn toàn thuộc tính `contain: content` khỏi `.rf-tab-view` để giải phóng ranh giới render và cho phép thẻ cha `<main>` đo đạc đúng chiều cao tự nhiên của nội dung bên trong (`scrollHeight`).
+  - Chuyển đổi các wrapper container từ `h-full` (100% cố định) sang `min-h-full` trên toàn bộ các Tab (`Dashboard`, `Orders`, `Production`, `Inventory`, `Finance`, `ImportExport`...), cho phép trang cuộn chuột và vuốt cảm ứng trơn tru 120fps mà không bị kẹt.
+  - Bảo toàn 100% các tối ưu về `React.useDeferredValue` và tốc độ phản hồi 0s.
+
+---
+
+## [v2.20.0] - 2026-08-28
+
+### ⚡ Tối Ưu Hóa Phản Hồi Tức Thì 0s & Tăng Tốc Toàn Bộ Ứng Dụng (`App_Main.html`, `Tab_Orders.html`, `Tab_Production.html`, `Tab_Inventory.html`, `Tab_ImportExport.html`)
+- **Tối ưu hóa GPU Compositing & Chuyển Tab 0s**:
+  - Cách ly phạm vi render với thuộc tính `contain: content`, `will-change: transform, opacity`, `transform: translateZ(0)` trên `.rf-tab-view` và `.rf-gpu-accelerated`.
+  - Giữ trạng thái (Keep-Alive) qua cơ chế `mountedTabs`, chuyển đổi mượt mà 60fps/120fps không bao giờ bị khựng lag.
+- **Triệt tiêu 300ms Độ Trễ Cảm Ứng (0ms Mobile Tap Delay)**:
+  - Bổ sung `touch-action: manipulation` trên toàn bộ các thành phần tương tác (nút bấm, ô nhập, dropdown, thẻ card) giúp thao tác trên điện thoại và máy tính bảng ăn ngay tức thì.
+- **Tích hợp React Concurrent `useDeferredValue` cho Tất Cả Ô Tìm Kiếm**:
+  - `Tab_Orders.html`: Tìm kiếm mã đơn, khách hàng, số điện thoại không làm block UI thread.
+  - `Tab_Production.html`: Tìm kiếm SKU, tên sản phẩm trên xưởng sản xuất phản hồi mượt mà.
+  - `Tab_Inventory.html`: Tìm kiếm kho hàng và phân loại tức thì.
+  - `Tab_ImportExport.html`: Lọc tìm kiếm chứng từ kho vận siêu tốc.
+
+---
+
+## [v2.19.1] - 2026-08-28
+
+### 💎 Khớp Dữ Liệu 100% SKU & Đồng Bộ Vật Tư BOM Chuẩn Đét (`Code.js`, `Operations.js`, `Config.html`, `Tab_ImportExport.html`)
+- **Đồng bộ hóa 100% BOM Layout & Bể Kính (`standardizeWarehouseSKU`)**:
+  - Tự động khớp `layoutCode` trong `BOM_Config` theo SKU chuẩn của `Products` (ví dụ: `LAY-RUN020-402325`, `LAY-BON001-302020`, `BE-ND-202008`...).
+  - Chuẩn hóa toàn bộ `materialSku` sang hệ mã chuẩn nguyên vật liệu (`NLSX-KINH-5LI`, `NLSX-MAI-CNC`, `NLSX-KEO-WACKER`, `NLSX-LUASANMIENG`, `NLSX-TAIMEO`, `NLSX-502-1CHAI`, `NLSX-FOMEX-8LI`, `NLSX-REU-A04`...).
+- **Mở rộng Từ Điển Khớp Nối Nguyên Vật Liệu (`ALIAS_MAP`)**:
+  - Bổ sung toàn diện các biến thể kính (`KINH 5LI`, `KINH 5 LI`, `KINH SIEU TRONG 5LI` ➡️ `NLSX-KINH-5LI`), công mài CNC, keo Wacker, keo 502, rêu và fomex.
+- **Nâng cấp Hiển thị Chi Tiết Phiếu Xuất BOM (`Tab_ImportExport.html`)**:
+  - Bảng chi tiết phiếu xuất BOM hiển thị Tên sản phẩm tiếng Việt rõ ràng (`Kính Siêu Trong 5li`, `Mài CNC Cạnh Vi Tính`, `Keo Silicone Wacker Chuyên Dụng`...) đi kèm badge mã SKU chuẩn màu vàng kim tinh tế theo triết lý thiết kế Hallmark.
+
+---
+
+## [v2.19.0] - 2026-08-28
+
+### 🛡️ Gỡ Bỏ Hoàn Toàn Cơ Chế Phạt SLA Đóng Gói Sau 19:00 & Tinh Gọn Dashboard (`Tab_Dashboard.html`, `Operations.js`, `Code.js`)
+- **Xóa bỏ Banner & Logic Cảnh Báo SLA Đóng Gói (Dashboard)**:
+  - Loại bỏ hoàn toàn khối cảnh báo đỏ *"CẢNH BÁO SLA ĐÓNG GÓI (SAU 19:00)"*, biến đếm `readyToPackOrders` và thông báo phạt Shopee VN sau 21:00.
+  - Tinh giản giao diện theo triết lý Hallmark: Gọn gàng, thanh thoát, tập trung vào dòng chảy sản xuất thực tế.
+- **Xóa bỏ Cơ Chế Tự Động Phạt trong `Operations.js`**:
+  - Gỡ bỏ `api_recordPackingViolationLog` và hàm quét `api_auditEndOfDayPackingSLA`.
+  - Không còn tự động ghi nhận các khoản phạt vi phạm đóng gói vào `BonusPenalty` và `Tracking_Log`.
+- **Dọn dẹp Toàn Diện Dữ Liệu Cũ (`AAA_CLEANUP_PACKING_SLA_PENALTIES`)**:
+  - Bổ sung hàm runner và mục Menu `⚡ RF Hệ Thống` ➔ `🧹 Xóa Sạch Phạt & Cảnh Báo SLA Đóng Gói` để dọn sạch toàn bộ các dòng phạt `BP_SLA_PACK_...`, `BP_AUTO_SHOPEE_21H_...` cũ trong CSDL.
+
+---
+
+## [v2.18.2] - 2026-08-28
+
+### 💎 Giữ Nguyên Tên Sản Phẩm Chuẩn Kho Cũ & Tự Động Gán Mã SKU Chuẩn Mới (`Modals_Orders.html`)
+- **Tên Sản Phẩm theo Kho Cũ**: Khi khớp với bảng `Products`, tên hiển thị và lưu vào đơn hàng được giữ nguyên theo cột `name` của kho (`Products.name`) như cũ (ví dụ: `Bể 30x18x18cm Nâng Đáy 2cm`, `Bể 30x10x12cm 3 ngăn`...).
+- **Gán Mã SKU Chuẩn Mới**: Tự động nhận diện và gán đúng mã SKU chuẩn hóa mới (`effectiveSku` / `matchedProd.sku`) cho từng sản phẩm.
+- **Nhận diện mã SKU Shopee đảo vị trí**: Hỗ trợ nhận diện các SKU dạng `BE301818ND` tự động chuyển đổi sang `BE-ND-301818`.
+- **Tối ưu bộ lọc Sản Xuất (`checkProductionItemType`)**: Nhận diện chuẩn xác nhóm Bể Kính và Bể Nâng Đáy là hàng Sản Xuất.
+
+---
+
+## [v2.18.1] - 2026-08-28
+
+### 🛍️ Tự Động Chuẩn Hóa & Khớp SKU Shopee 100% Khi Bơm/Nhập Đơn Hàng (`Modals_Orders.html`, `ShopeeWebhookHandler.js`, `ShopeeSyncEngine.js`)
+- **Tự động dịch mã SKU sàn Shopee sang hệ SKU chuẩn hóa mới**:
+  - Khi người dùng nạp file Excel Shopee (hoặc đồng bộ đơn từ API / Webhook), các mã SKU cũ của sàn (như `RUN-020-402325`, `BON01-30x20x20`, `BEND15`, `BE302020`, `XBL500`, `DALONGVU`, `AKADAMA`...) được tự động nhận diện và chuyển đổi sang đúng SKU chuẩn của kho (`LAY-RUN020-402325`, `LAY-BON001-302020`, `BE-ND-151515`, `BE-STD-302020`, `PK-LOC-XBL500`, `PK-VLL-DALONGVU`, `PK-NEN-AKADAMA`).
+  - Đảm bảo khi lưu đơn hàng, `accessories` lưu 100% mã SKU chuẩn và tự động kích hoạt trừ tồn kho vật lý chính xác.
+- **Nâng cấp `checkProductionItemType`**: Bổ sung nhận diện tiền tố `LAY-` và `BE-` cho các thành phẩm Sản Xuất (Bể kính / Layout).
+- **Nâng cấp `deductPhysicalInventory` trong `ShopeeWebhookHandler.js`**: Hỗ trợ tìm kiếm và trừ kho đa tầng (Exact SKU ➔ Clean Slug ➔ Product Name).
+
+---
+
+## [v2.18.0] - 2026-08-28
+
+### 🏷️ Chuẩn Hóa Toàn Bộ Mã SKU Kho Hàng & Đồng Bộ Quan Hệ 4 Bảng CSDL (`Operations.js`)
+- **Triển khai Engine Chuẩn Hóa SKU (`standardizeWarehouseSKU`)**:
+  - Tự động bóc tách kích thước D x R x C dạng 6 chữ số `[DxRxC]` và Version `ver\d+` -> `001`, `002`...
+  - **Nhóm Bể Kính (`category = "BỂ KÍNH"`)**: Phân loại theo `sub_category` thành `BE-ND-[DxRxC]`, `BE-BETTA-[DxRxC]`, `BE-TERA-[DxRxC]`, `BE-BC-[DxRxC]`, `BE-MINI-[DxRxC]`, `BE-STD-[DxRxC]`.
+  - **Nhóm Layout (`category = "LAYOUT"`)**: Phân loại tiền tố `BON`, `RUN`, `CAU`, `HAN`, `VAC`, `DAO`, `NAT`, `TRU`, `HEM`, `VOM`, `CV` -> định dạng chuẩn `LAY-[MÃ][VER]-[SIZE]` (riêng Cover: `LAY-CV-[SIZE]`).
+  - **Nhóm Nguyên Vật Liệu (`category = "DANH MỤC SẢN XUẤT"`)**: Chuẩn hóa không dấu phân tách gạch nối `NL-LAY-[MÃ]`, `NL-BE-[MÃ]`, `VT-[MÃ]`, `DG-[MÃ]`.
+  - **Nhóm Phụ Kiện Bán Lẻ (`category = "PHỤ KIỆN"`)**: Chuẩn hóa theo phân nhóm `PK-LOC-[MÃ]`, `PK-VLL-[MÃ]`, `PK-NEN-[MÃ]`, `PK-XLN-[MÃ]`, `PK-AN-[MÃ]`, `PK-KHAC-[MÃ]`.
+- **Cơ chế An Toàn & Đồng Bộ Quan Hệ (Relational Sync)**:
+  - Bọc `LockService.getScriptLock().waitLock(30000)` chống xung đột ghi đè đồng thời.
+  - Tự động tạo bản đồ ánh xạ `skuMap[oldSku] = newSku`.
+  - Quét và cập nhật nguyên khối chuỗi JSON trong cột `accessories` của bảng `Orders` (cho các đơn chưa hoàn tất/chưa đối soát).
+  - Cập nhật đồng bộ các cột `layoutCode` và `materialSku` trong bảng `BOM_Config`.
+  - Cập nhật đồng bộ cột `Từ Khoá` trong bảng `Config_KPI`.
+
+---
+
+## [v2.17.2] - 2026-08-28
+
+### 🎨 Khắc Phục Triệt Để Lỗi Form/Modal/Ảnh Bị Nhảy Lên Đầu Trang (`Index.html`, `App_Main.html`)
+- **Giải phóng Stacking Context cho Container Tab cha**:
+  - Loại bỏ các thuộc tính `transform: translate3d(0, 0, 0)` và `will-change: transform` khỏi class `.rf-gpu-accelerated` và animation `tabFadeIn` ở cả `Index.html` và `App_Main.html`.
+  - Giúp mọi thành phần `position: fixed` (Modal tạo phiếu, Form tạo đơn, Form sửa lệnh sản xuất, Lightbox xem ảnh QC/đơn hàng, Hộp thoại xác nhận) luôn neo chuẩn xác vào Viewport của màn hình trình duyệt thay vì bị nhốt vào hệ tọa độ cuộn của tab cha.
+- **Trải nghiệm mượt mà, không giật trôi**:
+  - Người dùng có thể thoải mái cuộn xuống dòng thứ 50, 100 ở bất kỳ tab nào (Orders, Production, HR, Inventory, Finance, Suppliers...) và bấm mở form/xem ảnh mà không bị hiện tượng form chạy tít lên trên đỉnh đầu trang hoặc nhảy giật màn hình.
+
+---
+
+## [v2.17.1] - 2026-08-28
+
+### 🐛 Hotfix Giao Diện Tabs & Lỗi Định Danh Vật Tư BOM (`Tab_Orders.html`, `Code.js`)
+- Khôi phục hiển thị thanh điều hướng nhanh "Tất Cả" ở `Tab_Orders` (Bị ẩn sau lần tái cấu trúc thống kê).
+- Sửa lỗi hiển thị màu sắc active tabs: Cập nhật điều kiện so khớp trạng thái và bộ lọc để tự động focus sáng màu chuẩn xác vào từng trạng thái tương ứng.
+- **Vá lỗi thuật toán Định danh Vật tư Phiếu BOM**: Khắc phục hiện tượng thuật toán tìm kiếm mờ của `repairAllBomTickets` nhận diện nhầm mã sản phẩm Bán Lẻ (ví dụ: lấy nhầm `1kg Sạn Suối - M` thay vì Vật tư thô `Sạn Suối`). Cấy ghép module `findMaterialSkuByAlias` vào thẳng engine App Script (`Code.js`) giúp chuẩn hoá tuyệt đối mã nguyên liệu `NLSX-...` trước khi tra cứu giá vốn và đơn vị.
+
+---
+
+## [v2.17.0] - 2026-08-28
+
+### ⚙️ Đồng Bộ Chuẩn Hoá Ma Trận Định Mức BomLayout & Khớp Tên Kho Nguyên Liệu (`Code.js`, `Config.html`, `Tab_Production.html`, `Tab_Inventory.html`)
+- **Trích xuất định mức 100% từ Sheet `BomLayout` chính thức**:
+  - Xây dựng hàm `getBomFromBomLayoutSheet(ss, prodName, targetSku)` đọc trực tiếp cấu hình ma trận dòng/cột từ sheet `BomLayout` trong Google Spreadsheet.
+  - Tự động lấy chuẩn xác số lượng vật tư (Lũa Săn Miếng, Đá Tai Mèo, Nham Nhọ Nồi, Fomex 8li/10li, Keo 502) cho từng mã Layout theo đúng thiết kế của xưởng.
+- **Đồng bộ tên và giá theo Kho Nguyên Liệu (`Products`)**:
+  - Bổ sung hàm `findMaterialInProducts(matSku, matId, prodList)` với từ điển SKU Alias toàn diện (`NLSX-NHAMNONOI` <-> `NLSX-NOIN`, `NLSX-NHAMXANH` <-> `NLSX-NHAM`, `NLSX-VIAVOI` <-> `NLSX-VIA`, `NLSX-DANHCANH` <-> `NLSX-LUASANCANH`, `NLSX-REEN` <-> `NLSX-RE`...).
+  - Triệt tiêu hoàn toàn hiện tượng hiển thị mã thô `NLSX-NOIN`, `NLSX-RE` trong Tab Sản Xuất (`Tab_Production.html`) và Kho Hàng (`Tab_Inventory.html`), đảm bảo 100% hiển thị đúng Tên tiếng Việt và Đơn giá từ bảng `Products`.
+- **Chuẩn hóa tính năng Sửa Phiếu Xuất BOM (`repairAllBomTickets`)**:
+  - Quét lại toàn bộ phiếu xuất kho BOM cũ `IE_BOM_...` trong `ImportExport`, gán đúng vật tư và giá vốn theo `BomLayout` và `Products`.
+
+---
+
+## [v2.16.9] - 2026-08-28
+
+### ⚙️ Đồng Bộ Chuẩn Hoá Nhóm Trạng Thái Đơn Hàng & Sửa Lỗi Đếm Badge (`Tab_Orders.html` & `Code.js`)
+- **Khắc phục lỗi đếm 0 trên thẻ tab nhưng có đơn bên trong (`Tab_Orders.html`)**:
+  - Xây dựng hàm `getOrderTabGroup(o)` làm Single Source of Truth phân loại đơn hàng đồng bộ 100% giữa bộ đếm `stats` và bộ lọc hiển thị `filtered`.
+  - Khắc phục lỗi so khớp chuỗi không cùng hoa/thường (case sensitivity mismatch) khiến tất cả các đơn hàng rơi vào nhánh fallback `completed++` (437 đơn).
+- **Khắc phục triệt để lỗi ép kiểu chuỗi `"FALSE"` từ Google Sheets (`isReconciledSafe`)**:
+  - Tạo hàm kiểm tra an toàn `isReconciledSafe(val)` ngăn chặn việc chuỗi `"FALSE"` từ Google Sheets bị ép kiểu thành `true` trong JavaScript, khiến hàng loạt đơn hàng bị ghi đè thành `HOÀN THÀNH`.
+  - Đồng bộ logic kiểm tra `isReconciled` an toàn trong cả `Code.js` và `Tab_Orders.html`.
+
+---
+
+## [v2.16.8] - 2026-08-28
+
+### 📊 Khắc Phục Lỗi Tính Doanh Thu Đa Kênh & Chuẩn Hóa Chi Phí P&L (`Tab_Analytics.html` & `Tab_BusinessReport.html`)
+- **Đồng bộ chuẩn 100% Doanh Thu Thực Tế VNĐ (`Tab_Analytics.html` & `Tab_BusinessReport.html`)**:
+  - Triệt tiêu lỗi nhân tỷ giá ngoại tệ (THB x715, MYR x5850) lần thứ hai trên các đơn Shopee Global (TH, MA/MY, SG...) vốn đã được quy đổi sẵn sang VNĐ khi lưu vào bảng `Orders`.
+  - Khôi phục chính xác doanh thu thực tế của toàn bộ các kênh bán hàng (Shopee VN, Shopee TH, Shopee MA, TikTok Shop, CTV, Bán Lẻ...).
+- **Chuẩn hóa quét Chi Phí Lương & Chi Phí Vận Hành (OPEX)**:
+  - Ưu tiên đọc Quỹ Lương Chốt từ `Monthly_Snapshots` cho kỳ báo cáo tương ứng, tránh tình trạng cộng dồn các giao dịch tạm ứng trùng lặp.
+  - Khoanh vùng chính xác chi phí vận hành OPEX (Mặt bằng, Điện nước, Quảng cáo/Ads, Tiếp khách, Sinh hoạt xưởng...), tuyệt đối không quét nhầm các khoản thanh toán tiền hàng nhập, công nợ nhà cung cấp hay hoàn tiền.
+
+---
+
+## [v2.16.7] - 2026-08-28
+
+### ⚙️ Chuẩn Hóa Engine Trừ Vật Tư BOM & Khôi Phục Đối Tượng Xuất Kho (`Code.js` & `Tab_ImportExport.html`)
+- **Tách biệt triệt để Engine định mức BOM Bể Kính vs Layout (`Code.js`)**:
+  - Bổ sung trích xuất cột `type` từ bảng `Production`, triệt tiêu hoàn toàn hiện tượng `targetProd.type` bị undefined.
+  - Phân loại chính xác 100%: Bể Kính chỉ trừ nguyên liệu kính/keo silicon/mài CNC và gán `target = 'Sản Xuất Bể Kính'`, Layout chỉ trừ lũa/đá/keo 502/fomex/rêu và gán `target = 'Sản Xuất Layout'`.
+  - Làm tròn tất cả các số tiền thành số nguyên, ngăn chặn lỗi hiển thị thập phân dạng `3.628,044đ`.
+- **Bổ sung tính năng Tự Động Sửa BOM Lỗi (`repairAllBomTickets`)**:
+  - Cung cấp hàm backend quét và tự động chuẩn hóa toàn bộ các phiếu xuất BOM cũ trong sheet `ImportExport`.
+  - Tích hợp nút bấm trực quan `Sửa BOM Lỗi` ngay trên thanh công cụ `Tab_ImportExport.html` cho Admin/Quản Lý Kho.
+
+---
+
+## [v2.16.6] - 2026-08-28
+
+### ⚙️ Tối Ưu Luồng Tạo Lệnh Sản Xuất Tồn Kho & Hiển Thị Đơn Hàng Đa Tháng (`Tab_Production.html` & `Modals_Orders.html`)
+- **Đồng bộ hiển thị lệnh chờ sản xuất xuyên tháng (`Tab_Production.html`)**:
+  - Khắc phục triệt để lỗi lệnh sản xuất tạo vào cuối tháng có deadline rơi vào đầu tháng sau (hoặc lệnh tồn đọng từ tháng trước) bị bộ lọc thời gian `Tháng Này` ẩn đi.
+  - Thiết lập cơ chế ưu tiên: Mọi lệnh `Chờ Sản Xuất` và `Kiểm Định` chưa hoàn thành (`!isFinished`) bắt buộc luôn hiển thị 100% trên bảng điều khiển xưởng để thợ nhận việc và gia công liên tục (One-Piece Flow).
+- **Bổ sung validation và hướng dẫn chọn mẫu sản xuất tồn (`Modals_Orders.html`)**:
+  - Bổ sung validation chặn lưu đơn khi giỏ hàng rỗng trong luồng Tạo Lệnh Tồn Kho, ngăn chặn việc submit nhầm đơn trống.
+  - Cải tiến giao diện giỏ hàng trống: Bổ sung chỉ dẫn trực quan kèm nút bấm nhanh `+ BỂ KÍNH` và `+ LAYOUT` ngay bên trong khung thông báo.
+  - Truyền đầy đủ cấu hình `configGiaLayout` và `kpiConfig` vào `AddModal` trong `Tab_Production.html` để tự động tính giá và BOM chuẩn xác.
+
+---
+
+## [v2.16.5] - 2026-08-28
+
+### 🛠️ Khắc Phục Lỗi Hiển Thị Tổng Quỹ Lương Kỳ Này (`Tab_HR.html` Hotfix)
+- **Chuẩn hóa giải thuật bóc tách số `cleanNumber`**:
+  - Nâng cấp `cleanNumber` bóc tách an toàn mọi định dạng số (chuỗi có dấu phẩy/chấm phân cách hàng nghìn, khoảng trắng, undefined, null, NaN).
+  - Bọc toàn bộ các phép tính thành phần trong `payroll` (lương chính, thưởng KPI, phụ cấp, thưởng nóng, chuyên cần, giảm trừ, tạm ứng) bằng `cleanNumber`, triệt tiêu hoàn toàn hiện tượng 1 nhân sự lỗi format làm lây lan `NaN` sụp đổ số tổng cả xưởng.
+- **Mở rộng phân quyền hiển thị tổng lương**:
+  - Bổ sung quyền Founder (`FOUNDER`), Admin (`ADMIN`, `isBoss`, `isAdmin`) và Quản Lý Tối Cao vào điều kiện hiển thị số tổng trên thẻ "TỔNG QUỸ LƯƠNG KỲ NÀY".
+
+---
+
+## [v2.16.4] - 2026-08-28
+
+### 🛡️ Đại Tổng Rà Soát Kiến Trúc, Đồng Bộ Tỷ Giá Đa Tiền Tệ & Khóa Dữ Liệu Đồng Thời (Deep Architecture Audit & Concurrency Hardening)
+- **1. Đồng Bộ Tỷ Giá Đa Tiền Tệ Shopee Global (`Tab_Analytics.html`)**:
+  - Bổ sung bảng tỷ giá quy đổi sang VNĐ cho toàn bộ các kênh quốc tế: USD ($25.500$), TH ($715$), SG ($19.200$), MY ($5.850$), PH ($440$), TW ($810$).
+  - Đồng bộ 100% số liệu doanh thu thuần, chi phí nền tảng và lợi nhuận gộp giữa `Tab_Analytics.html` và `Tab_BusinessReport.html`.
+- **2. Quản Trị Công Nợ & Thanh Toán Từng Phần Nhà Cung Cấp (`Tab_Suppliers.html`)**:
+  - Lưu vết `paidAmount` lũy kế và tính toán `debtAmount` còn nợ theo từng phiếu nhập kho.
+  - Bổ sung huy hiệu `TRẢ 1 PHẦN` trực quan, bảo vệ công nợ không bị mất dấu và chỉ đóng trạng thái `isPaid: true` khi đã thanh toán đủ 100%.
+- **3. Chống Rò Rỉ Bộ Nhớ RAM Canvas & Object URL Trên Mobile (`Modals_Orders.html`)**:
+  - Đóng gói Component `SafeCoverImagePreview` tự động giải phóng Object URL thông qua `URL.revokeObjectURL(url)` trong hook cleanup React `useEffect`.
+- **4. Bảo Vệ Dữ Liệu Đồng Thời Backend LockService (`Code.js`)**:
+  - Bọc `LockService.getScriptLock().waitLock(15000)` kèm `try ... finally { lock.releaseLock(); }` trên toàn bộ các hàm ghi/xóa CSDL: `closeMonthAndArchive`, `cleanUpOldReconciliationJunk`, `autoCleanOrdersData`, `updateAppealStatus`, `hardDeleteOrderAndRelatedData`, `restoreFulfilledFromStock`.
+- **5. Chuẩn Hóa Nhận Diện Thương Hiệu Kênh TikTok (`Config.html`)**:
+  - Đồng bộ màu badge và inline accent của kênh TikTok sang màu Cyan chuẩn (`#06b6d4`, `bg-[#06b6d4]`).
+
+---
+
+## [v2.16.3] - 2026-08-27
+
+### 🛠️ Triệt Tiêu Khối Code Trùng Lặp Trong summaryStats (`Tab_Orders.html` Hotfix)
+- Xóa bỏ hoàn toàn đoạn code thừa bị lặp lại sau dòng `});` trong hook `summaryStats` tại `Tab_Orders.html`.
+- Làm sạch 100% các cảnh báo IDE Linter: `',' expected`, `Argument expression expected`, `Declaration or statement expected`.
+
+---
+
+## [v2.16.2] - 2026-08-27
+
+### 🛠️ Sửa Lỗi Cú Pháp Khối Hàm Lọc Thời Gian (`Tab_Orders.html` Hotfix)
+- Khắc phục triệt để lỗi syntax `Unexpected token, expected ','` tại khối hàm `matchTimeFilter` và `computeOrderMetadata` trong `Tab_Orders.html`.
+- Chuẩn hoá hoàn toàn các khối đóng/mở ngoặc `{ }` và hook `useCallback`/`useMemo` giúp ứng dụng render mượt mà không bị lỗi crash Babel.
+
+---
+
+## [v2.16.1] - 2026-08-27
+
+### 🪵 Đồng Bộ Thuật Toán Khấu Trừ Vật Tư BOM Layout & Bể Kính (`Code.js`)
+- **Phân định rõ ràng Bể Kính vs Layout**:
+  - Nếu là Layout (Biotop Cuội, Rừng, Bonsai, Đảo Bay... hoặc `type !== 'BỂ KÍNH'`), tuyệt đối không cho chạy vào `calculateGlassTankSpecs`, ngăn chặn việc nhận nhầm kích thước layout `30x20x20` thành bể kính và trừ nhầm kính siêu trong / mài CNC.
+- **Tính chuẩn 4 nguyên liệu Layout theo size (đồng bộ 100% `getProductBOMAndCosts`)**:
+  - **Nguyên liệu chính**: Phân loại chuẩn xác Đá Cuội (`NLSX-CUOI`), Đá Tai Mèo (`NLSX-TAIMEO`), Nham Thạch (`NLSX-NHAM`), Lũa Săn Miếng (`NLSX-LUASANMIENG`), Lũa Đỗ Quyên (`NLSX-DOQUYEN`), Đá Vỉa (`NLSX-VIA`), Rễ Rừng (`NLSX-RE`), Đá Voi (`NLSX-DAVOI`), v.v. với định mức $2.5 \times (size/30)^{1.4}$ kg.
+  - **Keo 502**: `NLSX-502-1CHAI` với định mức $\max(1, \text{round}(1.5 \times size/30))$ chai.
+  - **Fomex**: `NLSX-FOMEX-8li` (size < 60) hoặc `NLSX-FOMEX-10li` (size $\ge$ 60) với định mức $0.08 \times (size/30)$ $\text{m}^2$.
+  - **Rêu**: `NLSX-REU-A04` với định mức $\text{round}(20 \times size/30)$ gam.
+- **Chuẩn hóa UOM**: Quy đổi tự động giữa $\text{m}^2$ - tấm fomex, kg - gam, chai - gram keo khi trừ vào `Products.quantity` và ghi log phiếu xuất kho `ImportExport`.
+
+---
+
+## [v2.16.0] - 2026-08-27
+
+### ⚡ Đại Tu Luồng Dữ Liệu Đơn Hàng - Sản Xuất & Tối Ưu Hiệu Năng (Master Action Plan)
+- **1. Single Source of Truth cho `Orders.status` (`Tab_Orders.html`)**:
+  - **Triệt tiêu Trạng Thái Ma (Phantom Status)**: Gỡ bỏ việc ghi đè trạng thái ma `computeOrderStatus()` trên RAM Client, trạng thái đơn lấy 100% từ CSDL Google Sheets `Orders.status`.
+  - **Tách Warning Badges**: Các trạng thái thiếu tồn kho phụ kiện hoặc thiếu MVĐ chuyển thành cờ `_isMissingAccessories` và `_isMissingMVD` render huy hiệu cảnh báo độc lập, không kéo giật trạng thái đơn.
+- **2. Cô Lập Khấu Trừ BOM & Chống Trừ Kép (`Tab_Production.html` & `Code.js`)**:
+  - **Xóa Trigger Trừ BOM Client**: Loại bỏ hoàn toàn lệnh gọi `processMaterialDeduction` trực tiếp từ client trên `Tab_Production.html`.
+  - **Backend Single Point of Execution**: Khấu trừ BOM được giao duy nhất cho `syncDeltas` trong `Code.js` tự động thực thi 1 lần khi bản ghi lệnh chuyển sang `Done`.
+  - **Bổ sung `isExportChannel`**: Mở rộng nhận diện đơn USD/Quốc tế đảm bảo thợ nhận đúng định mức thưởng x3 mà không phát sinh `ReferenceError`.
+- **3. Chuẩn Hóa Hạch Toán Doanh Thu & Hàng Hoàn (`Tab_Orders.html`)**:
+  - **Hạch toán 0đ cho Đơn Hoàn / Quá hạn 72h**: Đơn hàng bị hoàn hoặc đơn xuất huỷ quá hạn 72h (đã phạt COGS Diệu Hương) được hạch toán doanh thu về đúng `0đ`, không cộng vào `totalSoldOrders` hay `totalRevenue`.
+  - **Nâng trần an toàn Doanh thu**: Nâng cấp `parseRevenue` lên trần an toàn 2 Tỷ đồng chống parse nhầm SĐT/mã vận đơn.
+  - **Bộ lọc thời gian KPI đa mốc**: Quét toàn bộ `reconciledAt`, `returnedAt`, `date`, `createdAt` không bỏ sót đơn đối soát từ kỳ trước.
+- **4. Tối Ưu Giải Phóng Bộ Nhớ RAM Canvas (`Modals_Orders.html`)**:
+  - Tự động reset `canvas.width = 1; canvas.height = 1;` và dọn dẹp URL base64 khi unmount `OrderInvoiceModal`, chống tràn RAM khi xem hóa đơn liên tục.
+
+---
+
+## [v2.15.0] - 2026-08-27
+
+### 💎 Tái Cấu Trúc Toàn Diện 6 Phân Hệ Cốt Lõi & Bộ 3 AI Agents Vận Hành (RF Enterprise Core)
+- **1. Phân Hệ Đối Soát CTV (`Tab_Affiliate.html`)**:
+  - **Triệt tiêu lỗi trừ nợ kép (Double Deduction)**: Phân tách hoàn toàn công nợ đơn hàng và dòng tiền thanh toán; `getOrderExtraExpenses` chỉ tính phụ phí dương gắn đơn (`PHÍ VẬN CHUYỂN`, `PHÍ HOÀN HÀNG`, `KHÁC...`) và bỏ qua các khoản thanh toán / kết chuyển.
+  - **Khớp mã phụ phí 1:1**: Chỉ so khớp theo `(code && note.includes(code)) || (id && note.includes(id))`, loại bỏ hoàn toàn quét mờ theo tên khách.
+  - **Lọc đơn huỷ, bảo lưu đơn hoàn**: Áp dụng chuẩn `normalizeStatus(o.status) === 'Đơn Huỷ'` để loại bỏ đơn hủy khỏi đối soát nhưng giữ nguyên đơn hoàn phục vụ chốt phí ship hoàn.
+- **2. Quản Trị Kho & Chứng Từ (`Tab_Inventory.html` & `Tab_ImportExport.html`)**:
+  - **Giao diện Hallmark Data Grid 1-tầng**: Xóa bỏ ma trận thư mục lồng nhau (`activeFolders`), chuyển sang danh sách phẳng kèm 2 nút gạt View Mode linh hoạt giữa **Dạng Thẻ (`VariantGroupCard`)** và **Dạng Bảng (`Compact Table`)**.
+  - **Chuẩn hoá Thẻ Kho (`StockHistoryModal`)**: Khớp 3 tầng linh hoạt (`SKU` ➡️ `id` ➡️ fallback tên chính xác), bỏ qua chứng từ `log.type === 'Đặt Hàng'`, lũy kế ngược kèm làm tròn UOM 3 chữ số thập phân (`Math.round(val * 1000) / 1000`).
+  - **Chuẩn hoá 4 phân hệ danh mục kho**: Ghim cố định 4 nhánh `BỂ KÍNH`, `LAYOUT`, `PHỤ KIỆN`, `DANH MỤC SẢN XUẤT`.
+- **3. Báo Cáo Kinh Doanh & Phân Tích P&L (`Tab_BusinessReport.html` & `Tab_Analytics.html`)**:
+  - **Tỷ giá ngoại tệ Shopee Global**: Tự động quy đổi tỷ giá sang VNĐ (TH: 715, SG: 19.200, MY: 5.850, PH: 440, TW: 810, USD: 25.500).
+  - **Ngưỡng an toàn thực tế 2 Tỷ đồng**: Nâng cấp `safeNum` với trần an toàn 2.000.000.000đ, ngăn chặn lỗi parse nhầm số điện thoại nhưng không ép các đơn doanh thu lớn về 0.
+- **4. Bộ 3 AI Agents Vận Hành & Master Cron (`RFEnterpriseCore.js`)**:
+  - Tích hợp 3 Autonomous Agents: `ProductionAgent`, `HRAgent`, `WarehouseAgent`.
+  - Khởi tạo `RFEnterpriseCore.setupMasterCron()` gom toàn bộ tiến trình quét ngầm vào duy nhất 1 trigger GAS chu kỳ 15 phút, giải quyết triệt để giới hạn GAS Trigger Quota.
+
+---
+
+## [v2.14.5] - 2026-08-27
+
+### 🏷️ Tự Động Khớp SKU (Cột R) File Đơn Shopee Thái Lan & Quốc Tế (Trạm Bơm Đơn)
+- **Chuẩn Hoá Parser Header Đa Dòng & Đa Ngôn Ngữ**:
+  - Tự động làm sạch các ký tự xuống dòng (`\r\n\t`) trong tiêu đề file Excel Shopee Thái Lan (như `เลข\nอ้างอิง\nSKU\n(SKU\nReferenc\ne No.)`).
+  - Khớp chuẩn xác **Cột R** thành `varSku` (SKU Reference No. / Mã SKU phân loại) và **Cột P** thành `parentSku` (Parent SKU Reference No. / Mã SKU người bán).
+- **Bộ Phân Giải SKU Thông Minh (`matchProductFromCatalog`)**:
+  - Tra cứu SKU ứng viên theo cấp độ ưu tiên: Cột R (Variation SKU) ➡️ SKU trong ngoặc `[...]` ➡️ Regex SKU ➡️ Cột P (Parent SKU).
+  - Tích hợp giải thuật bóc tách tiền tố (VD: `RUN-020`) và kích thước (`402325` ➡️ `40x23x25` / `Size L` / `ไซส์ L`) để map chính xác sản phẩm trong kho ERP.
+  - Tự động gán tên sản phẩm chuẩn tiếng Việt và mã SKU chuẩn vào lệnh xưởng (`Production`) và danh sách phụ kiện (`Accessories`), kích hoạt đúng công đoạn sản xuất (Dựng Khung ➡️ Gia Cố / Cắt Dán ➡️ Gọt Keo).
+
+---
+
+## [v2.13.9] - 2026-08-27
+
+### 🛡️ Chuẩn Hoá 4 Phân Hệ Kho, Triệt Tiêu Nhận Nhầm Hàng Phụ Kiện/Nguyên Liệu Sang Sản Xuất & Tách Biệt Phiếu Đặt Hàng
+- **Phân Định Ranh Giới Tuyệt Đối 4 Phân Hệ Kho**:
+  - `KHO BỂ KÍNH`: Chỉ các sản phẩm thành phẩm thuộc category `BỂ KÍNH` mới sinh lệnh sản xuất công đoạn (Cắt Dán / Gọt Keo).
+  - `KHO LAYOUT`: Chỉ các sản phẩm thành phẩm thuộc category `LAYOUT` / `THÀNH PHẨM` mới sinh lệnh sản xuất công đoạn (Dựng Khung / Gia Cố).
+  - `KHO NGUYÊN LIỆU`: Toàn bộ nguyên liệu dùng để sản xuất Bể Kính & Layout (`DANH MỤC SẢN XUẤT`, `NGUYÊN LIỆU LAYOUT`, `NGUYÊN LIỆU BỂ KÍNH`, `VẬT TƯ SẢN XUẤT` như Đá Cuội, Đá Tai Mèo, Lũa San Đá, Rễ Rừng, Sạn Suối, Keo 502, Silicon...). Khi khách đặt mua bán lẻ hoặc import đơn TMĐT, toàn bộ các mặt hàng này được tự động phân loại thành **Phụ Kiện Gói Kèm**, tuyệt đối **KHÔNG** tạo lệnh sản xuất cho thợ.
+  - `KHO PHỤ KIỆN`: Hàng hoá phụ kiện thương mại (`PHỤ KIỆN`, `HÀNG HOÁ` như Lọc, Đèn, Cát, Phân Nền, Khử Clo...).
+- **Nâng Cấp Bộ Nhận Diện Đa Tầng Poka-Yoke (`checkProductionItemType` - `Modals_Orders.html`)**:
+  - Thêm bộ lọc rào chắn chặn đứng việc nhận nhầm sub-category chứa từ khoá mờ `LAYOUT` (như `NGUYÊN LIỆU LAYOUT`).
+  - Tích hợp bộ lọc regex quy cách đóng gói thương mại (`1kg`, `2kg`, `500g`, `gói`, `túi`, `xô`, `cây`, `lũa san đá`, `đá cuội`...).
+  - Đồng bộ logic phân luồng trên toàn bộ hệ thống: Form Thêm/Sửa Đơn hàng, Xem trước Import Excel/TikTok/Shopee, Bộ lọc tìm kiếm nhanh `+ BỂ KÍNH`, `+ LAYOUT`, `+ PHỤ KIỆN`.
+- **Tách Biệt Bảng Báo Nhập Hàng Trên Dashboard Sang Bảng Chứng Từ `ImportExport` (Phiếu ĐẶT HÀNG)**:
+  - Tái cấu trúc `DashboardTasksSection` (`Tab_Dashboard.html`): Chức năng "Báo Nhập Hàng / Đặt Hàng" của nhân viên chỉ tạo duy nhất phiếu chứng từ `ĐẶT HÀNG` trong bảng `ImportExport`.
+  - Triệt tiêu 100% việc tạo bản ghi giả `MATERIAL_REQ` vào bảng `Production` (`prodItems`), loại bỏ triệt để lỗi thẻ rác `[DANH MỤC SẢN XUẤT] Carton Phế Liệu` xuất hiện trên Tab Sản Xuất của thợ.
+- **Rào Chắn Poka-Yoke Trên Tab Sản Xuất (`Tab_Production.html`)**:
+  - Bổ sung bộ lọc trong `baseFiltered` để loại trừ triệt để mọi bản ghi không thuộc lệnh sản xuất thực tế (`orderId === 'MATERIAL_REQ'`, `type === 'Báo Nhập Hàng'`, `MAT_REQ_...`).
+
+---
+
+## [v2.13.8] - 2026-08-27
+
+### 📅 Khắc Phục Lỗi Format Ngày Tháng Từ Trạm Bơm Đơn TikTok
+- **Chuẩn Hóa Dữ Liệu Ngày Tháng Tuyệt Đối**: Cập nhật bộ tiền xử lý (Preprocessor) trong `Modals_Orders.html` để tự động chuyển đổi định dạng ngày `DD/MM/YYYY HH:mm:ss` đặc thù của file Excel TikTok Shop sang chuẩn ISO `YYYY-MM-DD HH:mm:ss`.
+- **Khắc Phục Lỗi Giao Diện `dd/mm/yyyy`**: Giải quyết triệt để tình trạng thẻ input date bị lỗi hiển thị `dd/mm/yyyy` (do trình duyệt từ chối nhận diện chuỗi không chuẩn), qua đó đảm bảo mọi đơn hàng bơm vào hệ thống đều chốt chính xác thời điểm thực tế, không bị trôi dữ liệu.
+
+## [v2.13.7] - 2026-08-27
+
+### 🛠 Khắc Phục Lỗi Khấu Trừ BOM & Mất Dữ Liệu Bàn Giao Trạm
+- **Cải Tiến Thuật Toán Khớp Lệnh BOM (Fuzzy Matcher)**: Tự động lược bỏ các đuôi phụ trong ngoặc như `(Kg), (Gam), (Chai)` ở `BOM_Config` trước khi tra kho, đảm bảo map chính xác 100% với mã nguyên liệu trong kho.
+- **Tính Năng Bắt Vật Tư Sót Lại**: Mọi vật tư khai trong BOM dù chưa được tạo mã trong kho vẫn bắt buộc ghi nhận vào Phiếu Trừ BOM với số lượng `0` kèm ghi chú *"Không có trong Kho"*, giữ tính toàn vẹn 1-1 với Bảng định mức giao diện.
+- **Khắc Phục Lỗi Bốc Hơi Không Gian Làm Việc**: Xử lý triệt để tình trạng Trạm Đóng Gói mới tạo bị mất sau khi tải lại trang bằng cách tự động kiến tạo cấu trúc bảng `Workspaces` ngầm định ở backend nếu phát hiện thiếu hụt CSDL.
+
+---
+
+## [v2.13.6] - 2026-08-26
+
+### 📦 Chuẩn Hóa Phân Loại Tab Kho Hàng & Khấu Trừ Vật Tư BOM Chính Xác
+- **Phân Tách 4 Nhóm Kho Rõ Ràng**:
+  - `KHO BỂ KÍNH`: Chỉ hiển thị các phiếu nhập/xuất bể kính, terrarium.
+  - `KHO LAYOUT`: Chỉ hiển thị các phiếu nhập/xuất layout thành phẩm.
+  - `KHO HÀNG HOÁ (PHỤ KIỆN)`: Chỉ hiển thị hàng hóa, phụ kiện thương mại bán lẻ (đèn, lọc, phân nền, phụ kiện...). Triệt tiêu việc trộn lẫn các phiếu xuất vật tư BOM sản xuất xưởng vào tab này.
+  - `KHO NGUYÊN LIỆU (VẬT TƯ)`: Tập trung toàn bộ phiếu xuất khấu trừ BOM vật tư xưởng (Lũa, đá, sỏi/sạn, fomex, keo 502, silicon...).
+- **Tự Động Đồng Bộ Đơn Vị Tính Chuẩn Danh Mục Kho**:
+  - Chi tiết phiếu kho tự động nhận diện và hiển thị đúng đơn vị tính thực tế từ danh mục kho `Products` (Kg, m², Chai, Túi...) thay vì mặc định chuỗi "Cái".
+
+---
+
+## [v2.13.5] - 2026-08-26
+
+### 🪵 Khắc Phục Lỗi Không Trừ Kho Lũa San Miếng (NLSX-LUASANMIENG) Trong Lệnh Layout
+- **Cố Định Chính Xác SKU Vật Tư & Triệt Tiêu Lỗi Ghi Đè**:
+  - Khử bỏ vòng lặp quét mờ `indexOf('lũa san')` làm `NLSX-LUASANTRANG` (Lũa San Trắng) ở cuối danh sách `Products` cướp mất phiếu xuất kho của `NLSX-LUASANMIENG`.
+  - Cố định trực tiếp SKU nguyên liệu chính mặc định cho Layout là `NLSX-LUASANMIENG` (Lũa San Miếng) và Keo 502 là `NLSX-502-1CHAI`.
+- **Tự Động Ánh Xạ Tên Tiếng Việt Sang SKU Layout Khi Đối Chiếu `BOM_Config`**:
+  - Ánh xạ chuẩn xác các mẫu lệnh tiếng Việt (`Đảo Bay ver.3`, `Nature ver.2`, `Nhất Trụ ver.1`, `Hẻm Núi`...) sang SKU tương ứng trong bảng `Products` trước khi quét `BOM_Config`.
+  - Đảm bảo mỗi khi hoàn thành lệnh Layout xưởng, hệ thống sẽ tự động trừ đúng số kg Lũa San Miếng trong thẻ kho một cách chính xác 100%.
+
+---
+
+## [v2.13.4] - 2026-08-26
+
+### 🛡️ Khắc Phục Lỗi Nhận Diện Nhầm Đơn Đã Nhận Thành Đơn Hoàn Khi Quét File Shopee
+- **Tích Hợp Bộ Lọc Đơn Hoàn Chuẩn Xác 3 Tầng (`isActualReturnOrder`)**:
+  - Phân tích độc lập 3 cột từ file Shopee: `Trạng Thái Đơn Hàng`, `Trạng thái Trả hàng/Hoàn tiền`, `Lý do hủy`.
+  - Triệt tiêu lỗi bắt nhầm 188 đơn giao thành công có dòng thông báo *"Người mua xác nhận đã nhận được hàng, tuy nhiên Người mua vẫn có thể gửi yêu cầu Trả hàng/Hoàn tiền tới ngày..."*.
+  - Bảo vệ tuyệt đối các đơn giao thành công / đối soát thành công không bị chuyển nhầm sang Hàng Hoàn.
+  - Chỉ nhận diện đơn hoàn khi thực sự có khiếu nại được chấp thuận (`Đã Chấp Thuận`, `Yêu cầu chờ xử lý`, `Đã giải quyết khiếu nại`) hoặc đơn boom hàng giao thất bại (`Đã hủy` kèm lý do `Giao hàng thất bại`).
+- **Đồng Bộ Hoá Trạm Bơm Đơn (`Modals_Orders.html`) & Máy Quét Đơn Hoàn (`Tab_Orders.html`)**.
+
+---
+
+## [v2.13.3] - 2026-08-26
+
+### 🛠️ Khắc Phục Lỗi Parse Ngày DD/MM/YYYY Phục Hồi 100% Đơn Hoàn Thành & Doanh Thu
+- **Tích Hợp Hàm Giải Mã Ngày Đa Năng (`window.parseOrderDateSafe`)**:
+  - Hỗ trợ giải mã chính xác 100% tất cả các cấu trúc ngày tháng: Chuỗi định dạng Việt Nam `DD/MM/YYYY`, `DD-MM-YYYY`, chuẩn ISO `YYYY-MM-DD`, `YYYY/MM/DD` và JavaScript Date/Timestamp.
+  - Triệt tiêu lỗi `Invalid Date` hoặc nhận diện đảo lộn ngày thành tháng khi lọc dữ liệu ngày đặt hàng từ Google Sheets.
+- **Bảo Toàn Đầy Đủ 100% Đơn Hoàn Thành (Doanh Thu Khớp Chuẩn 134.701.869đ)**:
+  - Phục hồi trọn vẹn 262+ đơn hoàn thành của Tháng 8, đảm bảo thẻ Tổng Doanh Thu (`134.701.869đ`) và Số Đơn Bán (`563 đơn`) phản ánh chính xác từng đơn hàng.
+
+---
+
+## [v2.13.2] - 2026-08-26
+
+### 🛡️ Khắc Phục Lỗi Lọc Đè State Làm Tụt Doanh Thu (Immutable State & Solid KPI Engine)
+- **Tách Lập Mảng Dữ Liệu Gốc Bất Biến (`window.GLOBAL_ALL_ORDERS`)**:
+  - Bảo tồn 100% dữ liệu gốc không bao giờ bị ghi đè hay co hẹp lại khi người dùng chuyển đổi qua lại giữa các tab kênh bán (Shopee, TikTok, Bán Lẻ, CTV) hoặc mở xem accordion chi tiết.
+- **Phân Tầng Độc Lập Bộ Lọc Thời Gian Tính KPI (`timeFilteredOrders`)**:
+  - Tách riêng `timeFilteredOrders` chỉ thuần túy áp dụng bộ lọc ngày đặt hàng (`order.date` / `order.createdAt`) làm nguồn duy nhất để tính toán các thẻ KPI cốt lõi: `Tổng Doanh Thu`, `Số Đơn Bán`, `Giá Trị Hoàn`, `Bán Lẻ`, `Cộng Tác Viên`.
+  - Bộ lọc tìm kiếm (`searchCode`), bộ lọc kênh bán (`filterChannel`) và phân trang DOM chỉ áp dụng cho danh sách hiển thị vận hành (`baseFiltered` / `filtered`), hoàn toàn tách rời khỏi động cơ tính KPI, chấm dứt triệt để hiện tượng nhảy loạn số liệu doanh thu.
+
+---
+
+## [v2.13.1] - 2026-08-26
+
+### 📅 Chuẩn Hoá Bộ Lọc Thời Gian Theo Ngày Đặt Hàng & Nạp Đầy Đủ 100% Đơn Theo Tháng
+- **Cố Định Bộ Lọc Thời Gian Theo Ngày Đặt Hàng Thực Tế (`order.date` / `order.createdAt`)**:
+  - **Khử bỏ hoàn toàn việc lọc theo `reconciledAt`**: Đơn hàng đặt trong tháng nào sẽ luôn nằm cố định ở tháng đó. Khắc phục triệt để lỗi đơn đặt tháng trước nhưng khi đối soát ví ở tháng sau lại bị nhảy số liệu sang tháng sau làm méo mó báo cáo doanh thu.
+  - Áp dụng đồng bộ trên cả Frontend ([`Tab_Orders.html`](file:///c:/Users/ADMIN/RF_Workspace_Pro/Tab_Orders.html)) và Backend ([`Code.js`](file:///c:/Users/ADMIN/RF_Workspace_Pro/Code.js)).
+- **Truy Vấn Toàn Bộ 100% Đơn Hàng Của Tháng (Không Cắt Cụt Phân Trang)**:
+  - Nâng cấp API `getArchivedOrders` và luồng lazy-load: Khi chuyển dropdown thời gian sang `Tháng Trước` hoặc `Chọn Tháng`, hệ thống tự động nạp 100% tất cả các đơn hàng thuộc chu kỳ đó từ Google Sheet mà không bị thiếu sót do giới hạn phân trang.
+  - Thẻ KPI thống kê Tổng Doanh Thu, Số Đơn Bán, Hàng Hoàn, Bán Lẻ phản ánh chính xác số liệu phát sinh thực tế của tháng đang chọn.
+
+---
+
+## [v2.12.22] - 2026-08-26
+
+### 📊 Tái Cấu Trúc Toàn Diện Tab Báo Cáo KQKD (Executive P&L Dashboard & Data Editor)
+- **Thiết lập chuẩn mực 4 Trụ Cột Tài Chính (FinTech Executive Standard)**:
+  - **Trụ Cột 1 (Doanh Thu & Giảm Trừ)**: Thống kê chính xác GMV, AOV/đơn, bóc tách tỷ lệ hoàn hàng và voucher chiết khấu.
+  - **Trụ Cột 2 (Giá Vốn & Lợi Nhuận Gộp)**: Tính toán COGS vật tư và biên lợi nhuận gộp (~75-80%) phản ánh đúng giá trị mỹ nghệ thủ công Rich Fish.
+  - **Trụ Cột 3 (Cơ Cấu Chi Phí Hoạt Động)**: Phí sàn TMĐT, đóng gói giao hàng, marketing ADS, quỹ lương & chi phí mặt bằng xưởng.
+  - **Trụ Cột 4 (Lợi Nhuận Thuần Ròng)**: Đo lường dòng tiền thặng dư thực tế mang lại và tỷ suất sinh lời trên Doanh thu thuần (DTT) & GMV.
+- **Bảng Tóm Tắt Chỉ Tiêu Tài Chính Cốt Lõi (Financial Breakdown Matrix)**:
+  - Hiển thị bảng ma trận tài chính 8 dòng chuẩn mực P&L kèm đánh giá & tỷ trọng % trực quan.
+- **Tách bạch 2 chế độ: Tổng Quan (Dashboard) & Bảng Nhập Liệu (Editor)**:
+  - Hỗ trợ chỉnh sửa số liệu tức thì (Inline Editing) theo từng kênh (`Shopee VN`, `TikTok Shop`, `Bán Lẻ`, `Bán Sỉ`, `CTV`, `Xuất Khẩu`) và `Chi Phí Cố Định Xưởng`.
+- **Tách Lập Module Mã Nguồn Độc Lập (`Tab_BusinessReport.html`)**:
+  - Tách hoàn toàn component `BusinessReportTab` khỏi `Tab_Finance.html` thành file module độc lập [`Tab_BusinessReport.html`](file:///c:/Users/ADMIN/RF_Workspace_Pro/Tab_BusinessReport.html).
+- **Khắc Phục & Tối Ưu Phân Hệ Trách Nhiệm & Không Gian Làm Việc (`Tab_Workspaces.html`)**:
+  - Bổ sung `Workspaces` vào hàm cập nhật giao diện phản ứng nhanh (`optimisticMerge` trong `setErpData`), giúp trạm làm việc và danh sách thiết bị bàn giao xuất hiện ngay lập tức (0ms) sau khi bấm Lưu.
+  - Tích hợp thông báo Toast hiện đại thay cho hộp thoại browser alert cũ.
+
+---
+
+## [v2.12.21] - 2026-08-25
+
+### ⚖️ Chuẩn Hóa Luồng Nghiệp Vụ Chặt Chẽ Cho Hàng Hoàn: Khiếu Nại Sàn vs Duyệt Kho
+- **Xóa bỏ hoàn toàn nút nhảy cóc bước khi chưa xử lý**:
+  - **Luồng 1 (Khiếu Nại Sàn)**: Chỉ hiển thị ảnh camera đóng hàng, nút `Sao Chép Mẫu KN` và bắt buộc chọn 1 trong 2 kết quả:
+    - **`🏆 THẮNG (SÀN ĐỀN TIỀN)`**: Tự động chuyển đơn thẳng sang **`Đối Soát Thành Công`** / **`Hoàn Thành`** (`isReconciled = true`, ghi nhận doanh thu thuần và hoàn tất đơn ngay lập tức).
+    - **`❌ THUA (CHUYỂN DUYỆT KHO)`**: Đánh dấu `[KN-THUA]` và **tự động chuyển sang Bước 2 (Duyệt Kho)** để kiểm tra hàng và chọn lý do lỗi/vỡ.
+  - **Luồng 2 (Duyệt Kho)**: Phân nhánh rõ ràng 2 tình trạng:
+    - **`✅ HÀNG OK (NGUYÊN VẸN)`**: Tự động chọn lý do Boom hàng, nút CTA: `DUYỆT NHẬP LẠI KHO TỔNG → HOÀN THÀNH` (cộng lại tồn kho).
+    - **`💥 HÀNG LỖI / BỂ VỠ`**: Mở chọn chi tiết lỗi (💥 Bể vỡ khi vận chuyển, ⚠️ Lỗi thợ, ⏳ Giao trễ...), kiểm tra từng món KCS / SOS, nút CTA: `DUYỆT XUẤT HUỶ HÀNG VỠ → HOÀN THÀNH`.
+
+---
+
+## [v2.12.20] - 2026-08-25
+
+### 🔔 Sửa & Nâng Cấp Toàn Diện Hệ Thống Thông Báo Di Động ntfy.sh (0ms Push Alert)
+- **Khắc phục triệt để lỗi không bắn được thông báo qua ntfy**:
+  - **Sửa lỗi giao thức gửi API**: Chuyển từ định dạng Header RFC2047 cũ (bị lỗi ký tự UTF-8 và chữ ký hàm Apps Script) sang giao thức **JSON POST Payload chuẩn của ntfy.sh** (`topic`, `title`, `message`, `priority: 4`, `tags`, `click`).
+  - **Kích hoạt động cơ bắn thông báo 2 tầng (Dual-Engine)**: Hỗ trợ bắn trực tiếp từ trình duyệt Web Client (0ms latency, không phụ thuộc máy chủ GAS) và bắn dự phòng qua Backend API.
+  - **Bổ sung giao diện Cài Đặt & Bắn Thử Thông Báo (`NtfySettingsModal`)**: Người dùng có thể tùy chỉnh tên kênh thông báo (`rfworkspace` hoặc tên riêng tuỳ chọn), lưu kênh và bấm **"🚀 Bắn Thử Thông Báo"** để kiểm tra ngay trên điện thoại iOS / Android.
+  - Tích hợp tài liệu hướng dẫn 3 bước kết nối nhận thông báo đơn hàng và vận hành tức thì.
+
+---
+
+## [v2.12.19] - 2026-08-25
+
+### 🎯 Quy Trình Stepper Tuần Tự (Progressive Disclosure) Cho Trạm Xử Lý Hàng Hoàn
+- **Xong bước này mới hiện bước tiếp theo**: Tái cấu trúc toàn bộ Trạm Xử Lý Hàng Hoàn theo nguyên tắc Hallmark Progressive Stepper:
+  - **Bước 1 (Đối Chứng & Khiếu Nại Sàn)**: Mở đầu chỉ hiển thị ảnh camera đóng gói và các nút Mẫu KN / Thắng / Thua kèm nút chuyển bước. Ẩn toàn bộ phần phân loại và danh sách hàng bên dưới để chống rối mắt.
+  - **Bước 2 (Phân Loại Tình Trạng & Duyệt Hoàn Kho)**: Khi bấm Thắng/Thua hoặc bấm Tiếp Tục, Bước 1 tự động thu gọn thành 1 thanh tóm tắt siêu gọn gàng và **mở Bước 2** hiển thị lưới chọn lý do hoàn, kiểm tra tình trạng hàng trả và nút lớn `DUYỆT HOÀN XONG → CHUYỂN HOÀN THÀNH`.
+  - Hỗ trợ chuyển đổi qua lại giữa 2 bước linh hoạt bất cứ lúc nào.
+
+---
+
+## [v2.12.18] - 2026-08-25
+
+### 🔒 Phân Lập Tuyệt Đối Ghi Chú Theo Từng Tab & Sửa Lỗi Crash Tab Sản Xuất
+- **Khắc phục lỗi `ReferenceError: documents is not defined` ở Tab Sản Xuất**: Bổ sung `documents` vào danh sách tham số của component `ProductionTab`.
+- **Phân lập dữ liệu ghi chú nghiêm ngặt 100%**: Chuẩn hóa logic lọc `targetTab` trong `QuickNotesPanel`. Ghi chú tạo ở Tab Đơn Hàng chỉ hiển thị duy nhất ở Tab Đơn Hàng, tuyệt đối không bị rò rỉ sang Tab Sản Xuất hay các Tab khác.
+
+---
+
+## [v2.12.17] - 2026-08-25
+
+### ⚡ Tối Ưu 0ms Optimistic UI & Đồng Bộ Nguồn Dữ Liệu Documents Toàn Diện
+- **Hiển thị tức thì 0ms (Optimistic UI)**: Khi bấm "Lưu Ghi Chú" hoặc "Xoá", ghi chú lập tức xuất hiện / biến mất ngay trên giao diện mà không cần chờ đợi phản hồi từ server. Quá trình đồng bộ xuống Google Sheets được chạy hoàn toàn ngầm không gián đoạn thao tác người dùng.
+- **Đồng bộ hóa trực tiếp Documents vào 5 Tab**: Truyền chính xác prop `documents` từ state gốc và gắn dự phòng toàn cục `window._rf_documents` + `erpData.Documents`, đảm bảo tất cả các Tab (Đơn Hàng, Sản Xuất, Kho Hàng, Tài Chính, Nhân Sự) luôn nhận dữ liệu ghi chú mới nhất 100%.
+
+---
+
+## [v2.12.16] - 2026-08-25
+
+### 🧹 Loại Bỏ Triệt Để Modal Ghi Chú Nổi Cũ & Khắc Phục Lỗi isBoss Tab Sản Xuất
+- **Loại bỏ hoàn toàn icon ghi chú cũ trên Navbar**: Xoá nút ghi chú cạnh số dư xu và modal nổi cũ (`QuickNotesModal`), tránh xung đột và trùng lặp với hệ thống ghi chú nhúng độc lập của từng Tab.
+- **Đồng bộ hoá đa nền tảng cho QuickNotesPanel**: Cải tiến bộ lọc ghi chú trong `QuickNotesPanel` để tự động nhận diện và hiển thị tất cả các ghi chú cũ theo từng phân hệ (`ĐƠN HÀNG`, `SẢN XUẤT`, `KHO HÀNG`, `TÀI CHÍNH`, `NHÂN SỰ`).
+- **Sửa lỗi crash `isBoss is not defined`**: Khắc phục triệt để lỗi ReferenceError khi mở Tab Sản Xuất (`Tab_Production.html`).
+
+---
+
+## [v2.12.15] - 2026-08-25
+
+### ⚡ Tái Thiết Kế Trạm Xử Lý Hàng Hoàn Chuẩn Lean & Hallmark Stepper
+- **Quy trình 2 bước tuần tự trực quan**:
+  - **Bước 1 (Khiếu Nại Sàn & Bằng Chứng)**: Thu gọn ảnh đóng gói camera + nút copy Mẫu Khiếu Nại Sàn + 2 nút Thắng / Thua thành 1 hàng đối chứng tinh gọn, tự động hiển thị huy hiệu trạng thái khi đã đánh dấu.
+  - **Bước 2 (Phân Loại & Duyệt Hoàn)**: Chuyển đổi bộ chọn lý do thành dạng Bento Grid 4 phân loại trực quan (💥 Bể vỡ, 🚫 Boom hàng, ⚠️ Lỗi mẫu, ⏳ Giao trễ).
+- **Nút CTA Chính "Duyệt Hoàn Xong" Full-Width**: Đặt nổi bật ở cuối thẻ kèm hiệu ứng phát sáng chỉ khi đã chọn lý do, giúp nhân sự thao tác 1 chạm chuẩn xác, không bị rối mắt.
+
+---
+
+## [v2.12.14] - 2026-08-25
+
+### 🔧 Tối Ưu Hiển Thị & Quy Trình Trạm Khiếu Nại
+- Xoá bỏ nhãn "HÀNG HOÀN" thừa thãi giữa thẻ đơn hàng đối với các đơn đang nằm trong trạng thái Hàng hoàn chờ xử lý, giúp giao diện thẻ gọn gàng hơn.
+- Phục hồi lại 2 nút **Thắng** và **Thua** trong Trạm Khiếu Nại & Xử Lý Hàng Hoàn. Các nút này tự động gắn tag `[KN-THANG]` hoặc `[KN-THUA]` vào ghi chú đơn hàng để làm cơ sở tính KPI và đối soát khiếu nại với sàn.
+
+---
+
+## [v2.12.13] - 2026-08-25
+
+### 📝 Tái Cấu Trúc Khung Ghi Chú Độc Lập (Per-Tab QuickNotesPanel)
+- **Tối Ưu Trải Nghiệm & Phân Tách Không Gian Ghi Chú**:
+  - Loại bỏ hoàn toàn `QuickNotesModal` (Popup nổi giữa màn hình) cồng kềnh.
+  - Thay thế bằng component `QuickNotesPanel` dạng Accordion nhúng trực tiếp ngay bên dưới thanh công cụ của 5 Tab: Đơn Hàng, Sản Xuất, Kho Hàng, Tài Chính, Nhân Sự.
+  - Ghi chú được lọc và hiển thị độc lập hoàn toàn theo từng phân hệ. (Xem ở Tab nào chỉ hiển thị ghi chú Tab đó).
+- **Phân Quyền & Rút Gọn Biểu Mẫu (Minimalist Approach)**:
+  - Form tạo ghi chú mới được thiết kế cực kỳ tối giản (chỉ giữ lại Tiêu đề và Nội dung chi tiết).
+  - Khóa chặt quyền: Nút "+ Tạo Ghi Chú" chỉ hiển thị đối với tài khoản mang cấp bậc **TỐI CAO** (hoặc Ban Quản Trị / Quản Lý cấp cao).
+  - Tích hợp hiệu ứng thả xuống (dropdown animation) mượt mà tương tự như Khung Thống Kê ở Tab Đơn Hàng.
+
+---
+
+## [v2.12.12] - 2026-08-25
+
+### 🎯 Khắc Phục Dữ Liệu Ma Trận Lịch Tháng & Tổng Hợp Ca Chấm Công Chuẩn Xác
+- **Tổng Hợp Tất Cả Các Ca Làm Việc Trong Ngày Trên Ma Trận (`Tab_HR.html`)**:
+  - Khắc phục lỗi hiển thị chỉ lấy 1 ca đầu tiên (`userAtts.find`) dẫn đến ngày làm 2 ca (Sáng + Chiều) chỉ hiện `4h` hoặc `0h`.
+  - Tự động cộng dồn toàn bộ số giờ làm việc thực tế của tất cả các ca (Sáng + Chiều + Tối) trong từng ngày, hiển thị chuẩn xác `8h` / `4h` hoặc số giờ thực tế.
+  - Xử lý ưu tiên ca làm việc thực tế, không để các bản ghi nghỉ phép cũ đè làm mất giờ công đi làm của nhân sự.
+- **Bảo Toàn Giờ Chấm Công Cửa (`totalGateHours`)**:
+  - Triệt tiêu lỗi vô tình ghi đè `totalHours` bằng `activeHours` của lệnh sản xuất, loại bỏ hiện tượng ngày làm 8 tiếng bị rút xuống còn `1h` trên ma trận.
+- **Chuẩn Hóa Thuật Toán Tính Số Ngày Nghỉ Phép (`soNgayNghi`)**:
+  - Chỉ tính là ngày nghỉ nếu trong ngày đó nhân sự thực sự không có ca làm việc nào đạt trên 2h, tránh phạt nhầm số ngày nghỉ của nhân viên đi làm đầy đủ.
+
+---
+
+## [v2.12.11] - 2026-08-25
+
+### 🎯 Tích Hợp Bảng Ghi Chú & Nhắc Việc Nội Bộ Toàn Hệ Thống (`QuickNotesModal`)
+- **Ra Mắt Khung Ghi Chú Vận Hành Đa Phân Hệ (`Modals.html` - `QuickNotesModal`)**:
+  - Hỗ trợ lưu trữ, phân loại và lọc ghi chú theo 5 phân hệ cốt lõi: **🌟 Tất Cả**, **📦 Kho Hàng**, **🛠️ Sản Xuất**, **🛒 Đơn Hàng**, **💰 Tài Chính**, **👥 Nhân Sự** và **🔔 Chưa Đọc**.
+  - Cho phép chọn cấp độ ưu tiên: `📌 Ghim Lên Đầu` (Gold badge), `⚡ Khẩn Cấp` (Rose pulse badge), `📝 Thông Thường`.
+  - Tích hợp tìm kiếm thông minh theo tiêu đề, nội dung và tên người tạo.
+  - Lưu trữ và đồng bộ hóa tức thì vào cơ sở dữ liệu `Documents` (category `GHI_CHU_VAN_HANH`).
+- **Theo Dõi Trạng Thái Xác Nhận Đã Đọc / Đã Hiểu**:
+  - Nhân sự xem ghi chú có thể bấm nút **✔ Đã Hiểu** để xác nhận đã nắm bắt quy định/lưu ý.
+  - Hệ thống tự động ghi nhận danh sách nhân sự đã đọc (`readBy`), hiển thị số lượt đọc và cập nhật badge đếm số ghi chú chưa đọc trên Header.
+- **Tích Hợp Nút Mở Ghi Chú Nhanh Trên 5 Tab & Header Toàn Cục**:
+  - **Top Header (`App_Main.html`)**: Nút Ghi Chú với badge đếm số ghi chú chưa đọc nhấp nháy.
+  - **Tab Kho Hàng (`Tab_Inventory.html`)**: Nút Ghi Chú trên thanh công cụ sản phẩm.
+  - **Tab Sản Xuất (`Tab_Production.html`)**: Nút Ghi Chú trên thanh công cụ tìm kiếm và lọc.
+  - **Tab Đơn Hàng (`Tab_Orders.html`)**: Nút Ghi Chú trên thanh công cụ đơn hàng.
+  - **Tab Tài Chính (`Tab_Finance.html`)**: Nút Ghi Chú trên thanh công cụ Sổ Quỹ Thu Chi.
+  - **Tab Nhân Sự (`Tab_HR.html`)**: Nút Ghi Chú trên thanh Kỳ Báo Cáo.
+
+---
+
+## [v2.12.10] - 2026-08-25
+
+### 🎯 Hotfix: Khắc Phục Lỗi TypeError userConfigs.map Trong OrderCardV2
+- **Tương Thích An Toàn Nhiều Cấu Trúc Dữ Liệu `userConfigs` (`Modals_Orders.html`)**:
+  - Bổ sung cơ chế fallback đa hình cho biến `userConfigs` (xử lý khi là mảng, object `users`, object `pins` hoặc mảng `Config_NhanSu` từ Google Sheets).
+  - Triệt tiêu hoàn toàn lỗi runtime `TypeError: (userConfigs || ...).map is not a function` gây màn hình xám khi hiển thị thẻ đơn hàng.
+
+---
+
+## [v2.12.9] - 2026-08-25
+
+### 🎯 Tối Ưu Thẻ Nhân Sự Chấm Công, Nút Icon Kỳ Báo Cáo & Tính Năng Xoá Khoản Phạt
+- **Thiết Kế Lại Thẻ Hồ Sơ Chấm Công Nhân Sự (`Tab_HR.html`)**:
+  - Bỏ icon cái búa (`fa-gavel`) và tinh giản các nút thao tác theo đúng yêu cầu trải nghiệm gọn nhẹ, chuyên nghiệp.
+  - Thêm đèn báo online/trạng thái làm việc trực quan ngay trên Avatar nhân sự (xanh lá nhấp nháy khi đang làm việc, đỏ khi báo nghỉ, xanh dương khi hoàn thành ca).
+  - Tối ưu huy hiệu Ngày nghỉ, Giờ chấm công và Số lần đi muộn/phạt theo chuẩn Dark UI Dribbble.
+- **Bổ Sung Tính Năng Xoá / Miễn Trừ Khoản Phạt (`Tab_HR.html`)**:
+  - Cho phép cấp Quản lý / Boss bấm nút Thùng rác để trực tiếp xoá bỏ hoặc miễn trừ khoản phạt trong danh sách *Chi tiết phạt tháng này* (đồng bộ tức thì qua `pushDeltas` vào `BonusPenalty` / `Attendance`).
+- **Tinh Gọn Nút Kỳ Báo Cáo & Màu Sắc 3 Tab Nhanh (`Tab_HR.html`)**:
+  - Chuyển các nút *Tạo KPI*, *Giao Việc*, *Báo Nghỉ* thành dạng Icon Buttons bo tròn tinh tế, tiết kiệm không gian.
+  - Phủ màu Gradient phân biệt trực quan cho 3 tab nhanh trên cùng: **CHẤM CÔNG** (*Sky-Blue Gradient*), **NHIỆM VỤ** (*Amber Gradient*), **BẢNG LƯƠNG** (*Emerald Gradient*).
+
+---
+
+## [v2.12.8] - 2026-08-25
+
+### 🎯 Đồng Bộ Màu Sắc Nhãn Kênh Bán, Bộ Lọc Trạng Thái & Icon Tab Sản Xuất Với Tab Đơn Hàng
+- **Đồng Bộ Màu Sắc Nút Lọc Kênh Bán & Trạng Thái (`Tab_Production.html`)**:
+  - Khôi phục và chuẩn hoá 100% màu sắc nhận diện kênh bán (Shopee cam, TikTok hồng, Xuất Khẩu xanh lá, Bán Lẻ xanh dương, CTV tím) và trạng thái (Chờ SX vàng, Kiểm Định tím, Đã Xong xanh ngọc, Đã Huỷ đỏ) cả ở trạng thái bình thường (inactive) lẫn kích hoạt (active).
+  - Tích hợp icon có màu sắc chuyên biệt, triệt tiêu tình trạng icon bị mất màu hoặc xám xịt.
+- **Đồng Bộ Nhãn Kênh Bán Trên Thẻ Lệnh Sản Xuất (`Tab_Production.html` - `WorkerCardV2`)**:
+  - Chuyển toàn bộ nhãn kênh bán hàng trên thẻ lệnh thợ sang hàm `getChannelBadge(channelTag)` chuẩn nhận diện màu khối sắc nét, đồng nhất hoàn toàn với thẻ `OrderCardV2` của tab Đơn Hàng.
+- **Tối Ưu Giao Diện Nút Thao Tác Header (`Tab_Production.html`)**:
+  - Chuẩn hoá nút Tạo Lệnh SX Tồn (`+`) và nút Kho Thiếu Hàng (`Boxes`) theo phong cách Glassmorphism Amber sang trọng.
+
+---
+
+## [v2.12.7] - 2026-08-25
+
+### 🎯 Tích Hợp Thông Tin Nhân Viên Bán Trong Chi Tiết Đơn Hàng & Đồng Bộ In Hoá Đơn
+- **Hiển Thị & Gán Nhân Viên Bán Trên Popup Chi Tiết Đơn Hàng (`Modals_Orders.html` - `OrderCardV2`)**:
+  - Bổ sung trường **Nhân viên bán** vào bảng tóm tắt thông tin trên modal Chi Tiết Đơn Hàng (khớp 100% giao diện popup Order Detail).
+  - Nhân sự quản lý có thể chọn lại nhân viên phụ trách trực tiếp từ danh sách nhân sự công ty (`Config_NhanSu`) qua dropdown và lưu cập nhật tự động khi bấm **Lưu Thay Đổi**.
+- **Đồng Bộ Tên Nhân Viên Bán Lên Hoá Đơn In Nhiệt K58 & Ảnh Canvas (`Modals_Orders.html`)**:
+  - Tự động in kèm dòng `NV bán: <Tên nhân sự>` trên bill in nhiệt K58 (58mm) và ảnh hoá đơn tạo từ `OrderInvoiceModal` phục vụ gửi khách qua Zalo/Facebook.
+
+---
+
+## [v2.12.6] - 2026-08-25
+
+### 🎯 Gom Khung Hàng Hoá & Phụ Kiện, Ô Giá Bán Tự Động, Quyết Toán Đơn Hàng Mới & Thả Xuống Tài Khoản Cọc
+- **Gom Hàng Sản Xuất & Phụ Kiện Vào 1 Khung Thống Nhất (`Modals_Orders.html` - `AddModal`)**:
+  - Gom toàn bộ **Hàng Sản Xuất** (*Bể Kính*, *Layout*) và **Phụ Kiện Kèm Theo** vào chung 1 khung `Hàng Hoá & Phụ Kiện Trong Đơn` gọn gàng, có 3 nút chọn nhanh: `+ BỂ KÍNH`, `+ LAYOUT`, `+ PHỤ KIỆN`.
+- **Ô Giá Bán Tự Động Lấy Giá Kho & Hỗ Trợ Chỉnh Sửa Mẫu**:
+  - Khi thêm bất kỳ mặt hàng nào, giá bán mặc định tự động lấy từ niêm yết kho (`price`), đồng thời cung cấp ô nhập giá bán trực tiếp trên từng món hàng để nhân viên sửa nếu bán giá khác.
+- **Tái Cấu Trúc Khung Quyết Toán Đơn Hàng & Thả Xuống Chọn Tài Khoản Cọc**:
+  - Chuyển toàn bộ khung **Quyết Toán Đơn Hàng** sang cột bên phải, nằm ngay bên dưới khung Hàng Hoá Trong Đơn.
+  - Tự động cộng **TỔNG TIỀN HÀNG** từ các món trong đơn (có nút *Tự động tính*).
+  - Bổ sung ô nhập **GIẢM GIÁ HOÁ ĐƠN** và **THU KHÁC / PHÍ SHIP**.
+  - Tự động tính toán hiển thị song song **THÀNH TIỀN ĐƠN HÀNG** (`Tổng tiền hàng - Giảm giá + Thu khác`) và **TIỀN COD CẦN THU** (`Thành tiền - Đã cọc`).
+  - Ô **TÀI KHOẢN NHẬN CỌC** chuyển thành thẻ chọn `<select>` gồm 2 tài khoản chính: **`ACC_1782746951474` (TÀI KHOẢN CÔNG TY)** và **`ACC_1783639668347` (TIỀN MẶT)**.
+
+---
+
+## [v2.12.5] - 2026-08-25
+
+### 🎯 Phương Thức Bán Hàng Trực Tiếp Offline & Tự Động Duyệt Hoàn Thành
+- **Bổ Sung Phương Thức Giao Hàng "Trực Tiếp" (`Modals_Orders.html` - `AddModal`)**:
+  - Thêm hình thức giao hàng **`Trực Tiếp`** vào danh sách lựa chọn phương thức giao nhận (Gửi GHN, Gửi Xe, Trực Tiếp).
+- **Tự Động Chuyển Trạng Thái Hoàn Thành Đơn Offline (`Modals_Orders.html`)**:
+  - Khi nhân sự bấm **CHỐT ĐƠN BÁN HÀNG** với hình thức `Trực Tiếp`, đơn hàng được tự động xác nhận trạng thái **`Hoàn Thành`** ngay lập tức mà không cần đi qua quy trình đóng gói hay tạo vận đơn.
+  - Tất cả các sản phẩm sản xuất đi kèm trong đơn trực tiếp cũng tự động chuyển trạng thái **`Hoàn Kho Đạt`** (Phases `Done`), giúp khớp đúng thực tế khách nhận hàng offline tại xưởng.
+
+---
+
+## [v2.12.4] - 2026-08-25
+
+### 🎯 Đổi Tên Danh Mục BỂ LẺ SIZE & Tạo Duy Nhất 1 Lệnh Sản Xuất Cho Bể Lẻ Size
+- **Đổi Tên Nhóm KHÁC Thành BỂ LẺ SIZE (`Config.html` & `Tab_Inventory.html`)**:
+  - Bổ sung nhóm phân loại chuẩn `BỂ LẺ SIZE` vào `SUB_CATEGORIES['BỂ KÍNH']`.
+  - Tự động map và hiển thị toàn bộ các sản phẩm bể kính chưa phân nhóm hoặc nhóm `KHÁC` thành **`BỂ LẺ SIZE`** trên giao diện kho hàng Bento.
+  - Khi thêm sản phẩm mới hoặc sửa sản phẩm trong kho Bể Kính, hệ thống tự động gán phân loại `BỂ LẺ SIZE`.
+- **Tối Ưu Hoá Quy Tắc Tạo Lệnh Sản Xuất (`Modals_Orders.html`)**:
+  - Khi đơn hàng nhập từ Trạm Bơm Đơn Excel hoặc Quét Mã Vận Đơn OCR có chứa sản phẩm thuộc danh mục `BỂ LẺ SIZE`, hệ thống chỉ tạo **duy nhất 1 lệnh sản xuất** cho toàn bộ số lượng của mặt hàng đó thay vì tách thành nhiều lệnh riêng lẻ.
+  - Lệnh sản xuất ghi nhận rõ ràng ghi chú tổng số lượng `(SL: X)` giúp thợ cắt mài dán theo dõi và xử lý nguyên lô tập trung, triệt tiêu lãng phí thao tác (Muda).
+
+---
+
+## [v2.12.3] - 2026-08-25
+
+### 🎯 Tách Độc Lập Kho Bể Kính & Layout, Gọn Gàng Nút Xuất Nhập & Loại Bỏ Nút BOM
+- **Tách Kho Thành Phẩm Thành 2 Kho Độc Lập (`Tab_Inventory.html` & `Tab_ImportExport.html`)**:
+  - Phân tách `KHO THÀNH PHẨM` thành **`KHO BỂ KÍNH`** (icon cá, màu vàng hổ phách) và **`KHO LAYOUT`** (icon khối hộp, màu vàng gold).
+  - Cập nhật cả ở dải Ribbon tab kho sản phẩm lẫn bộ lọc chứng từ xuất nhập kho, giúp quản lý tồn kho và phiếu kho chuyên biệt theo từng dây chuyền sản xuất.
+- **Thiết Kế 1 Dòng 4 Nút Tác Vụ Kho Gọn Gàng (`Tab_ImportExport.html`)**:
+  - Gom 4 nút: **Nhập Kho** (Emerald), **Đặt Hàng** (Purple), **Xuất Kho** (Rose), **Thanh Lý** (Amber) thành 1 dải ngang tinh gọn, đồng bộ thẩm mỹ tối giản, tương phản cao chuẩn Dark UI với toàn bộ ứng dụng.
+- **Loại Bỏ Nút Tính BOM (`Tab_Inventory.html`)**:
+  - Gỡ bỏ nút "Tính BOM" khỏi thanh công cụ tìm kiếm kho hàng để giải phóng diện tích và tập trung vào các thao tác nghiệp vụ cốt lõi.
+
+---
+
+## [v2.12.2] - 2026-08-25
+
+### 🎯 Chuẩn Hoá Nhận Diện Mã Đơn, Tách Bạch Hạn Xử Lý & Cập Nhật Thương Hiệu / Địa Chỉ Hoá Đơn
+- **Tách Bạch Trường Hạn Xử Lý & Mã Vận Đơn (`Modals_Orders.html` - `OrderDetailModal`)**:
+  - Khắc phục triệt để lỗi ghi đè dữ liệu: Trước đây khi đơn có mã vận đơn, ô `Hạn xử lý:` bị hiển thị thành `MVĐ: ...`. Đã tách riêng thành dòng `Hạn xử lý:` (hiển thị ngày giờ deadline thực tế) và `Mã vận đơn:` (hiển thị mã SPX/GHN riêng biệt).
+- **Loại Bỏ Ký Tự Phân Cách `|` Ở Cuối Mã Đơn (`Modals_Orders.html`)**:
+  - Chuẩn hoá bóc tách `mainCode` và `trackingCode` trên toàn hệ thống (Form chi tiết đơn, In hoá đơn K58, Sao chép văn bản).
+  - Tự động cắt bỏ triệt để ký tự `|` (dấu gạch đứng) còn sót lại ở đuôi mã đơn hàng.
+- **Cập Nhật Tên Thương Hiệu & Địa Chỉ In Hoá Đơn Toàn Hệ Thống**:
+  - Đổi toàn bộ tên thương hiệu từ `RICH FISH AQUARIUM` thành `RF AQUARIUM`.
+  - Cập nhật địa chỉ cửa hàng trên mẫu in phiếu K58 và phiếu kho từ `Kiến Tạo Thế Giới Thuỷ Sinh` thành `30 Lương Thế Vinh, Thống Nhất, Phú Thọ`.
+
+---
+
+## [v2.12.1] - 2026-08-25
+
+### 🎯 Tối Ưu & Khắc Phục Triệt Để Thuật Toán So Khớp Hàng Hoá Theo SKU (Exact SKU Match)
+- **Ưu Tiên Tách Cột SKU Phân Loại Hàng (Variation SKU) Trước SKU Cha (`Modals_Orders.html`)**:
+  - Tách bạch nhận diện cột `SKU phân loại hàng` / `Mã SKU phân loại` với `SKU sản phẩm` cha trong file xuất Excel của Shopee / TikTok.
+  - Loại bỏ hoàn toàn lỗi gán nhầm SKU cha (`SAN`, `NAT-011`) cho tất cả các size phân loại.
+- **Tự Động Trích Xuất SKU Trong Ngoặc Vuông `[...]` (`Modals_Orders.html`)**:
+  - Trích xuất tự động SKU phân loại từ chuỗi Shopee như `[SAN SANM]`, `[SAN SANL]`, `[NAT-011 NAT-011-402325]`, `[BE301812ND]`, `[SANFREESIZE]`, `[KEODANREU]`.
+  - Khớp trực tiếp vào bảng danh mục `Products` qua tra cứu bảng băm `skuExactMap` và `skuCleanMap`.
+- **Khắc Phục Lỗi Match Substring Sai Lệch**:
+  - Triệt tiêu hoàn toàn hiện tượng lấy sai biến thể (như Sạn Suối M & L bị nhận diện nhầm thành Sạn XL, hoặc Layout Nature Size L bị gán nhầm sang 20x20x20cm).
+  - Đồng bộ thuật toán cho cả Trạm Bơm Đơn Excel và Máy Quét Nhãn Vận Đơn OCR.
+
+---
+
+## [v2.12.0] - 2026-08-24
 
 ### 🎯 Khắc Phục Lỗi Xác Thực PIN Khi Chạy Lưu Trữ Đơn Cũ (Orders_Archive)
 - **Tự Động Bổ Sung Xác Thực PIN Cho RunGAS (`App_Main.html` - `window.runGAS`)**:

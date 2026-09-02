@@ -35,6 +35,18 @@
         return { bg: 'bg-[#d4af37]/15', text: 'text-[#d4af37]', border: 'border-[#d4af37]/30', icon: 'fa-layer-group' };
     };
 
+    // Helper so khớp nhân sự thông minh (hỗ trợ cả Tên đầy đủ và Tên gọi ngắn: Trần Duy Tân <-> Tân)
+    const isStaffMatch = (u1, u2) => {
+        if (!u1 || !u2) return false;
+        const s1 = String(u1).trim().toLowerCase();
+        const s2 = String(u2).trim().toLowerCase();
+        if (s1 === s2) return true;
+        if (s1.includes(s2) || s2.includes(s1)) return true;
+        const last1 = s1.split(/\s+/).pop();
+        const last2 = s2.split(/\s+/).pop();
+        return last1 === last2 && last1.length >= 2;
+    };
+
     // =========================================================================
     // 🛡️ BLACKBOX ACTION LOGGER & SENSORY FEEDBACK (CHỐNG ĐỔ LỖI MẠNG / QUÊN BẤM)
     // =========================================================================
@@ -350,10 +362,10 @@
             }
 
             // B. TỔNG HỢP TỪ ĐÓNG GÓI (packings hoặc erpData.packings)
-            const packingList = Array.isArray(packings) && packings.length > 0 
-                ? packings 
+            const packingList = Array.isArray(packings) && packings.length > 0
+                ? packings
                 : (Array.isArray(erpData?.packings) ? erpData.packings : []);
-            
+
             packingList.forEach(pkg => {
                 const pkgUser = (pkg.user || '').trim();
                 const orderCode = pkg.orderId ? `#${pkg.orderId}` : 'Đơn hàng';
@@ -543,7 +555,7 @@
                 return;
             }
             const header = `=== BẰNG CHỨNG ĐỐI SOÁT THAO TÁC XƯỞNG (${filteredLogs.length} LƯỢT) ===\nThời điểm xuất: ${new Date().toLocaleString('vi-VN')}\n\n`;
-            const text = filteredLogs.map((l, idx) => 
+            const text = filteredLogs.map((l, idx) =>
                 `[${idx + 1}] ${l.time} | Nguồn: ${l.sourceLabel || l.source} | Thợ: ${l.user} | ${l.action} | Đơn: ${l.orderId || 'Sản xuất lẻ'} | Hàng: ${l.itemName}${l.reward ? ` | Thưởng: +${Number(l.reward).toLocaleString('vi-VN')}đ` : ''}${l.photo ? ` | Ảnh: ${l.photo}` : ''}`
             ).join('\n');
 
@@ -565,7 +577,7 @@
         return (
             <div className="fixed inset-0 z-[9999] bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-fade-in" onClick={onClose}>
                 <div className="bg-[#0e0e12] border border-white/[0.1] rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-                    
+
                     {/* Header */}
                     <div className="px-3.5 py-2.5 bg-[#141418] border-b border-white/[0.08] flex items-center justify-between flex-wrap gap-2 shrink-0">
                         <div className="flex items-center gap-2.5 min-w-0">
@@ -584,7 +596,7 @@
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">
-                            <button 
+                            <button
                                 onClick={fetchServerLogs}
                                 disabled={loadingServer}
                                 className={`w-7 h-7 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white flex items-center justify-center transition-all cursor-pointer border border-white/[0.08] ${loadingServer ? 'opacity-50' : ''}`}
@@ -592,7 +604,7 @@
                             >
                                 <i className={`fas fa-sync-alt text-[10px] ${loadingServer ? 'fa-spin text-[#d4af37]' : ''}`}></i>
                             </button>
-                            <button 
+                            <button
                                 onClick={onClose}
                                 className="w-7 h-7 rounded-lg bg-white/[0.04] hover:bg-rose-600 text-zinc-300 hover:text-white flex items-center justify-center transition-all cursor-pointer border border-white/[0.08]"
                             >
@@ -632,7 +644,7 @@
                                     className="w-full bg-[#09090b] border border-white/[0.08] focus:border-[#d4af37]/60 text-white rounded-lg pl-7 pr-6 py-1 outline-none text-[11px] font-medium placeholder-zinc-500"
                                 />
                                 {searchQuery && (
-                                    <button 
+                                    <button
                                         onClick={() => setSearchQuery('')}
                                         className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
                                     >
@@ -674,9 +686,8 @@
                                     <button
                                         key={t.id}
                                         onClick={() => setFilterDays(t.id)}
-                                        className={`px-2 py-0.5 rounded text-[9.5px] font-bold transition-all cursor-pointer ${
-                                            filterDays === t.id ? 'bg-[#d4af37] text-zinc-950 font-black shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
-                                        }`}
+                                        className={`px-2 py-0.5 rounded text-[9.5px] font-bold transition-all cursor-pointer ${filterDays === t.id ? 'bg-[#d4af37] text-zinc-950 font-black shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
+                                            }`}
                                     >
                                         {t.label}
                                     </button>
@@ -695,9 +706,8 @@
                                     <button
                                         key={s.id}
                                         onClick={() => setActiveSource(s.id)}
-                                        className={`px-2 py-0.5 rounded text-[9.5px] font-bold whitespace-nowrap transition-all cursor-pointer ${
-                                            activeSource === s.id ? 'bg-zinc-700 text-white font-black shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
-                                        }`}
+                                        className={`px-2 py-0.5 rounded text-[9.5px] font-bold whitespace-nowrap transition-all cursor-pointer ${activeSource === s.id ? 'bg-zinc-700 text-white font-black shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
+                                            }`}
                                     >
                                         {s.label}
                                     </button>
@@ -705,8 +715,8 @@
                             </div>
 
                             {/* Dropdowns */}
-                            <select 
-                                value={filterUser} 
+                            <select
+                                value={filterUser}
                                 onChange={e => setFilterUser(e.target.value)}
                                 className="bg-[#09090b] border border-white/[0.08] text-zinc-200 font-bold rounded-lg px-2 py-0.5 outline-none focus:border-[#d4af37]/60 text-[10px] shrink-0"
                             >
@@ -716,8 +726,8 @@
                                 ))}
                             </select>
 
-                            <select 
-                                value={filterActionType} 
+                            <select
+                                value={filterActionType}
                                 onChange={e => setFilterActionType(e.target.value)}
                                 className="bg-[#09090b] border border-white/[0.08] text-zinc-200 font-bold rounded-lg px-2 py-0.5 outline-none focus:border-[#d4af37]/60 text-[10px] shrink-0"
                             >
@@ -758,8 +768,8 @@
                                 else if (shortAction.includes('Hoàn thành Đóng Gói')) shortAction = 'Xong Đóng Gói';
 
                                 return (
-                                    <div 
-                                        key={l.id || idx} 
+                                    <div
+                                        key={l.id || idx}
                                         className="bg-[#121215] hover:bg-[#16161c] border border-white/[0.08] hover:border-white/[0.12] px-2.5 py-1.5 rounded-xl flex items-center justify-between gap-2 text-[11px] transition-colors group select-none"
                                     >
                                         {/* Cột trái: Thứ tự, Badge hành động, Tên thợ, Tên hàng/Mã đơn */}
@@ -767,14 +777,13 @@
                                             <span className="font-mono text-[9px] text-zinc-500 font-bold shrink-0 w-6 text-right">
                                                 #{idx + 1}
                                             </span>
-                                            
+
                                             {/* Micro Badge */}
-                                            <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase shrink-0 border whitespace-nowrap ${
-                                                isQC ? 'bg-purple-950/50 text-purple-300 border-purple-500/30' :
-                                                isPenalty ? 'bg-rose-950/50 text-rose-300 border-rose-500/40' :
-                                                isDone ? 'bg-emerald-950/50 text-emerald-300 border-emerald-500/30' :
-                                                'bg-sky-950/50 text-sky-300 border-sky-500/30'
-                                            }`}>
+                                            <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase shrink-0 border whitespace-nowrap ${isQC ? 'bg-purple-950/50 text-purple-300 border-purple-500/30' :
+                                                    isPenalty ? 'bg-rose-950/50 text-rose-300 border-rose-500/40' :
+                                                        isDone ? 'bg-emerald-950/50 text-emerald-300 border-emerald-500/30' :
+                                                            'bg-sky-950/50 text-sky-300 border-sky-500/30'
+                                                }`}>
                                                 {shortAction}
                                             </span>
 
@@ -840,8 +849,8 @@
                 {previewPhoto && (
                     <div className="fixed inset-0 z-[10000] bg-black/90 flex items-center justify-center p-4 animate-fade-in" onClick={() => setPreviewPhoto(null)}>
                         <div className="relative max-w-2xl max-h-[85vh] bg-[#18181c] p-2 rounded-2xl border border-zinc-700 shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
-                            <button 
-                                onClick={() => setPreviewPhoto(null)} 
+                            <button
+                                onClick={() => setPreviewPhoto(null)}
                                 className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-rose-600 text-white flex items-center justify-center font-bold shadow-lg hover:bg-rose-500 cursor-pointer"
                             >
                                 <i className="fas fa-times text-sm"></i>
@@ -985,7 +994,7 @@
                 return `${idx + 1}. ${typeStr} ${p.name} (Mã: ${p.sku || 'N/A'}) - Tồn: ${p.quantity || 0} ${p.unit || 'Cái'} | Min: ${p.minStock || 0}`;
             });
             const content = `DANH SÁCH BỂ KÍNH & LAYOUT CẦN SẢN XUẤT (${new Date().toLocaleDateString('vi-VN')}):\n` + lines.join('\n');
-            
+
             navigator.clipboard.writeText(content).then(() => {
                 triggerToast && triggerToast('Đã sao chép danh sách vào bộ nhớ tạm!', 'fa-clipboard-check', 'success');
             }).catch(() => {
@@ -998,7 +1007,7 @@
         return (
             <div className="fixed inset-0 z-[9999] bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-fade-in" onClick={onClose}>
                 <div className="bg-[#121214] border border-amber-500/30 rounded-2xl w-full max-w-4xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden animate-scale-up" onClick={e => e.stopPropagation()}>
-                    
+
                     {/* Header */}
                     <div className="p-3 sm:px-4 sm:py-3.5 bg-[#121214] border-b border-amber-500/20 flex items-center justify-between gap-2 shrink-0">
                         <div className="flex items-center gap-2.5 min-w-0">
@@ -1033,7 +1042,7 @@
                                 <i className="fas fa-copy text-xs"></i>
                                 <span className="hidden xs:inline">Sao chép</span>
                             </button>
-                            <button 
+                            <button
                                 onClick={onClose}
                                 className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-zinc-800 hover:bg-rose-600 text-zinc-300 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-sm text-xs sm:text-sm font-bold"
                             >
@@ -1056,11 +1065,10 @@
                                         key={f.id}
                                         type="button"
                                         onClick={() => setActiveFilter(f.id)}
-                                        className={`px-2 py-1 sm:px-2.5 sm:py-1 rounded-lg font-black transition-all flex items-center gap-1 text-[10px] sm:text-[11px] cursor-pointer ${
-                                            activeFilter === f.id
+                                        className={`px-2 py-1 sm:px-2.5 sm:py-1 rounded-lg font-black transition-all flex items-center gap-1 text-[10px] sm:text-[11px] cursor-pointer ${activeFilter === f.id
                                                 ? 'bg-[#d4af37] text-black shadow-sm'
                                                 : 'text-zinc-400 hover:text-white hover:bg-white/5'
-                                        }`}
+                                            }`}
                                     >
                                         <i className={`fas ${f.icon} text-[9px]`}></i>
                                         <span>{f.label}</span>
@@ -1079,11 +1087,10 @@
                                         key={st.id}
                                         type="button"
                                         onClick={() => setStockStatusFilter(st.id)}
-                                        className={`px-2 py-1 sm:px-2.5 sm:py-1 rounded-lg font-bold transition-all text-[10px] sm:text-[11px] cursor-pointer ${
-                                            stockStatusFilter === st.id
+                                        className={`px-2 py-1 sm:px-2.5 sm:py-1 rounded-lg font-bold transition-all text-[10px] sm:text-[11px] cursor-pointer ${stockStatusFilter === st.id
                                                 ? 'bg-zinc-700 text-white font-black shadow-sm'
                                                 : `${st.color} hover:bg-white/5`
-                                        }`}
+                                            }`}
                                     >
                                         {st.label}
                                     </button>
@@ -1135,35 +1142,33 @@
                                     const selectedQty = selectedEntry ? selectedEntry.qty : 0;
 
                                     return (
-                                        <div 
+                                        <div
                                             key={prodKey}
-                                            className={`p-2.5 sm:p-3 rounded-2xl border transition-all duration-200 flex items-center justify-between gap-2.5 relative overflow-hidden ${
-                                                isSelected
+                                            className={`p-2.5 sm:p-3 rounded-2xl border transition-all duration-200 flex items-center justify-between gap-2.5 relative overflow-hidden ${isSelected
                                                     ? 'bg-gradient-to-r from-[#241c0c] to-[#1a1408] border-[#d4af37] ring-1 ring-[#d4af37]/60 shadow-md shadow-amber-500/10'
-                                                    : isOut 
-                                                    ? 'bg-rose-950/15 border-rose-500/30 hover:border-rose-500/60' 
-                                                    : isLow 
-                                                        ? 'bg-amber-950/15 border-amber-500/30 hover:border-amber-500/60'
-                                                        : 'bg-[#121214]/80 border-zinc-800 hover:border-zinc-700'
-                                            }`}
+                                                    : isOut
+                                                        ? 'bg-rose-950/15 border-rose-500/30 hover:border-rose-500/60'
+                                                        : isLow
+                                                            ? 'bg-amber-950/15 border-amber-500/30 hover:border-amber-500/60'
+                                                            : 'bg-[#121214]/80 border-zinc-800 hover:border-zinc-700'
+                                                }`}
                                         >
                                             {/* Ảnh thu nhỏ & Thông tin */}
                                             <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                                 {/* Thumbnail cố định kích thước, tuyệt đối không bị dãn */}
                                                 <div className="w-12 h-12 sm:w-14 sm:h-14 shrink-0 rounded-xl bg-[#09090b] border border-zinc-800 overflow-hidden flex items-center justify-center relative select-none">
                                                     {imgUrl ? (
-                                                        <img 
-                                                            src={typeof rfOptimizeImageUrl === 'function' ? rfOptimizeImageUrl(imgUrl, 'sm') : imgUrl} 
-                                                            alt={p.name} 
-                                                            className="w-full h-full max-w-full max-h-full object-cover block" 
-                                                            loading="lazy" 
+                                                        <img
+                                                            src={typeof rfOptimizeImageUrl === 'function' ? rfOptimizeImageUrl(imgUrl, 'sm') : imgUrl}
+                                                            alt={p.name}
+                                                            className="w-full h-full max-w-full max-h-full object-cover block"
+                                                            loading="lazy"
                                                         />
                                                     ) : (
                                                         <i className={`fas ${isGlass ? 'fa-fish' : 'fa-cubes'} text-zinc-600 text-base sm:text-lg`}></i>
                                                     )}
-                                                    <span className={`absolute bottom-0 inset-x-0 text-[7px] sm:text-[8px] font-black uppercase text-center py-0.2 leading-tight ${
-                                                        isOut ? 'bg-rose-600 text-white' : 'bg-amber-500 text-black'
-                                                    }`}>
+                                                    <span className={`absolute bottom-0 inset-x-0 text-[7px] sm:text-[8px] font-black uppercase text-center py-0.2 leading-tight ${isOut ? 'bg-rose-600 text-white' : 'bg-amber-500 text-black'
+                                                        }`}>
                                                         {isOut ? 'HẾT' : 'THIẾU'}
                                                     </span>
                                                 </div>
@@ -1171,9 +1176,8 @@
                                                 {/* Thông tin sản phẩm */}
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <span className={`text-[8.5px] sm:text-[9px] px-1.5 py-0.2 rounded font-black uppercase ${
-                                                            isGlass ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                                        }`}>
+                                                        <span className={`text-[8.5px] sm:text-[9px] px-1.5 py-0.2 rounded font-black uppercase ${isGlass ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                                            }`}>
                                                             {isGlass ? 'Bể Kính' : (p.sub_category || 'Layout')}
                                                         </span>
                                                         {p.sku && (
@@ -1263,13 +1267,13 @@
                                     {selectedItems.map(it => {
                                         const key = it.product.id || it.product.sku || it.product.name;
                                         return (
-                                            <span 
+                                            <span
                                                 key={key}
                                                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#272010] text-amber-200 border border-amber-500/30 text-[10px] font-bold shrink-0 shadow-sm"
                                             >
                                                 <span className="truncate max-w-[120px]">{it.product.name}</span>
                                                 <strong className="text-[#d4af37] font-black font-mono">x{it.qty}</strong>
-                                                <i 
+                                                <i
                                                     className="fas fa-times text-[9px] text-zinc-400 hover:text-rose-400 ml-0.5 cursor-pointer"
                                                     onClick={() => handleRemoveItem(key)}
                                                     title="Xoá khỏi danh sách"
@@ -1368,18 +1372,18 @@
                 .split(' | ')
                 .filter(part => {
                     const p = part.trim().toUpperCase();
-                    return !p.startsWith('TỪ CHỐI KHUNG') && 
-                           !p.startsWith('YÊU CẦU LÀM LẠI') && 
-                           !p.startsWith('TỪ CHỐI') &&
-                           !p.includes('BÁO LỖI KHUNG');
+                    return !p.startsWith('TỪ CHỐI KHUNG') &&
+                        !p.startsWith('YÊU CẦU LÀM LẠI') &&
+                        !p.startsWith('TỪ CHỐI') &&
+                        !p.includes('BÁO LỖI KHUNG');
                 })
                 .join(' | ')
                 .trim();
         };
 
-        let isLocked = c.req.some(rk => ((item.phases || {})[rk] || {}).status !== 'Done');
+        let isLocked = c.req.some(rk => ((item.phases || {})[rk] || {}).status !== 'Done') || item.qc_status === 'Chờ duyệt khung' || item.qc_status === 'Yêu cầu làm lại';
 
-        const isOwner = !data.user || String(data.user).trim() === '' || data.user === currentUser;
+        const isOwner = !data.user || String(data.user).trim() === '' || isStaffMatch(data.user, currentUser);
         const isPending = data.status !== 'In Progress' && data.status !== 'Done';
         const isInProgress = data.status === 'In Progress';
         const isDone = data.status === 'Done';
@@ -1447,7 +1451,7 @@
             updateTimer();
             const interval = setInterval(updateTimer, 1000);
             return () => clearInterval(interval);
-        }, [isInProgress, data.start, limitMins]);
+        }, [isInProgress, data.start, limitMins, item.qc_status, data.endTime]);
 
         const completedDurationText = React.useMemo(() => {
             const startMs = parseDateSafe(data.start);
@@ -1460,14 +1464,14 @@
         if (isLocked) return null;
 
         const act = async (s, confirmed = false) => {
-            if (item.assignee && String(item.assignee).trim() !== '' && String(item.assignee).trim() !== String(currentUser).trim() && !isAdmin) {
+            if (item.assignee && String(item.assignee).trim() !== '' && !isStaffMatch(item.assignee, currentUser) && !isAdmin) {
                 triggerToast(`Lệnh này đã được chỉ định cho ${item.assignee}. Bạn không thể nhận!`, 'fa-lock', 'danger');
                 return;
             }
 
             if (s === 'In Progress') {
                 const hasActiveCheckin = (attendance || []).some(a =>
-                    String(a.user).trim() === currentUser.trim() &&
+                    isStaffMatch(a.user, currentUser) &&
                     a.timeIn && !a.timeOut
                 );
                 if (!hasActiveCheckin) {
@@ -1488,18 +1492,33 @@
             const currentDateTime = safeDateFull.slice(0, 16).replace('T', ' ');
 
             const upd = JSON.parse(JSON.stringify(item));
-            upd.phases[c.k] = {
-                ...upd.phases[c.k],
-                status: s,
-                user: currentUser,
-                date: currentDateTime.split(' ')[0],
-                start: s === 'In Progress' ? currentDateTime : data.start,
-                endTime: s === 'Done' ? currentDateTime : ''
-            };
+            const isTwoPhaseProduct = configs.length >= 2;
+
+            if (c.k === 'phase1' && isTwoPhaseProduct && s === 'Done') {
+                upd.phases['phase1'] = {
+                    ...upd.phases['phase1'],
+                    status: 'In Progress',
+                    user: currentUser,
+                    date: currentDateTime.split(' ')[0],
+                    start: data.start || currentDateTime,
+                    endTime: currentDateTime
+                };
+                upd.qc_status = 'Chờ duyệt khung';
+                upd.status = 'In Progress';
+            } else {
+                upd.phases[c.k] = {
+                    ...upd.phases[c.k],
+                    status: s,
+                    user: currentUser,
+                    date: currentDateTime.split(' ')[0],
+                    start: s === 'In Progress' ? currentDateTime : data.start,
+                    endTime: s === 'Done' ? currentDateTime : ''
+                };
+            }
 
             // Nếu người nhận việc mới khác người từng bị từ chối khâu 1 trước đó -> xóa ghi chú từ chối
             const previousRejectedUser = String(item.phases?.phase1?.user || item.p1_user || '').trim();
-            if (s === 'In Progress' && previousRejectedUser && String(currentUser).trim() !== previousRejectedUser) {
+            if (s === 'In Progress' && previousRejectedUser && !isStaffMatch(currentUser, previousRejectedUser)) {
                 upd.note = cleanRejectionNote(upd.note);
                 upd.qc_status = '';
                 upd.qc_note = '';
@@ -1556,18 +1575,14 @@
                 upd.phases[c.k].reward_vnd = baseReward;
             }
 
-            if (s === 'Done' && isAdmin) upd.phases[c.k].adminCompleted = true;
+            if (s === 'Done' && isAdmin && !isTwoPhaseProduct) upd.phases[c.k].adminCompleted = true;
 
             const p1 = upd.phases['phase1']?.status || 'Pending';
             const p2 = upd.phases['phase2']?.status || 'Pending';
             const isAllDone = (p1 === 'Done' && p2 === 'Done');
             if (!isAllDone && upd.status === 'Pending') upd.status = 'In Progress';
             if (isAllDone) {
-                if (upd.phases['phase1']?.adminCompleted || upd.phases['phase2']?.adminCompleted || isAdmin) {
-                    upd.status = 'Done';
-                } else {
-                    upd.status = 'Kiểm Định';
-                }
+                upd.status = 'Kiểm Định';
             }
 
             // GHI NHẬN HỘP ĐEN CỤC BỘ (BLACKBOX LOG) TRÊN MÁY THỢ
@@ -1595,7 +1610,7 @@
                 'Ghi chú thêm': `Định mức: +${(kpiData.reward || 0).toLocaleString('vi-VN')}đ | Thiết bị: ${/Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'Điện thoại' : 'Máy tính'}`
             }];
 
-            await pushDeltas(payloadDeltas, s === 'In Progress' ? `Đã nhận ${c.n}` : `Xong ${c.n}`, s === 'In Progress' ? 'fa-play' : 'fa-check');
+            await pushDeltas(payloadDeltas, s === 'In Progress' ? `Đã nhận ${c.n}` : (c.k === 'phase1' && isTwoPhaseProduct ? `Đã nộp ${c.n} - Chờ duyệt khung!` : `Xong ${c.n}`), s === 'In Progress' ? 'fa-play' : 'fa-check');
             setProcessing(false);
         };
 
@@ -1614,15 +1629,32 @@
                 const currentDateTime = safeDateFull.slice(0, 16).replace('T', ' ');
 
                 const upd = JSON.parse(JSON.stringify(item));
-                upd.phases[c.k] = {
-                    ...upd.phases[c.k],
-                    status: 'Done',
-                    user: currentUser,
-                    date: currentDateTime.split(' ')[0],
-                    start: data.start || currentDateTime,
-                    endTime: currentDateTime,
-                    photo: url
-                };
+                const isTwoPhaseProduct = configs.length >= 2;
+
+                if (c.k === 'phase1' && isTwoPhaseProduct) {
+                    upd.phases['phase1'] = {
+                        ...upd.phases['phase1'],
+                        status: 'In Progress',
+                        user: currentUser,
+                        date: currentDateTime.split(' ')[0],
+                        start: data.start || currentDateTime,
+                        endTime: currentDateTime,
+                        photo: url
+                    };
+                    upd.qc_status = 'Chờ duyệt khung';
+                    upd.qc_front_photo = url;
+                    upd.status = 'In Progress';
+                } else {
+                    upd.phases[c.k] = {
+                        ...upd.phases[c.k],
+                        status: 'Done',
+                        user: currentUser,
+                        date: currentDateTime.split(' ')[0],
+                        start: data.start || currentDateTime,
+                        endTime: currentDateTime,
+                        photo: url
+                    };
+                }
 
                 let penaltyPayload = null;
                 let payloadDeltas = { prodItems: [upd] };
@@ -1674,28 +1706,44 @@
                 }
                 upd.phases[c.k].reward_vnd = baseReward;
 
-                if (isSenior || isAutoBypassQC) upd.phases[c.k].adminCompleted = true;
-
                 const p1 = upd.phases['phase1']?.status || 'Pending';
                 const p2 = upd.phases['phase2']?.status || 'Pending';
                 const isAllDone = (p1 === 'Done' && p2 === 'Done');
                 if (!isAllDone && upd.status === 'Pending') upd.status = 'In Progress';
                 if (isAllDone) {
-                    if (upd.phases['phase1']?.adminCompleted || upd.phases['phase2']?.adminCompleted || isSenior || isAutoBypassQC) {
-                        upd.status = 'Done';
-                        upd.qc_status = 'Đã duyệt (Tự động KCS)';
+                    upd.status = 'Kiểm Định';
+                }
 
-                        window.safeFetchJSON(window.SCRIPT_URL || '', {
-                            method: 'POST',
-                            body: JSON.stringify({ action: 'deductInventoryBOM', pin: localStorage.getItem('rf_pin'), prodId: upd.id })
-                        }).catch(console.error);
+                // GHI NHẬN HỘP ĐEN CỤC BỘ (BLACKBOX LOG) TRÊN MÁY THỢ
+                recordWorkerActionLog({
+                    user: currentUser,
+                    action: 'Chụp ảnh & hoàn thành ' + c.n,
+                    phaseKey: c.k,
+                    phaseName: c.n,
+                    itemId: item.id,
+                    itemName: item.name,
+                    orderId: item.orderId,
+                    reward: baseReward,
+                    status: c.k === 'phase1' && isTwoPhaseProduct ? 'Chờ duyệt khung' : 'Done'
+                });
 
-                        if (order && order.id) {
-                            await checkAndToggleOrderReadiness(order, prodItems, erpProducts);
-                        }
-                    } else {
-                        upd.status = 'Kiểm Định';
-                    }
+                // PHÁT ÂM THANH & RUNG ĐIỆN THOẠI XÁC NHẬN HOÀN THÀNH
+                playWorkerHapticAndAudio('done');
+
+                // GHI VÀO BẢNG TRACKING_LOG CỦA SERVER
+                payloadDeltas.Tracking_Log = [{
+                    'Thời gian': currentDateTime,
+                    'Tên nhân sự': currentUser,
+                    'Hoàn thành': `${c.k === 'phase1' && isTwoPhaseProduct ? 'Nộp ảnh chờ duyệt khung' : 'Hoàn thành'} ${c.n} - ${item.name} (${item.orderId || 'Sản xuất lẻ'})`,
+                    'Hỏi AI': navigator.onLine ? 'Online' : 'Offline Mode',
+                    'Ghi chú thêm': `Thưởng nhận: +${baseReward.toLocaleString('vi-VN')}đ | Thiết bị: ${/Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'Điện thoại' : 'Máy tính'}`
+                }];
+
+                await pushDeltas(payloadDeltas, c.k === 'phase1' && isTwoPhaseProduct ? `Đã nộp ảnh ${c.n} - Chờ Quản lý duyệt!` : `Tải ảnh & hoàn thành ${c.n}`, 'fa-check-double');
+                if (isLate || durationMins < 2) {
+                    triggerToast(`Có lỗi vi phạm thao tác/trễ hạn. Đã ghi nhận phạt!`, 'fa-times-circle', 'danger');
+                } else {
+                    triggerToast(c.k === 'phase1' && isTwoPhaseProduct ? `Đã nộp ảnh Khung thành công! Chờ Quản lý duyệt.` : `Tải ảnh & hoàn thành ${c.n} thành công!`, 'fa-check', 'success');
                 }
 
                 // GHI NHẬN HỘP ĐEN CỤC BỘ (BLACKBOX LOG) TRÊN MÁY THỢ
@@ -1808,23 +1856,14 @@
                 });
 
                 let updatedOrder = { ...targetOrder };
-                let finalStatus = '';
-
-                if (isShortOfAccessories) {
-                    finalStatus = 'Chờ Phụ Kiện';
-                    updatedOrder.status = finalStatus;
-                    const cleanNote = String(updatedOrder.note || '').replace(/\s*\[Cảnh báo: Thiếu phụ kiện đóng gói:[^\]]*\]/g, '').trim();
-                    updatedOrder.note = cleanNote ? `${cleanNote} [Cảnh báo: Thiếu phụ kiện đóng gói: ${warningDetails.join(', ')}]` : `[Cảnh báo: Thiếu phụ kiện đóng gói: ${warningDetails.join(', ')}]`;
-                } else {
-                    finalStatus = 'Sẵn Sàng Đóng Gói';
-                    updatedOrder.status = finalStatus;
-                    updatedOrder.note = String(updatedOrder.note || '').replace(/\s*\[Cảnh báo: Thiếu phụ kiện đóng gói:[^\]]*\]/g, '').trim();
-                }
+                const finalStatus = 'Sẵn Sàng Đóng Gói';
+                updatedOrder.status = finalStatus;
+                updatedOrder.note = String(updatedOrder.note || '').replace(/\s*\[Cảnh báo: Thiếu phụ kiện đóng gói:[^\]]*\]/g, '').trim();
 
                 await pushDeltas(
                     { orders: [updatedOrder] },
                     `Đơn hàng #${targetOrder.orderCode || targetOrder.id} đã chuyển trạng thái sang: ${finalStatus}`,
-                    isShortOfAccessories ? 'fa-boxes-packing' : 'fa-check-double'
+                    'fa-check-double'
                 );
             }
         };
@@ -1875,9 +1914,7 @@
                     upd.qc_status = 'Đã duyệt';
                     upd.qc_front_photo = urlFront;
                     upd.qc_side_photo = urlSide;
-                    if (window.google && google.script && google.script.run) {
-                        try { google.script.run.processMaterialDeduction(upd.id, null); } catch (eBOM) {}
-                    }
+                    // Khấu trừ BOM được giao duy nhất cho backend Code.js (syncDeltas) tự động thực thi khi status = 'Done'
 
                     if (order && order.id) {
                         await checkAndToggleOrderReadiness(order, prodItems, erpProducts);
@@ -2021,25 +2058,23 @@
             <div className="w-[32px] h-[32px] rounded-full bg-[#222] border border-[#333] flex items-center justify-center text-gray-500"><i className="fas fa-user text-[14px]"></i></div>;
 
         return (
-            <div className={`w-full py-2.5 rounded-xl px-3 border transition-all flex flex-col gap-1.5 ${
-                isDone
-                    ? 'bg-[#0a130f] border-emerald-500/25 shadow-sm'
+            <div className={`w-full py-2.5 rounded-xl px-3 border transition-all flex flex-col gap-1.5 bg-transparent ${isDone
+                    ? 'border-emerald-500/30 shadow-sm'
                     : isInProgress
-                        ? 'bg-[#10141d] border-blue-500/40 shadow-sm'
-                        : 'bg-[#0e0e11] border-white/[0.05]'
-            }`}>
+                        ? 'border-blue-500/40 shadow-sm'
+                        : 'border-white/[0.05]'
+                }`}>
                 <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-2.5 min-w-0 pr-2">
                         {phaseAvatar}
                         <div className="flex flex-col min-w-0">
                             <div className="flex items-center gap-1.5">
-                                <span className={`font-black text-[10px] uppercase tracking-wider flex items-center gap-1 ${
-                                    isDone 
-                                        ? 'text-emerald-400' 
-                                        : isInProgress 
-                                            ? 'text-blue-400' 
+                                <span className={`font-black text-[10px] uppercase tracking-wider flex items-center gap-1 ${isDone
+                                        ? 'text-emerald-400'
+                                        : isInProgress
+                                            ? 'text-blue-400'
                                             : 'text-zinc-400'
-                                }`}>
+                                    }`}>
                                     {isDone && <i className="fas fa-check-circle text-[9px] text-emerald-400"></i>}
                                     {isInProgress && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>}
                                     {c.n}
@@ -2218,7 +2253,7 @@
                                         <p className="text-[9.5px] text-zinc-400">Kiểm tra đúng sản phẩm trước khi bắt đầu</p>
                                     </div>
                                 </div>
-                                <button 
+                                <button
                                     onClick={() => setShowPokaYokeConfirm(false)}
                                     className="text-zinc-400 hover:text-white p-1"
                                 >
@@ -2419,8 +2454,8 @@
         const effectiveKpi = kpiConfig || erpData?.Config_KPI || [];
 
         // 1. Tìm thông tin sản phẩm trong danh mục Products
-        const prodInfo = (prodList || []).find(p => 
-            (item.productId && p.id === item.productId) || 
+        const prodInfo = (prodList || []).find(p =>
+            (item.productId && p.id === item.productId) ||
             (p.name && p.name.trim().toLowerCase() === String(item.name || '').trim().toLowerCase())
         ) || {};
 
@@ -2458,15 +2493,16 @@
             bomItems = matchedBomRows.map((b, idx) => {
                 const matSku = String(b.materialSku || '').trim();
                 const matId = b.material_id;
-                const mat = (prodList || []).find(p => 
-                    (matId && p.id === matId) ||
-                    (matSku && String(p.sku || '').trim().toUpperCase() === matSku.toUpperCase()) || 
-                    (matSku && String(p.name || '').trim().toLowerCase() === matSku.toLowerCase()) ||
-                    (matSku && String(p.id || '') === matSku)
-                );
+                const mat = typeof findMaterialInProducts === 'function'
+                    ? findMaterialInProducts(matSku, matId, prodList)
+                    : (prodList || []).find(p => (matId && p.id === matId) || (matSku && String(p.sku || '').trim().toUpperCase() === matSku.toUpperCase()));
 
                 const rawQty = Number(b.defaultQty ?? b.quantity ?? 0);
                 const bomUnit = b.unit || mat?.unit || 'cái';
+
+                // Tên BẮT BUỘC chuẩn 100% theo tên trong Kho Nguyên Liệu (Products.name)
+                const matDisplayName = mat?.name || matSku || 'Nguyên liệu';
+                const matActualSku = mat?.sku || matSku;
 
                 const costCalc = typeof calculateBomItemCost === 'function'
                     ? calculateBomItemCost(mat, rawQty, bomUnit)
@@ -2474,8 +2510,8 @@
 
                 return {
                     id: b.id || idx,
-                    sku: mat?.sku || matSku,
-                    name: mat?.name || matSku || 'Nguyên liệu',
+                    sku: matActualSku,
+                    name: matDisplayName,
                     qty: rawQty,
                     unit: bomUnit,
                     costPrice: costCalc.convertedPrice || costCalc.unitPrice || 0,
@@ -2616,7 +2652,7 @@
 
         // 3. Tiền công thợ & Đóng gói CHUẨN XÁC 100% từ Config_KPI
         const kpiMatch = lookupItemKPI(item, effectiveKpi, order?.channel);
-        
+
         const p1Name = kpiMatch.p1Name || (isGlass ? 'Cắt Dán' : 'Dựng Khung');
         const p1Reward = Number(item.phases?.phase1?.reward_vnd || item.p1_reward_vnd) || kpiMatch.p1Reward || 0;
         const p1Time = kpiMatch.p1Time || 45;
@@ -2699,14 +2735,14 @@
 
         return (
             <div className="mt-2.5 pt-2.5 border-t border-[#27272a] flex flex-col gap-2 w-full animate-fade-in text-[11px]" onClick={e => e.stopPropagation()}>
-                
+
                 {/* Header thanh tiêu đề có nút ĐÓNG LẠI nổi bật */}
                 <div className="flex items-center justify-between bg-[#141418] px-2.5 py-1.5 rounded-xl border border-indigo-500/20 shadow-sm">
                     <div className="flex items-center gap-1.5">
                         <i className="fas fa-layer-group text-indigo-400 text-xs"></i>
                         <span className="text-[10.5px] font-black uppercase text-indigo-300 tracking-wider">ĐỊNH MỨC & GIÁ VỐN SẢN XUẤT</span>
                     </div>
-                    <button 
+                    <button
                         onClick={(e) => { e.stopPropagation(); onClose && onClose(); }}
                         className="px-2.5 py-1 bg-zinc-800/90 hover:bg-rose-600 text-zinc-300 hover:text-white rounded-lg text-[9.5px] font-black uppercase tracking-wider flex items-center gap-1 transition-all active:scale-95 shadow-sm border border-zinc-700 hover:border-rose-500 cursor-pointer"
                         title="Đóng bảng định mức"
@@ -2779,31 +2815,27 @@
                 {/* Chi Tiết Tiền Công Thợ (Config_KPI) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 w-full">
                     {/* Khâu 1: Dựng Khung / Cắt Dán */}
-                    <div className={`p-2.5 rounded-xl border flex items-center justify-between transition-all ${
-                        isP1Done
+                    <div className={`p-2.5 rounded-xl border flex items-center justify-between transition-all ${isP1Done
                             ? 'bg-emerald-500/10 border-emerald-500/30'
                             : 'bg-amber-500/10 border-amber-500/30'
-                    }`}>
+                        }`}>
                         <div className="min-w-0 pr-2">
-                            <div className={`font-black uppercase truncate text-[11px] flex items-center gap-1 ${
-                                isP1Done ? 'text-emerald-400' : 'text-amber-400'
-                            }`}>
+                            <div className={`font-black uppercase truncate text-[11px] flex items-center gap-1 ${isP1Done ? 'text-emerald-400' : 'text-amber-400'
+                                }`}>
                                 <i className={`fas ${isP1Done ? 'fa-check-circle' : 'fa-clock'} text-[10px]`}></i>
                                 <span>{p1Name} ({p1Time}p)</span>
                             </div>
                             <div className="text-[9.5px] font-bold text-zinc-300 truncate mt-0.5">
                                 Thợ: <span className="text-white font-black">{p1User}</span>
                             </div>
-                            <div className={`text-[8.5px] font-bold uppercase tracking-wider mt-0.5 ${
-                                isP1Done ? 'text-emerald-400 font-black' : 'text-amber-300/90'
-                            }`}>
+                            <div className={`text-[8.5px] font-bold uppercase tracking-wider mt-0.5 ${isP1Done ? 'text-emerald-400 font-black' : 'text-amber-300/90'
+                                }`}>
                                 {isP1Done ? '✅ Đã hoàn thành' : (p1User && p1User !== 'Chưa nhận việc' ? '⏳ Đang làm / Chờ duyệt' : '⏳ Chưa nhận việc')}
                             </div>
                         </div>
                         <div className="text-right shrink-0">
-                            <div className={`text-[13px] font-mono font-black ${
-                                isP1Done ? 'text-emerald-400' : 'text-amber-400'
-                            }`}>
+                            <div className={`text-[13px] font-mono font-black ${isP1Done ? 'text-emerald-400' : 'text-amber-400'
+                                }`}>
                                 +{formatMoney(p1Reward)}đ
                             </div>
                             <div className="text-[8px] font-black uppercase tracking-wider text-zinc-500">
@@ -2813,31 +2845,27 @@
                     </div>
 
                     {/* Khâu 2: Gia Cố / Gọt Keo */}
-                    <div className={`p-2.5 rounded-xl border flex items-center justify-between transition-all ${
-                        isP2Done
+                    <div className={`p-2.5 rounded-xl border flex items-center justify-between transition-all ${isP2Done
                             ? 'bg-emerald-500/10 border-emerald-500/30'
                             : 'bg-amber-500/10 border-amber-500/30'
-                    }`}>
+                        }`}>
                         <div className="min-w-0 pr-2">
-                            <div className={`font-black uppercase truncate text-[11px] flex items-center gap-1 ${
-                                isP2Done ? 'text-emerald-400' : 'text-amber-400'
-                            }`}>
+                            <div className={`font-black uppercase truncate text-[11px] flex items-center gap-1 ${isP2Done ? 'text-emerald-400' : 'text-amber-400'
+                                }`}>
                                 <i className={`fas ${isP2Done ? 'fa-check-circle' : 'fa-clock'} text-[10px]`}></i>
                                 <span>{p2Name} ({p2Time}p)</span>
                             </div>
                             <div className="text-[9.5px] font-bold text-zinc-300 truncate mt-0.5">
                                 Thợ: <span className="text-white font-black">{p2User}</span>
                             </div>
-                            <div className={`text-[8.5px] font-bold uppercase tracking-wider mt-0.5 ${
-                                isP2Done ? 'text-emerald-400 font-black' : 'text-amber-300/90'
-                            }`}>
+                            <div className={`text-[8.5px] font-bold uppercase tracking-wider mt-0.5 ${isP2Done ? 'text-emerald-400 font-black' : 'text-amber-300/90'
+                                }`}>
                                 {isP2Done ? '✅ Đã hoàn thành' : (p2User && p2User !== 'Chưa nhận việc' ? '⏳ Đang làm / Chờ duyệt' : '⏳ Chưa nhận việc')}
                             </div>
                         </div>
                         <div className="text-right shrink-0">
-                            <div className={`text-[13px] font-mono font-black ${
-                                isP2Done ? 'text-emerald-400' : 'text-amber-400'
-                            }`}>
+                            <div className={`text-[13px] font-mono font-black ${isP2Done ? 'text-emerald-400' : 'text-amber-400'
+                                }`}>
                                 +{formatMoney(p2Reward)}đ
                             </div>
                             <div className="text-[8px] font-black uppercase tracking-wider text-zinc-500">
@@ -2855,7 +2883,7 @@
                 )}
 
                 {/* NÚT THU GỌN Ở DƯỚI CÙNG */}
-                <button 
+                <button
                     onClick={(e) => { e.stopPropagation(); onClose && onClose(); }}
                     className="w-full py-1.5 bg-[#09090b] hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all active:scale-98 shadow-sm cursor-pointer"
                 >
@@ -3024,10 +3052,10 @@
                 n = n.split(' | ')
                     .filter(part => {
                         const p = part.trim().toUpperCase();
-                        return !p.startsWith('TỪ CHỐI KHUNG') && 
-                               !p.startsWith('YÊU CẦU LÀM LẠI') && 
-                               !p.startsWith('TỪ CHỐI') &&
-                               !p.includes('BÁO LỖI KHUNG');
+                        return !p.startsWith('TỪ CHỐI KHUNG') &&
+                            !p.startsWith('YÊU CẦU LÀM LẠI') &&
+                            !p.startsWith('TỪ CHỐI') &&
+                            !p.includes('BÁO LỖI KHUNG');
                     })
                     .join(' | ');
             }
@@ -3054,34 +3082,18 @@
 
         return (
             <React.Fragment>
-                <div className={`rf-card relative transition-all duration-200 rounded-2xl overflow-hidden ${
-                    isItemDone
-                        ? 'bg-[#0b1612] border border-emerald-500/30 hover:border-emerald-500/50'
+                <div className={`rf-card relative transition-all duration-200 rounded-2xl overflow-hidden bg-[#121214] ${isItemDone
+                        ? 'border border-emerald-500/30 hover:border-emerald-500/50'
                         : isRejected
-                            ? 'bg-[#181012] border border-rose-500/50 hover:border-rose-500/70 shadow-lg'
+                            ? 'border border-rose-500/50 hover:border-rose-500/70 shadow-lg'
                             : isReadyForInspection
-                                ? 'bg-[#15131a] border border-indigo-500/40 hover:border-indigo-500/60 shadow-lg'
+                                ? 'border border-indigo-500/40 hover:border-indigo-500/60 shadow-lg'
                                 : isAnyInProgress
-                                    ? 'bg-[#11141a] border border-blue-500/40 hover:border-blue-500/60 shadow-lg'
+                                    ? 'border border-blue-500/40 hover:border-blue-500/60 shadow-lg'
                                     : isPhase2Pending
-                                        ? 'bg-[#0f1714] border border-emerald-500/40 hover:border-emerald-500/60 shadow-lg'
-                                        : 'bg-[#121214] border border-white/[0.08] hover:border-white/[0.14] shadow-sm'
-                }`}>
-                    {/* Top Status Accent Line */}
-                    <div className={`h-[2.5px] w-full ${
-                        isItemDone
-                            ? 'bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500'
-                            : isRejected
-                                ? 'bg-gradient-to-r from-rose-500 via-red-400 to-rose-500'
-                                : isReadyForInspection
-                                    ? 'bg-gradient-to-r from-indigo-500 via-purple-400 to-indigo-500'
-                                    : isAnyInProgress
-                                        ? 'bg-gradient-to-r from-blue-500 via-indigo-400 to-blue-500'
-                                        : isPhase2Pending
-                                            ? 'bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500'
-                                            : 'bg-white/[0.06]'
-                    }`} />
-
+                                        ? 'border border-emerald-500/40 hover:border-emerald-500/60 shadow-lg'
+                                        : 'border border-white/[0.08] hover:border-white/[0.14] shadow-sm'
+                    }`}>
                     <div className="flex flex-col w-full cursor-pointer relative p-3" onClick={() => setIsExpanded(!isExpanded)}>
 
                         {/* === KHU VỰC 1: HEADER TRÊN CÙNG (GIỐNG TAB ĐƠN HÀNG) === */}
@@ -3103,10 +3115,9 @@
 
                                 {(() => {
                                     const channelTag = order?.channel === 'KHÁC' ? 'XUẤT KHẨU' : (order?.channel || (_item.orderId === 'SẢN XUẤT TỒN' || String(_item.note || '').includes('tự động tạo lệnh bù kho') ? 'SẢN XUẤT TỒN' : 'BÁN LẺ'));
-                                    const chInfo = getChannelBadgeInfo(channelTag);
+                                    const chBadgeClass = typeof getChannelBadge === 'function' ? getChannelBadge(channelTag) : 'bg-[#f97316] text-black font-black border border-[#ea580c] shadow-sm';
                                     return (
-                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border uppercase tracking-wider shadow-sm truncate flex items-center gap-1 shrink-0 ${chInfo.bg} ${chInfo.text} ${chInfo.border}`}>
-                                            <i className={`fas ${chInfo.icon} text-[8px]`}></i>
+                                        <span className={`text-[8.5px] font-black px-2 py-0.5 rounded border uppercase tracking-wider shadow-sm truncate flex items-center gap-1 shrink-0 ${chBadgeClass}`}>
                                             {channelTag}
                                         </span>
                                     );
@@ -3162,14 +3173,8 @@
                                 )}
 
                                 {_item.assignee && (
-                                    <span className="text-[8px] font-black px-1.5 py-0.5 bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30 rounded uppercase tracking-wider flex items-center gap-1 shrink-0">
-                                        <i className="fas fa-lock text-[8px]"></i> CHỈ ĐỊNH: {_item.assignee}
-                                    </span>
-                                )}
-
-                                {assignedUser && !isAnyInProgress && (
-                                    <span className="text-[8px] font-black px-1.5 py-0.5 bg-zinc-800 text-zinc-300 border border-zinc-700/60 rounded uppercase tracking-wider flex items-center gap-1 shrink-0">
-                                        <i className="fas fa-user text-[8px] text-zinc-400"></i> THỢ: {assignedUser}
+                                    <span className="text-[8.5px] font-black px-2 py-0.5 bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded-md uppercase tracking-wider flex items-center gap-1 shrink-0 shadow-sm" title={`Lệnh sản xuất chỉ định riêng cho ${_item.assignee}`}>
+                                        <i className="fas fa-lock text-[8.5px] text-amber-400"></i> CHỈ ĐỊNH: {_item.assignee}
                                     </span>
                                 )}
                             </div>
@@ -3177,16 +3182,15 @@
                             {/* Right: CỤM NÚT THAO TÁC CỐ ĐỊNH (ACTION BUTTON STRIP) */}
                             <div className="flex items-center gap-1 shrink-0 z-30" onClick={e => e.stopPropagation()}>
                                 {/* NÚT THẢ XUỐNG XEM ĐỊNH MỨC VẬT TƯ (BOM) & GIÁ VỐN */}
-                                <button 
+                                <button
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         setShowBOMDrawer(prev => !prev);
-                                    }} 
-                                    className={`h-6 px-2 rounded flex items-center justify-center gap-1 transition-all shadow-sm text-[9.5px] font-black uppercase tracking-wider active:scale-95 cursor-pointer border ${
-                                        showBOMDrawer 
-                                            ? 'bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-500/30' 
+                                    }}
+                                    className={`h-6 px-2 rounded flex items-center justify-center gap-1 transition-all shadow-sm text-[9.5px] font-black uppercase tracking-wider active:scale-95 cursor-pointer border ${showBOMDrawer
+                                            ? 'bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-500/30'
                                             : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30 hover:bg-indigo-500 hover:text-white'
-                                    }`} 
+                                        }`}
                                     title="Bấm để mở/đóng danh sách định mức vật tư và giá vốn"
                                 >
                                     <i className="fas fa-layer-group text-[10px]"></i>
@@ -3216,9 +3220,9 @@
 
                                 {/* NÚT HUỶ / XOÁ LỆNH TÍCH HỢP TẠI ĐÂY */}
                                 {((isBossRole || isAdmin || userRole === 'QUẢN LÝ SẢN XUẤT' || userRole === 'QUẢN LÝ KHO' || userRole === 'QUẢN LÝ KHO VẬN' || userRole === 'TỐI CAO' || (_item.orderId === 'SẢN XUẤT TỒN' || String(_item.note || '').includes('tự động tạo lệnh bù kho'))) && _item.status !== 'Đã Huỷ') && (
-                                    <button 
-                                        onClick={(e) => { 
-                                            e.stopPropagation(); 
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
                                             if (window.confirm("Bạn có chắc chắn muốn huỷ/xoá lệnh sản xuất này?")) {
                                                 if (_item.orderId === 'SẢN XUẤT TỒN' || String(_item.note || '').includes('tự động tạo lệnh bù kho')) {
                                                     const upd = { ..._item, status: 'Đã Huỷ' };
@@ -3226,9 +3230,9 @@
                                                 } else {
                                                     wrappedPushDeltas({ deletes: { prodItems: [_item.id] } }, 'Đã xoá lệnh sản xuất', 'fa-trash');
                                                 }
-                                            } 
-                                        }} 
-                                        className="w-6 h-6 bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white rounded flex items-center justify-center transition-all shadow-sm active:scale-95 cursor-pointer" 
+                                            }
+                                        }}
+                                        className="w-6 h-6 bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white rounded flex items-center justify-center transition-all shadow-sm active:scale-95 cursor-pointer"
                                         title="Huỷ/Xoá lệnh này"
                                     >
                                         <i className="fas fa-trash-alt text-[10px]"></i>
@@ -3236,7 +3240,7 @@
                                 )}
 
                                 {/* NÚT THU GỌN / MỞ RỘNG THẺ */}
-                                <button 
+                                <button
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         setIsExpanded(prev => !prev);
@@ -3317,7 +3321,7 @@
                                                 </div>
                                             )}
 
-                                             {/* KHỐI GHI CHÚ XANH (ĐƠN HÀNG) */}
+                                            {/* KHỐI GHI CHÚ XANH (ĐƠN HÀNG) */}
                                             {blueBoxNote && (
                                                 <div className="mt-2 p-2 bg-indigo-500/10 border-l-[3px] border-indigo-500 rounded-r-lg flex items-start gap-1.5 shadow-sm w-full">
                                                     <i className="fas fa-comment-alt text-indigo-400 mt-[2.5px] shrink-0 text-[10px]"></i>
@@ -3347,7 +3351,7 @@
                     </div>
 
                     {isExpanded && (
-                        <div className={`px-2 pb-2 border-t border-white/[0.08] pt-2 flex flex-col gap-1 w-full animate-fade-in rounded-b-xl ${isItemDone ? 'bg-[#0a1410]' : 'bg-[#0e0e11]'}`}>
+                        <div className="px-2 pb-2 border-t border-white/[0.08] pt-2 flex flex-col gap-1 w-full animate-fade-in rounded-b-xl bg-transparent">
                             {canApproveQC && _item.qc_status === 'Chờ duyệt khung' && (
                                 <div className="mb-2 p-2.5 bg-[#14141a] rounded-xl border border-indigo-500/40 relative flex items-center gap-2.5 shadow-sm">
                                     <div className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden border border-indigo-500/30 bg-black/40 cursor-pointer group" onClick={(e) => { e.stopPropagation(); setPreviewImg(_item.qc_front_photo); }}>
@@ -3410,13 +3414,82 @@
 
                             {(!(_item.fulfilledFromStock === true || String(_item.fulfilledFromStock).toUpperCase() === 'TRUE') || (String(_item.note || '').toLowerCase().includes('kho âm'))) ? configs.map(c => (
                                 <WorkerPhaseV2 key={c.k} attendance={attendance} item={_item} c={c} configs={configs} order={order} prodItems={prodItems} erpProducts={erpProducts} currentUser={currentUser} pushDeltas={wrappedPushDeltas} userConfigs={userConfigs} triggerToast={triggerToast} kpiConfig={kpiConfig} isAdmin={isAdmin} />
-                            )) : (
-                                <div className="text-center py-4 bg-[#111] rounded-xl border border-emerald-500/30">
-                                    <i className="fas fa-check-circle text-emerald-500 text-2xl mb-2 shadow-emerald-500/50 drop-shadow-md"></i>
-                                    <div className="text-emerald-400 font-bold text-[11px] uppercase">SẢN PHẨM XUẤT KHO</div>
-                                    <div className="text-gray-500 text-[10px] mt-1">Không yêu cầu thực hiện khâu sản xuất</div>
-                                </div>
-                            )}
+                            )) : (() => {
+                                const p1 = _item.phases?.phase1?.user || _item.p1_user || '';
+                                const p2 = _item.phases?.phase2?.user || _item.p2_user || '';
+                                const p1Photo = _item.phases?.phase1?.photo || _item.p1_photo || '';
+                                const p2Photo = _item.phases?.phase2?.photo || _item.p2_photo || '';
+                                const qcPhoto = _item.qc_front_photo || _item.qc_side_photo || '';
+
+                                let originP1 = p1;
+                                let originP2 = p2;
+                                let originP1Photo = p1Photo;
+                                let originP2Photo = p2Photo;
+                                let originQCPhoto = qcPhoto;
+                                let batchDate = _item.phases?.phase1?.date || _item.deadline || '';
+
+                                if (!originP1 && !originP2) {
+                                    const myName = String(_item.name || '').trim().toLowerCase();
+                                    const pastItem = (prodItems || []).slice().reverse().find(p => {
+                                        if (!p || p.id === _item.id || String(p.name || '').trim().toLowerCase() !== myName) return false;
+                                        const pastP1 = p.phases?.phase1?.user || p.p1_user || '';
+                                        const pastP2 = p.phases?.phase2?.user || p.p2_user || '';
+                                        return Boolean(pastP1 || pastP2);
+                                    });
+                                    if (pastItem) {
+                                        originP1 = pastItem.phases?.phase1?.user || pastItem.p1_user || '';
+                                        originP2 = pastItem.phases?.phase2?.user || pastItem.p2_user || '';
+                                        originP1Photo = pastItem.phases?.phase1?.photo || pastItem.p1_photo || '';
+                                        originP2Photo = pastItem.phases?.phase2?.photo || pastItem.p2_photo || '';
+                                        originQCPhoto = pastItem.qc_front_photo || pastItem.qc_side_photo || '';
+                                        batchDate = pastItem.phases?.phase1?.date || pastItem.deadline || '';
+                                    }
+                                }
+
+                                return (
+                                    <div className="p-3 bg-[#0c0c0e] rounded-xl border border-emerald-500/30 space-y-2.5 shadow-sm">
+                                        <div className="flex items-center justify-between border-b border-white/[0.08] pb-1.5">
+                                            <div className="flex items-center gap-1.5 text-emerald-400 font-black text-[11px] uppercase tracking-wider">
+                                                <i className="fas fa-box-check text-emerald-400"></i>
+                                                <span>XUẤT TỪ KHO CÓ SẴN (ĐÃ NGHIỆM THU)</span>
+                                            </div>
+                                            <span className="text-[8.5px] bg-emerald-500/15 text-emerald-300 font-bold px-2 py-0.5 rounded border border-emerald-500/30">
+                                                ĐẠT KCS
+                                            </span>
+                                        </div>
+                                        <div className="text-[10px] space-y-1.5">
+                                            <div className="text-zinc-400 font-medium flex items-center justify-between">
+                                                <span className="flex items-center gap-1"><i className="fas fa-history text-amber-400 text-[9px]"></i> Truy vết thợ sản xuất lưu kho:</span>
+                                                {batchDate && <span className="font-mono text-zinc-500 text-[9px]">{batchDate}</span>}
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="bg-[#141417] p-2 rounded-lg border border-white/[0.06] flex items-center justify-between">
+                                                    <div className="min-w-0 pr-1">
+                                                        <div className="text-zinc-500 text-[9px] font-bold uppercase truncate">{configs[0]?.n || 'Khâu 1'}</div>
+                                                        <div className="text-amber-400 font-black text-[11px] mt-0.5 truncate">{originP1 || 'Tồn Kho'}</div>
+                                                    </div>
+                                                    {originP1Photo && (
+                                                        <button onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('triggerInternalPreview', { detail: originP1Photo })); }} className="w-6 h-6 shrink-0 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded flex items-center justify-center text-[10px] active:scale-95 cursor-pointer shadow-sm" title="Xem ảnh nghiệm thu khâu 1">
+                                                            <i className="fas fa-image"></i>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div className="bg-[#141417] p-2 rounded-lg border border-white/[0.06] flex items-center justify-between">
+                                                    <div className="min-w-0 pr-1">
+                                                        <div className="text-zinc-500 text-[9px] font-bold uppercase truncate">{configs[1]?.n || 'Khâu 2'}</div>
+                                                        <div className="text-sky-400 font-black text-[11px] mt-0.5 truncate">{originP2 || 'Tồn Kho'}</div>
+                                                    </div>
+                                                    {originP2Photo && (
+                                                        <button onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('triggerInternalPreview', { detail: originP2Photo })); }} className="w-6 h-6 shrink-0 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded flex items-center justify-center text-[10px] active:scale-95 cursor-pointer shadow-sm" title="Xem ảnh nghiệm thu khâu 2">
+                                                            <i className="fas fa-image"></i>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             {isReadyForInspection && !isItemDone && canApproveQC && (
                                 <div className="mt-1 p-2.5 bg-[#1e1b4b]/50 border border-[#4338ca]/30 rounded-xl relative">
@@ -3623,77 +3696,77 @@
                                         type="checkbox"
                                         checked={groupItems.every(gi => selectedProdIds && selectedProdIds.includes(gi.id))}
                                         onChange={(e) => {
-                                             e.stopPropagation();
-                                             const allSelected = groupItems.every(gi => selectedProdIds && selectedProdIds.includes(gi.id));
-                                             if (allSelected) {
-                                                 // Deselect all in group
-                                                 const idsToRemove = groupItems.map(gi => gi.id);
-                                                 setSelectedProdIds(prev => prev.filter(id => !idsToRemove.includes(id)));
-                                             } else {
-                                                 // Select all in group
-                                                 const idsToAdd = groupItems.map(gi => gi.id).filter(id => !selectedProdIds.includes(id));
-                                                 setSelectedProdIds(prev => [...prev, ...idsToAdd]);
-                                             }
-                                         }}
-                                         className="w-5 h-5 accent-rose-500 rounded cursor-pointer"
-                                         title="Chọn cả lô"
-                                     />
-                                 </div>
-                             )}
-                             <div className="absolute top-0.5 left-0.5 w-3.5 h-3.5 bg-[#d4af37] text-black font-black text-[8px] rounded-full flex items-center justify-center border border-[#333] z-10">
-                                 LÔ
-                             </div>
-                             {productImage ? (
-                                 <img src={productImage} loading="lazy" className="w-full h-full object-cover opacity-90" alt="product" />
-                             ) : (
-                                 <i className="fas fa-boxes text-[#444] text-lg"></i>
-                             )}
-                         </div>
-                         <div className="min-w-0 pr-2">
-                             <h4 className="font-black text-[13px] text-[#d4af37] uppercase truncate">{firstItem.name}</h4>
-                             <div className="text-[9px] text-gray-400 mt-1 uppercase tracking-wider flex items-center gap-2 flex-wrap">
-                                 <span className="bg-[#141414] px-1.5 py-0.5 rounded border border-[#2a2a2a]"><i className="fas fa-layer-group"></i> {channelName}</span>
-                                 <span className={isP1Started ? 'text-indigo-400' : 'text-gray-500'}>
-                                     {isP1Started ? 'ĐÃ BẮT ĐẦU' : 'CHỜ LÀM'}
-                                 </span>
-                             </div>
-                         </div>
-                     </div>
-                     <div className="flex items-center gap-3 shrink-0">
-                         <div className="bg-amber-500/20 text-amber-300 text-[11px] font-black px-2.5 py-1 rounded-lg border border-amber-500/30 shadow-sm">
-                             SL: x{qty}
-                         </div>
-                         <i className={`fas fa-chevron-${expanded ? 'up' : 'down'} text-gray-500 text-lg`}></i>
-                     </div>
-                 </div>
+                                            e.stopPropagation();
+                                            const allSelected = groupItems.every(gi => selectedProdIds && selectedProdIds.includes(gi.id));
+                                            if (allSelected) {
+                                                // Deselect all in group
+                                                const idsToRemove = groupItems.map(gi => gi.id);
+                                                setSelectedProdIds(prev => prev.filter(id => !idsToRemove.includes(id)));
+                                            } else {
+                                                // Select all in group
+                                                const idsToAdd = groupItems.map(gi => gi.id).filter(id => !selectedProdIds.includes(id));
+                                                setSelectedProdIds(prev => [...prev, ...idsToAdd]);
+                                            }
+                                        }}
+                                        className="w-5 h-5 accent-rose-500 rounded cursor-pointer"
+                                        title="Chọn cả lô"
+                                    />
+                                </div>
+                            )}
+                            <div className="absolute top-0.5 left-0.5 w-3.5 h-3.5 bg-[#d4af37] text-black font-black text-[8px] rounded-full flex items-center justify-center border border-[#333] z-10">
+                                LÔ
+                            </div>
+                            {productImage ? (
+                                <img src={productImage} loading="lazy" className="w-full h-full object-cover opacity-90" alt="product" />
+                            ) : (
+                                <i className="fas fa-boxes text-[#444] text-lg"></i>
+                            )}
+                        </div>
+                        <div className="min-w-0 pr-2">
+                            <h4 className="font-black text-[13px] text-[#d4af37] uppercase truncate">{firstItem.name}</h4>
+                            <div className="text-[9px] text-gray-400 mt-1 uppercase tracking-wider flex items-center gap-2 flex-wrap">
+                                <span className="bg-[#141414] px-1.5 py-0.5 rounded border border-[#2a2a2a]"><i className="fas fa-layer-group"></i> {channelName}</span>
+                                <span className={isP1Started ? 'text-indigo-400' : 'text-gray-500'}>
+                                    {isP1Started ? 'ĐÃ BẮT ĐẦU' : 'CHỜ LÀM'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                        <div className="bg-amber-500/20 text-amber-300 text-[11px] font-black px-2.5 py-1 rounded-lg border border-amber-500/30 shadow-sm">
+                            SL: x{qty}
+                        </div>
+                        <i className={`fas fa-chevron-${expanded ? 'up' : 'down'} text-gray-500 text-lg`}></i>
+                    </div>
+                </div>
 
-                 {expanded && (
-                     <div className="pl-3 border-l-2 border-[#333] mt-3 space-y-3">
-                         {groupItems.map((item, idx) => {
-                             const o = (orders || []).find(x => x.id === item.orderId) || {};
-                             return (
-                                 <WorkerCardV2
-                                     key={item.id}
-                                     item={item}
-                                     order={o}
-                                     prodItems={prodItems}
-                                     erpProducts={erpProducts}
-                                     currentUser={currentUser}
-                                     pushDeltas={pushDeltas}
-                                     userConfigs={userConfigs}
-                                     triggerToast={triggerToast}
-                                     kpiConfig={kpiConfig}
-                                     idx_num={idx + 1}
-                                     isAdmin={isAdmin}
-                                     orders={orders}
-                                     models3D={models3D}
-                                     attendance={attendance}
-                                     selectedProdIds={selectedProdIds}
-                                     toggleSelectProd={toggleSelectProd}
-                                     configs={typeTab === 'Bể Kính' ? CONFIGS_BE_KINH : CONFIGS_KHUNG}
-                                     erpData={erpData}
-                                 />
-                             );
+                {expanded && (
+                    <div className="pl-3 border-l-2 border-[#333] mt-3 space-y-3">
+                        {groupItems.map((item, idx) => {
+                            const o = (orders || []).find(x => x.id === item.orderId) || {};
+                            return (
+                                <WorkerCardV2
+                                    key={item.id}
+                                    item={item}
+                                    order={o}
+                                    prodItems={prodItems}
+                                    erpProducts={erpProducts}
+                                    currentUser={currentUser}
+                                    pushDeltas={pushDeltas}
+                                    userConfigs={userConfigs}
+                                    triggerToast={triggerToast}
+                                    kpiConfig={kpiConfig}
+                                    idx_num={idx + 1}
+                                    isAdmin={isAdmin}
+                                    orders={orders}
+                                    models3D={models3D}
+                                    attendance={attendance}
+                                    selectedProdIds={selectedProdIds}
+                                    toggleSelectProd={toggleSelectProd}
+                                    configs={typeTab === 'Bể Kính' ? CONFIGS_BE_KINH : CONFIGS_KHUNG}
+                                    erpData={erpData}
+                                />
+                            );
                         })}
                     </div>
                 )}
@@ -3704,13 +3777,14 @@
     // -------------------------------------------------------------------------
     // MỤC 3: GIAO DIỆN CHÍNH TAB SẢN XUẤT (ProductionTab)
     // -------------------------------------------------------------------------
-    const ProductionTab = React.memo(function ProductionTab({ attendance, orders, prodItems, packings, erpProducts, currentUser, pushDeltas, userConfigs, triggerToast, kpiConfig, erpData, models3D }) {
+    const ProductionTab = React.memo(function ProductionTab({ attendance, orders, prodItems, packings, erpProducts, currentUser, userRole: propUserRole, hasPerm: propHasPerm, pushDeltas, userConfigs, triggerToast, kpiConfig, erpData, models3D, documents }) {
         const [typeTab, setTypeTab] = React.useState('Layout');
         const [statusTab, setStatusTab] = React.useState('CHỜ SẢN XUẤT');
         const [filterChannel, setFilterChannel] = React.useState('ALL');
         const [filterTime, setFilterTime] = React.useState('Tháng Này');
         const [customMonth, setCustomMonth] = React.useState('');
         const [searchQuery, setSearchQuery] = React.useState('');
+        const deferredSearchQuery = React.useDeferredValue ? React.useDeferredValue(searchQuery) : searchQuery;
         const [globalPreview, setGlobalPreview] = React.useState(null);
         const [showRules, setShowRules] = React.useState(false);
         const [showAddSXTModal, setShowAddSXTModal] = React.useState(false);
@@ -3721,6 +3795,11 @@
         const [showReportTable, setShowReportTable] = React.useState(false);
         const [showAuditModal, setShowAuditModal] = React.useState(false);
         const [showOutOfStockModal, setShowOutOfStockModal] = React.useState(false);
+        const [showQuickNotes, setShowQuickNotes] = React.useState(false);
+        const [showSOSModal, setShowSOSModal] = React.useState(false);
+        const [sosType, setSosType] = React.useState('Vỡ Kính / Hỏng Phôi');
+        const [sosNote, setSosNote] = React.useState('');
+        const [isSendingSOS, setIsSendingSOS] = React.useState(false);
 
         // Đếm số lượng bể kính & layout hết hàng trong kho để hiển thị badge cảnh báo trên nút
         const outOfStockCount = React.useMemo(() => {
@@ -3729,13 +3808,21 @@
                 const subCat = String(p.sub_category || '').toUpperCase().trim();
                 const name = String(p.name || '').toUpperCase().trim();
                 const isGlassOrLayout = cat.includes('BỂ') || cat.includes('BE') || subCat.includes('BỂ') || name.includes('BỂ KÍNH') || name.includes('BỂ DÁN') ||
-                                        cat.includes('LAYOUT') || subCat.includes('LAYOUT') || name.includes('LAYOUT') || name.includes('KHUNG') || name.includes('TIỂU CẢNH');
+                    cat.includes('LAYOUT') || subCat.includes('LAYOUT') || name.includes('LAYOUT') || name.includes('KHUNG') || name.includes('TIỂU CẢNH');
                 return isGlassOrLayout && Number(p.quantity || 0) <= 0;
             }).length;
         }, [erpProducts]);
 
-        const userRole = String(userConfigs?.[currentUser]?.role || localStorage.getItem('rf_role') || '').toUpperCase();
-        const isBossRole = userRole === 'TỐI CAO' || localStorage.getItem('rf_role') === 'TỐI CAO' || localStorage.getItem('rf_boss') === 'true' || currentUser === 'Đỗ Tiến' || currentUser === 'Tối Cao';
+        const userRole = String(propUserRole || userConfigs?.[currentUser]?.role || localStorage.getItem('rf_role') || '').toUpperCase();
+        const isBossRole = userRole === 'TỐI CAO' || localStorage.getItem('rf_role') === 'TỐI CAO' || localStorage.getItem('rf_boss') === 'true' || currentUser === 'Đỗ Tiến' || currentUser.includes('Tiến');
+        const isAdmin = isBossRole || ['QUẢN LÝ SẢN XUẤT', 'QUẢN LÝ KHO', 'QUẢN LÝ KHO VẬN', 'ADMIN', 'FOUNDER'].includes(userRole);
+
+        const hasPerm = React.useCallback((actionCode) => {
+            if (isBossRole || userRole === 'TỐI CAO') return true;
+            if (typeof propHasPerm === 'function') return propHasPerm(actionCode);
+            if (typeof canUserDo === 'function') return canUserDo(actionCode, userRole, currentUser);
+            return isAdmin;
+        }, [propHasPerm, userRole, currentUser, isAdmin, isBossRole]);
 
         const [selectedProdIds, setSelectedProdIds] = React.useState([]);
 
@@ -3749,7 +3836,7 @@
 
         const toggleSelectProd = React.useCallback((id) => {
             setSelectedProdIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-        }, []);        React.useEffect(() => {
+        }, []); React.useEffect(() => {
             const handleGlobalPreview = (e) => { if (e.detail) setGlobalPreview(e.detail); };
             const handleAnnotation = (e) => { if (e.detail) setAnnotationData(e.detail); };
             window.addEventListener('triggerInternalPreview', handleGlobalPreview);
@@ -3787,35 +3874,33 @@
 
         const baseFiltered = React.useMemo(() => {
             return (prodItems || []).filter(i => {
-                if (i.orderId === 'SHARED_TASK' || i.orderId === 'REMINDER') return false;
+                if (!i || i.orderId === 'SHARED_TASK' || i.orderId === 'REMINDER' || i.orderId === 'MATERIAL_REQ' || i.type === 'Báo Nhập Hàng' || String(i.id || '').startsWith('MAT_REQ_') || String(i.name || '').includes('[DANH MỤC SẢN XUẤT]')) return false;
                 const o = orderMap[i.orderId] || {};
                 const isCtvOrder = String(o.channel || '').toUpperCase().includes('CỘNG TÁC VIÊN') || String(o.channel || '').toUpperCase() === 'CTV';
                 if (isCTV && o.createdBy !== currentUser && o.sale !== currentUser && o.responsibleUser !== currentUser && !isCtvOrder) return false;
 
-                if (searchQuery) {
-                    const q = searchQuery.toLowerCase();
+                if (deferredSearchQuery) {
+                    const q = deferredSearchQuery.toLowerCase();
                     const matchName = String(i.name || '').toLowerCase().includes(q);
                     const matchOrder = String(o.orderCode || '').toLowerCase().includes(q);
                     if (!matchName && !matchOrder) return false;
                 }
 
-                const deadlineStr = i.deadline || o.createdAt;
-                const isTimeMatch = checkTimeFilter(deadlineStr, filterTime, customMonth);
+                const deadlineStr = i.deadline || o.createdAt || o.date;
+                const isTimeMatch = checkTimeFilter(deadlineStr, filterTime, customMonth) || checkTimeFilter(o.createdAt || o.date, filterTime, customMonth);
 
                 if (filterTime === 'Tháng Này' && !isTimeMatch) {
-                    const isFinished = i.status === 'Done' || i.status === 'Đã Huỷ' || i.status === 'Cancel' || i.status === 'Huỷ';
-                    if (!isFinished && deadlineStr) {
-                        const tzOffset = (new Date()).getTimezoneOffset() * 60000;
-                        const nowMonthStr = new Date(Date.now() - tzOffset).toISOString().slice(0, 7);
-                        if (String(deadlineStr) < nowMonthStr) {
-                            return true;
-                        }
+                    const statusUpper = String(i.status || '').toUpperCase();
+                    const isFinished = statusUpper === 'DONE' || statusUpper === 'ĐÃ XONG' || statusUpper === 'ĐÃ HUỶ' || statusUpper === 'CANCEL' || statusUpper === 'HUỶ' || statusUpper === 'HỦY' || statusUpper === 'HOÀN KHO ĐẠT';
+                    // Lệnh CHƯA HOÀN THÀNH (Đang chờ sản xuất / Kiểm định) bắt buộc luôn hiển thị trên xưởng để thợ làm, kể cả hạn rơi vào đầu tháng sau hoặc tháng trước tồn sang
+                    if (!isFinished) {
+                        return true;
                     }
                 }
                 if (!isTimeMatch) return false;
                 return true;
             });
-        }, [prodItems, orderMap, filterTime, customMonth, searchQuery]);
+        }, [prodItems, orderMap, filterTime, customMonth, deferredSearchQuery]);
 
         const countBeKinh = baseFiltered.filter(i => {
             const searchStr = String(i.type || '') + ' ' + String(i.name || '');
@@ -3875,7 +3960,7 @@
 
             listWithStatus.forEach(i => {
                 ['phase1', 'phase2'].forEach(pk => {
-                    if (i.phases && i.phases[pk] && i.phases[pk].status === 'Done' && i.phases[pk].user === currentUser && i.phases[pk].date === today) {
+                    if (i.phases && i.phases[pk] && i.phases[pk].status === 'Done' && isStaffMatch(i.phases[pk].user, currentUser) && i.phases[pk].date === today) {
                         if (String(i.type || '').toLowerCase().includes('bể')) framesCount++;
                         else layoutCount++;
                         kpiVND += (i.phases[pk].reward_vnd || 0);
@@ -3902,7 +3987,7 @@
                 const p1User = item?.phases?.phase1?.user || item.p1_user;
                 const p1Date = item?.phases?.phase1?.endTime || item?.phases?.phase1?.start || item?.phases?.phase1?.date || item.p1_endTime || item.p1_start || item.createdAt;
 
-                if ((p1Status === 'Done' || p1Status === 'ĐÃ XONG') && String(p1User || '').trim() === String(currentUser || '').trim()) {
+                if ((p1Status === 'Done' || p1Status === 'ĐÃ XONG') && isStaffMatch(p1User, currentUser)) {
                     if (checkTimeFilter(p1Date, filterTime, customMonth)) {
                         if (isBeKinh) beKinhP1++;
                         else layoutP1++;
@@ -3914,7 +3999,7 @@
                 const p2User = item?.phases?.phase2?.user || item.p2_user;
                 const p2Date = item?.phases?.phase2?.endTime || item?.phases?.phase2?.start || item?.phases?.phase2?.date || item.p2_endTime || item.p2_start || item.createdAt;
 
-                if ((p2Status === 'Done' || p2Status === 'ĐÃ XONG') && String(p2User || '').trim() === String(currentUser || '').trim()) {
+                if ((p2Status === 'Done' || p2Status === 'ĐÃ XONG') && isStaffMatch(p2User, currentUser)) {
                     if (checkTimeFilter(p2Date, filterTime, customMonth)) {
                         if (isBeKinh) beKinhP2++;
                         else layoutP2++;
@@ -3969,39 +4054,44 @@
                 const p2Date = p2.endTime || p2.start || item.p2_endTime || item.p2_start || item.deadline || item.createdAt || item.date;
                 const itemDate = item.updatedAt || item.createdAt || p1Date || p2Date;
 
-                if (p1User && !EXCLUDED_USERS.includes(p1User) && !statsMap[p1User]) {
-                    statsMap[p1User] = { fullName: p1User, name: p1User.split(' ').pop(), dungKhung: 0, giaCo: 0, catDan: 0, gotKeo: 0, reworkCount: 0, overdueCount: 0 };
-                }
-                if (p2User && !EXCLUDED_USERS.includes(p2User) && !statsMap[p2User]) {
-                    statsMap[p2User] = { fullName: p2User, name: p2User.split(' ').pop(), dungKhung: 0, giaCo: 0, catDan: 0, gotKeo: 0, reworkCount: 0, overdueCount: 0 };
-                }
+                const getWorkerEntry = (userName) => {
+                    if (!userName || EXCLUDED_USERS.some(ex => isStaffMatch(ex, userName))) return null;
+                    const existing = Object.values(statsMap).find(w => isStaffMatch(w.fullName, userName));
+                    if (existing) return existing;
+                    const entry = { fullName: userName, name: userName.split(' ').pop(), dungKhung: 0, giaCo: 0, catDan: 0, gotKeo: 0, reworkCount: 0, overdueCount: 0 };
+                    statsMap[userName] = entry;
+                    return entry;
+                };
+
+                const w1 = getWorkerEntry(p1User);
+                const w2 = getWorkerEntry(p2User);
 
                 // --- KHÂU 1 (DỰNG KHUNG / CẮT DÁN) ---
-                if (p1User && statsMap[p1User]) {
+                if (w1) {
                     const matchTime = checkTimeFilter(p1Date, filterTime, customMonth) || checkTimeFilter(itemDate, filterTime, customMonth);
                     if ((p1Status === 'Done' || String(p1Status).toUpperCase() === 'ĐÃ XONG') && matchTime) {
-                        if (isBeKinh) statsMap[p1User].catDan++;
-                        else statsMap[p1User].dungKhung++;
+                        if (isBeKinh) w1.catDan++;
+                        else w1.dungKhung++;
                     }
                     if (matchTime) {
                         const p1NoteStr = String(p1.note || item.p1_note || '').toLowerCase();
                         if (p1NoteStr.includes('trễ') || p1NoteStr.includes('quá hạn') || (p1.reward_vnd === 0 && p1Status === 'Done' && p1NoteStr.includes('kpi'))) {
-                            statsMap[p1User].overdueCount++;
+                            w1.overdueCount++;
                         }
                     }
                 }
 
                 // --- KHÂU 2 (GIA CỐ / GỌT KEO) ---
-                if (p2User && statsMap[p2User]) {
+                if (w2) {
                     const matchTime = checkTimeFilter(p2Date, filterTime, customMonth) || checkTimeFilter(itemDate, filterTime, customMonth);
                     if ((p2Status === 'Done' || String(p2Status).toUpperCase() === 'ĐÃ XONG') && matchTime) {
-                        if (isBeKinh) statsMap[p2User].gotKeo++;
-                        else statsMap[p2User].giaCo++;
+                        if (isBeKinh) w2.gotKeo++;
+                        else w2.giaCo++;
                     }
                     if (matchTime) {
                         const p2NoteStr = String(p2.note || item.p2_note || '').toLowerCase();
                         if (p2NoteStr.includes('trễ') || p2NoteStr.includes('quá hạn') || (p2.reward_vnd === 0 && p2Status === 'Done' && p2NoteStr.includes('kpi'))) {
-                            statsMap[p2User].overdueCount++;
+                            w2.overdueCount++;
                         }
                     }
                 }
@@ -4018,11 +4108,11 @@
                     const matchTime = checkTimeFilter(itemDate, filterTime, customMonth) || checkTimeFilter(p1Date, filterTime, customMonth) || checkTimeFilter(p2Date, filterTime, customMonth);
                     if (matchTime) {
                         if (combinedNote.includes('gia cố') || combinedNote.includes('gọt keo') || combinedNote.includes('khâu 2') || combinedNote.includes('phase2')) {
-                            if (p2User && statsMap[p2User]) statsMap[p2User].reworkCount++;
-                            else if (p1User && statsMap[p1User]) statsMap[p1User].reworkCount++;
+                            if (w2) w2.reworkCount++;
+                            else if (w1) w1.reworkCount++;
                         } else {
-                            if (p1User && statsMap[p1User]) statsMap[p1User].reworkCount++;
-                            else if (p2User && statsMap[p2User]) statsMap[p2User].reworkCount++;
+                            if (w1) w1.reworkCount++;
+                            else if (w2) w2.reworkCount++;
                         }
                     }
                 }
@@ -4048,7 +4138,7 @@
                 const p1Status = item?.phases?.phase1?.status || item.p1_status;
                 const p1User = item?.phases?.phase1?.user || item.p1_user;
                 const p1Date = item?.phases?.phase1?.endTime || item?.phases?.phase1?.start || item.p1_endTime || item.p1_start || item.deadline || item.createdAt;
-                if (p1Status === 'Done' && String(p1User || '').trim() === String(currentUser || '').trim()) {
+                if ((p1Status === 'Done' || p1Status === 'ĐÃ XONG') && isStaffMatch(p1User, currentUser)) {
                     if (p1Date && String(p1Date).startsWith(currentMonthStr)) {
                         count++;
                     }
@@ -4058,7 +4148,7 @@
                 const p2Status = item?.phases?.phase2?.status || item.p2_status;
                 const p2User = item?.phases?.phase2?.user || item.p2_user;
                 const p2Date = item?.phases?.phase2?.endTime || item?.phases?.phase2?.start || item.p2_endTime || item.p2_start || item.deadline || item.createdAt;
-                if (p2Status === 'Done' && String(p2User || '').trim() === String(currentUser || '').trim()) {
+                if ((p2Status === 'Done' || p2Status === 'ĐÃ XONG') && isStaffMatch(p2User, currentUser)) {
                     if (p2Date && String(p2Date).startsWith(currentMonthStr)) {
                         count++;
                     }
@@ -4075,7 +4165,8 @@
             return true;
         });
 
-        const adminCheck = localStorage.getItem('rf_admin') === 'true';
+        const role = localStorage.getItem('rf_role') || '';
+        const adminCheck = isBossRole || (typeof isAdmin !== 'undefined' && isAdmin) || (currentUser && (currentUser.includes('Vinh') || currentUser.includes('Long') || currentUser === 'Đỗ Tiến' || ['SẢN XUẤT', 'QUẢN LÝ SẢN XUẤT', 'QUẢN LÝ KHO', 'TỐI CAO', 'FOUNDER', 'ADMIN'].includes(String(role).toUpperCase())));
 
         // ==========================================
         // LOGIC ĐẾM NGƯỢC THỜI GIAN CA LÀM VIỆC REALTIME (LEAN SHIFT TIMER)
@@ -4089,7 +4180,7 @@
 
                 // Tìm bản ghi check-in hôm nay của thợ hiện tại
                 const todayCheckin = attendance.find(a =>
-                    String(a.user).trim() === currentUser.trim() && a.timeIn && !a.timeOut
+                    isStaffMatch(a.user, currentUser) && a.timeIn && !a.timeOut
                 );
 
                 if (!todayCheckin) {
@@ -4140,13 +4231,125 @@
             return () => clearInterval(shiftInterval);
         }, [attendance, currentUser]);
 
+        // HÀM IN BÁO CÁO SẢN LƯỢNG CHUẨN A4 SANG TRỌNG
+        const handlePrintProductionReport = () => {
+            const periodStr = filterTime === 'Chọn Tháng' ? (customMonth || 'Tháng Đã Chọn') : filterTime;
+            const printDateStr = new Date().toLocaleString('vi-VN');
+            const totalDungKhung = allWorkersReport.reduce((sum, x) => sum + (x.dungKhung || 0), 0);
+            const totalGiaCo = allWorkersReport.reduce((sum, x) => sum + (x.giaCo || 0), 0);
+            const totalCatDan = allWorkersReport.reduce((sum, x) => sum + (x.catDan || 0), 0);
+            const totalGotKeo = allWorkersReport.reduce((sum, x) => sum + (x.gotKeo || 0), 0);
+            const totalRework = allWorkersReport.reduce((sum, x) => sum + (x.reworkCount || 0), 0);
+            const totalOverdue = allWorkersReport.reduce((sum, x) => sum + (x.overdueCount || 0), 0);
+            const grandTotal = totalDungKhung + totalGiaCo + totalCatDan + totalGotKeo;
+
+            let rowsHtml = '';
+            allWorkersReport.forEach((w, idx) => {
+                const totalWorkerKhau = (w.dungKhung || 0) + (w.giaCo || 0) + (w.catDan || 0) + (w.gotKeo || 0);
+                rowsHtml += `
+                    <tr>
+                        <td style="border: 1px solid #333; padding: 6px 8px; text-align: center;">${idx + 1}</td>
+                        <td style="border: 1px solid #333; padding: 6px 8px; font-weight: bold; text-align: left;">${w.name}</td>
+                        <td style="border: 1px solid #333; padding: 6px 8px; text-align: center; font-family: monospace; font-weight: bold; color: #b45309;">${w.dungKhung || 0}</td>
+                        <td style="border: 1px solid #333; padding: 6px 8px; text-align: center; font-family: monospace; font-weight: bold; color: #047857;">${w.giaCo || 0}</td>
+                        <td style="border: 1px solid #333; padding: 6px 8px; text-align: center; font-family: monospace; font-weight: bold; color: #1d4ed8;">${w.catDan || 0}</td>
+                        <td style="border: 1px solid #333; padding: 6px 8px; text-align: center; font-family: monospace; font-weight: bold; color: #7e22ce;">${w.gotKeo || 0}</td>
+                        <td style="border: 1px solid #333; padding: 6px 8px; text-align: center; font-family: monospace; font-weight: bold; background-color: #f3f4f6;">${totalWorkerKhau}</td>
+                        <td style="border: 1px solid #333; padding: 6px 8px; text-align: center; font-family: monospace; color: #be123c;">${w.reworkCount || 0}</td>
+                        <td style="border: 1px solid #333; padding: 6px 8px; text-align: center; font-family: monospace; color: #b45309;">${w.overdueCount || 0}</td>
+                    </tr>
+                `;
+            });
+
+            const printHtml = `
+                <div style="font-family: Arial, sans-serif; color: #000; padding: 15px; width: 100%; max-width: 210mm; margin: 0 auto; box-sizing: border-box;">
+                    <div style="text-align: center; margin-bottom: 12px; border-bottom: 2px solid #000; padding-bottom: 8px;">
+                        <div style="font-size: 11px; font-weight: bold; text-transform: uppercase; color: #555; letter-spacing: 2px;">RICH FISH AQUARIUM — HỆ THỐNG QUẢN TRỊ SẢN XUẤT</div>
+                        <div style="font-size: 20px; font-weight: 900; text-transform: uppercase; margin-top: 4px;">BÁO CÁO TỔNG HỢP SẢN LƯỢNG THỢ & CÔNG ĐOẠN</div>
+                        <div style="font-size: 12px; margin-top: 4px; font-weight: bold;">Kỳ báo cáo: ${periodStr} | Ngày in: ${printDateStr}</div>
+                    </div>
+
+                    <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px;">
+                        <thead>
+                            <tr style="background-color: #e5e7eb; font-weight: 900; text-transform: uppercase;">
+                                <th style="border: 1px solid #000; padding: 6px 4px; text-align: center; width: 5%;">STT</th>
+                                <th style="border: 1px solid #000; padding: 6px 8px; text-align: left; width: 25%;">Thợ / Nhân Sự</th>
+                                <th style="border: 1px solid #000; padding: 6px 4px; text-align: center; width: 10%;">Dựng Khung</th>
+                                <th style="border: 1px solid #000; padding: 6px 4px; text-align: center; width: 10%;">Gia Cố</th>
+                                <th style="border: 1px solid #000; padding: 6px 4px; text-align: center; width: 10%;">Cắt Dán</th>
+                                <th style="border: 1px solid #000; padding: 6px 4px; text-align: center; width: 10%;">Gọt Keo</th>
+                                <th style="border: 1px solid #000; padding: 6px 4px; text-align: center; width: 12%;">Tổng Khâu</th>
+                                <th style="border: 1px solid #000; padding: 6px 4px; text-align: center; width: 9%;">Làm Lại</th>
+                                <th style="border: 1px solid #000; padding: 6px 4px; text-align: center; width: 9%;">Quá Hạn</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                        <tfoot>
+                            <tr style="background-color: #f3f4f6; font-weight: 900; border-top: 2px solid #000;">
+                                <td colspan="2" style="border: 1px solid #000; padding: 8px; text-align: center; text-transform: uppercase;">TỔNG CỘNG TOÀN XƯỞNG</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: center; font-family: monospace;">${totalDungKhung}</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: center; font-family: monospace;">${totalGiaCo}</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: center; font-family: monospace;">${totalCatDan}</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: center; font-family: monospace;">${totalGotKeo}</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: center; font-family: monospace; background-color: #e5e7eb;">${grandTotal}</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: center; font-family: monospace; color: #be123c;">${totalRework}</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: center; font-family: monospace; color: #b45309;">${totalOverdue}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <div style="display: flex; justify-content: space-between; margin-top: 30px; font-size: 12px; font-weight: bold; page-break-inside: avoid;">
+                        <div style="width: 30%; text-align: center;">
+                            <div>Người Lập Báo Cáo</div>
+                            <div style="font-weight: normal; font-size: 10px; color: #666; margin-top: 2px;">(Ký & ghi rõ họ tên)</div>
+                            <div style="margin-top: 45px;">${currentUser || 'Nhân sự'}</div>
+                        </div>
+                        <div style="width: 30%; text-align: center;">
+                            <div>Quản Lý Sản Xuất</div>
+                            <div style="font-weight: normal; font-size: 10px; color: #666; margin-top: 2px;">(Ký & ghi rõ họ tên)</div>
+                            <div style="margin-top: 45px;">...........................</div>
+                        </div>
+                        <div style="width: 30%; text-align: center;">
+                            <div>Giám Đốc / Điều Hành</div>
+                            <div style="font-weight: normal; font-size: 10px; color: #666; margin-top: 2px;">(Phê duyệt)</div>
+                            <div style="margin-top: 45px;">...........................</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const style = document.createElement('style');
+            style.innerHTML = `
+                @media print {
+                    @page { size: A4 portrait; margin: 12mm auto; }
+                    body > *:not(#print-section) { display: none !important; }
+                    body { background: white !important; margin: 0 !important; padding: 0 !important; color: #000 !important; }
+                    #print-section { display: block !important; width: 100% !important; }
+                    table { page-break-inside: auto; width: 100% !important; }
+                    tr { page-break-inside: avoid; page-break-after: auto; }
+                    thead { display: table-header-group; }
+                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                }
+            `;
+            document.head.appendChild(style);
+            const printDiv = document.createElement('div');
+            printDiv.id = 'print-section';
+            printDiv.innerHTML = printHtml;
+            document.body.appendChild(printDiv);
+            window.print();
+            document.body.removeChild(printDiv);
+            document.head.removeChild(style);
+        };
+
         return (
             <div className="space-y-4 max-w-5xl mx-auto px-1 sm:px-0">
                 {/* BẢNG BÁO CÁO SẢN LƯỢNG NẰM TRÊN CÙNG (GỌN GÀNG - CLICK ĐỂ MỞ) */}
                 {!isCTV && (
                     <div className="bg-[#121214] border border-white/[0.08] rounded-2xl mb-3 shadow-md overflow-hidden transition-all duration-300">
                         {/* Header có thể click để toggle mở/đóng */}
-                        <div 
+                        <div
                             onClick={() => setShowReportTable(prev => !prev)}
                             className="p-3.5 flex justify-between items-center cursor-pointer hover:bg-white/[0.02] transition-colors select-none flex-wrap gap-2"
                         >
@@ -4169,6 +4372,15 @@
                                 <div className="text-[10px] text-zinc-400 font-bold hidden xs:block">
                                     Tài khoản: <span className="text-[#d4af37] font-black">{currentUser}</span>
                                 </div>
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handlePrintProductionReport(); }}
+                                    className="px-2.5 py-1 rounded-lg bg-[#d4af37]/15 hover:bg-[#d4af37] hover:text-black border border-[#d4af37]/30 text-[#d4af37] text-[11px] font-black flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
+                                    title="In Báo Cáo Sản Lượng Toàn Xưởng (Khổ A4)"
+                                >
+                                    <i className="fas fa-print text-[11px]"></i>
+                                    <span>In Báo Cáo</span>
+                                </button>
                                 {isBossRole && (
                                     <button
                                         type="button"
@@ -4266,10 +4478,10 @@
                 )}
 
                 {/* BỘ CHUYỂN PHÂN HỆ: BỂ KÍNH VS KHUNG LAYOUT (CHUẨN DRIBBLE SEGMENTED PILL) */}
-                <div className="flex gap-2 w-full max-w-sm mx-auto mb-3 bg-[#121214] p-1.5 rounded-2xl border border-white/[0.08] shadow-sm">
+                <div className="flex gap-2 w-full mb-3 bg-[#121214] p-1.5 rounded-2xl shadow-sm">
                     {[
-                        { id: 'Bể Kính', label: 'BỂ KÍNH', count: countBeKinh },
-                        { id: 'Layout', label: 'LAYOUT', count: countLayout }
+                        { id: 'Bể Kính', label: 'BỂ KÍNH', count: countBeKinh, icon: 'fa-fish' },
+                        { id: 'Layout', label: 'LAYOUT', count: countLayout, icon: 'fa-cubes' }
                     ].map(t => (
                         <button
                             key={t.id}
@@ -4277,16 +4489,15 @@
                                 typeTab !== t.id && setTypeTab(t.id);
                                 if (typeof triggerToast === 'function') triggerToast(`Đã chuyển sang ${t.label}`, t.id === 'Bể Kính' ? 'fa-fish' : 'fa-cubes', 'info');
                             }}
-                            className={`flex-1 py-2 font-black text-[13px] rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${
-                                typeTab === t.id
-                                    ? 'bg-white text-zinc-950 shadow-md scale-[1.01]'
-                                    : 'bg-transparent text-zinc-400 hover:text-white'
-                            }`}
+                            className={`flex-1 py-2.5 font-black text-[13px] rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${typeTab === t.id
+                                    ? 'bg-amber-400 text-zinc-950 shadow-md scale-[1.005]'
+                                    : 'bg-transparent text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                                }`}
                         >
-                            {t.label}
-                            <span className={`px-2 py-0.5 rounded-lg text-[11px] font-mono ${
-                                typeTab === t.id ? 'bg-zinc-200 text-zinc-950 font-black' : 'bg-white/10 text-zinc-300'
-                            }`}>
+                            <i className={`fas ${t.icon} text-[12px] opacity-80`}></i>
+                            <span>{t.label}</span>
+                            <span className={`px-2.5 py-0.5 rounded-lg text-[11px] font-mono ${typeTab === t.id ? 'bg-black text-amber-400 font-black' : 'bg-white/10 text-zinc-300'
+                                }`}>
                                 {t.count}
                             </span>
                         </button>
@@ -4299,10 +4510,10 @@
                         <button
                             type="button"
                             onClick={() => setShowAddSXTModal(true)}
-                            className="w-[42px] h-[42px] shrink-0 bg-[#d4af37] text-black font-black rounded-xl flex items-center justify-center hover:bg-[#b89628] active:scale-95 transition-all shadow-md cursor-pointer"
+                            className="w-[42px] h-[42px] shrink-0 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 text-amber-300 font-black rounded-xl flex items-center justify-center border border-amber-500/40 active:scale-95 transition-all shadow-sm cursor-pointer"
                             title="Tạo Lệnh SX Tồn"
                         >
-                            <i className="fas fa-plus text-base"></i>
+                            <i className="fas fa-plus text-amber-400 text-base"></i>
                         </button>
                     )}
 
@@ -4311,15 +4522,42 @@
                         <button
                             type="button"
                             onClick={() => setShowOutOfStockModal(true)}
-                            className="w-[42px] h-[42px] shrink-0 bg-[#121214] hover:bg-zinc-800 text-amber-400 border border-amber-500/40 rounded-xl flex items-center justify-center active:scale-95 transition-all shadow-md relative cursor-pointer"
+                            className="w-[42px] h-[42px] shrink-0 bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 border border-amber-500/40 rounded-xl flex items-center justify-center active:scale-95 transition-all shadow-sm relative cursor-pointer"
                             title="Xem danh sách Bể Kính & Layout hết/thiếu trong kho để tạo lệnh sản xuất"
                         >
-                            <i className="fas fa-boxes-stacked text-sm text-amber-400"></i>
+                            <i className="fas fa-boxes-stacked text-base text-amber-400"></i>
                             {outOfStockCount > 0 && (
                                 <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-rose-600 text-white font-mono text-[9px] font-black shadow">
                                     {outOfStockCount}
                                 </span>
                             )}
+                        </button>
+                    )}
+
+                    {/* NÚT GHI CHÚ NHANH SẢN XUẤT */}
+                    {!isCTV && (
+                        <button
+                            type="button"
+                            onClick={() => setShowQuickNotes(prev => !prev)}
+                            className={`w-[42px] h-[42px] shrink-0 border rounded-xl flex items-center justify-center active:scale-95 transition-all shadow-sm cursor-pointer ${showQuickNotes ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30'}`}
+                            title="Ghi chú & nhắc việc xưởng sản xuất"
+                        >
+                            <i className="fas fa-sticky-note text-base text-amber-400"></i>
+                        </button>
+                    )}
+
+                    {/* NÚT PHÁT TÍN HIỆU SOS XƯỞNG SẢN XUẤT */}
+                    {!isCTV && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (typeof window.triggerHaptic === 'function') window.triggerHaptic('heavy');
+                                setShowSOSModal(true);
+                            }}
+                            className="w-[42px] h-[42px] shrink-0 bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 border border-rose-500/50 shadow-[0_0_12px_rgba(244,63,94,0.25)] rounded-xl flex items-center justify-center active:scale-95 transition-all shadow-sm cursor-pointer relative"
+                            title="Báo cáo sự cố khẩn cấp (Phát tín hiệu SOS xưởng)"
+                        >
+                            <i className="fas fa-triangle-exclamation text-base text-rose-400 animate-pulse"></i>
                         </button>
                     )}
 
@@ -4352,7 +4590,19 @@
                     )}
                 </div>
 
-                {/* BỘ LỌC KÊNH BÁN NHANH (CHUẨN DRIBBLE COLOR ACCENT) */}
+                {/* KHUNG GHI CHÚ NHANH SẢN XUẤT */}
+                {showQuickNotes && (
+                    <window.QuickNotesPanel
+                        targetTab="SAN_XUAT"
+                        documents={documents || erpData?.Documents || window._rf_documents || []}
+                        pushDeltas={pushDeltas}
+                        currentUser={currentUser}
+                        isBoss={isBossRole}
+                        triggerToast={triggerToast}
+                    />
+                )}
+
+                {/* BỘ LỌC KÊNH BÁN NHANH (CHUẨN DRIBBLE COLOR ACCENT ĐỒNG BỘ TAB ĐƠN HÀNG) */}
                 <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar no-scrollbar mb-3 pb-1">
                     {[
                         {
@@ -4360,54 +4610,54 @@
                             label: 'Tất Cả',
                             icon: 'fa-store',
                             activeClass: 'bg-white text-zinc-950 shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                            inactiveClass: 'bg-white/5 text-zinc-300 border border-white/10 hover:bg-white/10 hover:text-white',
                             activeIconClass: 'text-zinc-950',
-                            inactiveIconClass: 'text-zinc-400'
+                            inactiveIconClass: 'text-zinc-300'
                         },
                         {
                             id: 'SHOPEE',
                             label: 'Shopee',
                             icon: 'fa-shopping-bag',
                             activeClass: 'bg-[#f97316] text-white shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#f97316]',
+                            inactiveClass: 'bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 hover:text-orange-300',
                             activeIconClass: 'text-white',
-                            inactiveIconClass: 'text-zinc-400'
+                            inactiveIconClass: 'text-orange-400'
                         },
                         {
                             id: 'EXPORT',
                             label: 'Xuất Khẩu',
                             icon: 'fa-globe-asia',
                             activeClass: 'bg-[#10b981] text-zinc-950 shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#10b981]',
+                            inactiveClass: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:text-emerald-300',
                             activeIconClass: 'text-zinc-950',
-                            inactiveIconClass: 'text-zinc-400'
+                            inactiveIconClass: 'text-emerald-400'
                         },
                         {
                             id: 'TIKTOK',
                             label: 'TikTok',
                             icon: 'fa-video',
-                            activeClass: 'bg-[#06b6d4] text-zinc-950 shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#06b6d4]',
-                            activeIconClass: 'text-zinc-950',
-                            inactiveIconClass: 'text-zinc-400'
+                            activeClass: 'bg-[#ec4899] text-white shadow-md font-black',
+                            inactiveClass: 'bg-pink-500/10 text-pink-400 border border-pink-500/20 hover:bg-pink-500/20 hover:text-pink-300',
+                            activeIconClass: 'text-white',
+                            inactiveIconClass: 'text-pink-400'
                         },
                         {
                             id: 'BÁN LẺ',
                             label: 'Bán Lẻ',
                             icon: 'fa-box',
                             activeClass: 'bg-[#60a5fa] text-zinc-950 shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#60a5fa]',
+                            inactiveClass: 'bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 hover:text-blue-300',
                             activeIconClass: 'text-zinc-950',
-                            inactiveIconClass: 'text-zinc-400'
+                            inactiveIconClass: 'text-blue-400'
                         },
                         {
                             id: 'CTV',
                             label: 'CTV',
                             icon: 'fa-handshake',
                             activeClass: 'bg-[#c084fc] text-zinc-950 shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#c084fc]',
+                            inactiveClass: 'bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 hover:text-purple-300',
                             activeIconClass: 'text-zinc-950',
-                            inactiveIconClass: 'text-zinc-400'
+                            inactiveIconClass: 'text-purple-400'
                         }
                     ].map(ch => {
                         const isActive = filterChannel === ch.id;
@@ -4424,7 +4674,7 @@
                     })}
                 </div>
 
-                {/* BỘ LỌC TRẠNG THÁI SẢN XUẤT (CHUẨN DRIBBLE ACCENT) */}
+                {/* BỘ LỌC TRẠNG THÁI SẢN XUẤT (CHUẨN DRIBBLE ACCENT ĐỒNG BỘ TAB ĐƠN HÀNG) */}
                 <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar no-scrollbar mb-4 pb-1">
                     {[
                         {
@@ -4433,9 +4683,11 @@
                             count: counts['CHỜ SẢN XUẤT'],
                             icon: 'fa-tools',
                             activeClass: 'bg-amber-400 text-zinc-950 shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                            inactiveClass: 'bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 hover:text-amber-300',
+                            activeIconClass: 'text-zinc-950',
+                            inactiveIconClass: 'text-amber-400',
                             activeBadgeClass: 'bg-black text-amber-400 font-black',
-                            inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
+                            inactiveBadgeClass: 'bg-amber-500/20 text-amber-300 font-bold'
                         },
                         {
                             id: 'KIỂM ĐỊNH',
@@ -4443,9 +4695,11 @@
                             count: counts['KIỂM ĐỊNH'],
                             icon: 'fa-clipboard-check',
                             activeClass: 'bg-purple-500 text-white shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                            inactiveClass: 'bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 hover:text-purple-300',
+                            activeIconClass: 'text-white',
+                            inactiveIconClass: 'text-purple-400',
                             activeBadgeClass: 'bg-black/30 text-white font-black',
-                            inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
+                            inactiveBadgeClass: 'bg-purple-500/20 text-purple-300 font-bold'
                         },
                         {
                             id: 'ĐÃ XONG',
@@ -4453,9 +4707,11 @@
                             count: counts['ĐÃ XONG'],
                             icon: 'fa-check-double',
                             activeClass: 'bg-emerald-500 text-zinc-950 shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                            inactiveClass: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:text-emerald-300',
+                            activeIconClass: 'text-zinc-950',
+                            inactiveIconClass: 'text-emerald-400',
                             activeBadgeClass: 'bg-black text-emerald-300 font-black',
-                            inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
+                            inactiveBadgeClass: 'bg-emerald-500/20 text-emerald-300 font-bold'
                         },
                         {
                             id: 'ĐÃ HUỶ',
@@ -4463,9 +4719,11 @@
                             count: counts['ĐÃ HUỶ'],
                             icon: 'fa-ban',
                             activeClass: 'bg-rose-500 text-white shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                            inactiveClass: 'bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 hover:text-rose-300',
+                            activeIconClass: 'text-white',
+                            inactiveIconClass: 'text-rose-400',
                             activeBadgeClass: 'bg-black/30 text-white font-black',
-                            inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
+                            inactiveBadgeClass: 'bg-rose-500/20 text-rose-300 font-bold'
                         },
                         {
                             id: 'TẤT CẢ',
@@ -4473,9 +4731,11 @@
                             count: counts['TẤT CẢ'],
                             icon: 'fa-layer-group',
                             activeClass: 'bg-zinc-200 text-zinc-950 shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                            inactiveClass: 'bg-white/5 text-zinc-300 border border-white/10 hover:bg-white/10 hover:text-white',
+                            activeIconClass: 'text-zinc-950',
+                            inactiveIconClass: 'text-zinc-300',
                             activeBadgeClass: 'bg-zinc-400 text-zinc-950 font-black',
-                            inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
+                            inactiveBadgeClass: 'bg-zinc-800 text-zinc-300 font-bold'
                         }
                     ].map(t => {
                         const isActive = statusTab === t.id;
@@ -4485,7 +4745,7 @@
                                 onClick={() => setStatusTab(t.id)}
                                 className={`shrink-0 px-3.5 py-2 rounded-xl text-[11px] transition-all duration-200 flex items-center gap-2 active:scale-95 cursor-pointer ${isActive ? t.activeClass : t.inactiveClass}`}
                             >
-                                <i className={`fas ${t.icon} ${isActive ? '' : 'opacity-80'}`}></i>
+                                <i className={`fas ${t.icon} ${isActive ? t.activeIconClass : t.inactiveIconClass}`}></i>
                                 <span>{t.label}</span>
                                 <span className={`px-1.5 py-0.5 rounded-md text-[9px] min-w-[20px] text-center ${isActive ? t.activeBadgeClass : t.inactiveBadgeClass}`}>
                                     {t.count}
@@ -4744,21 +5004,30 @@
                     </div>
                 )}
 
-                {showAddSXTModal && (
-                    <AddModal
-                        onClose={() => {
-                            setShowAddSXTModal(false);
-                            setSxtDraftData(null);
-                        }}
-                        pushDeltas={pushDeltas}
-                        products={erpProducts}
-                        erpData={erpData}
-                        triggerToast={triggerToast}
-                        userConfigs={userConfigs}
-                        forceSXTOnly={true}
-                        draftData={sxtDraftData}
-                    />
-                )}
+                {showAddSXTModal && (() => {
+                    const AddModalComp = window.AddModal || (typeof AddModal !== 'undefined' ? AddModal : null);
+                    if (!AddModalComp) {
+                        console.warn('AddModal chưa sẵn sàng');
+                        return null;
+                    }
+                    return (
+                        <AddModalComp
+                            onClose={() => {
+                                setShowAddSXTModal(false);
+                                setSxtDraftData(null);
+                            }}
+                            pushDeltas={pushDeltas}
+                            products={erpProducts}
+                            erpData={erpData}
+                            triggerToast={triggerToast}
+                            userConfigs={userConfigs}
+                            configGiaLayout={erpData?.Config_GiaLayout || []}
+                            kpiConfig={kpiConfig || window.kpiConfig || erpData?.Config_KPI || []}
+                            forceSXTOnly={true}
+                            draftData={sxtDraftData}
+                        />
+                    );
+                })()}
 
                 {editingProdItem && (
                     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm animate-fade-in" onClick={() => setEditingProdItem(null)}>
@@ -4831,15 +5100,15 @@
 
                 {/* MODAL HỘP ĐEN ĐỐI SOÁT THAO TÁC THỢ (CHỈ DÀNH CHO BOSS TỐI CAO) */}
                 {isBossRole && (
-                    <WorkerActionAuditModal 
-                        isOpen={showAuditModal} 
-                        onClose={() => setShowAuditModal(false)} 
+                    <WorkerActionAuditModal
+                        isOpen={showAuditModal}
+                        onClose={() => setShowAuditModal(false)}
                         prodItems={prodItems}
                         orders={orders}
                         packings={packings || erpData?.packings || []}
                         erpData={erpData}
-                        userConfigs={userConfigs} 
-                        triggerToast={triggerToast} 
+                        userConfigs={userConfigs}
+                        triggerToast={triggerToast}
                     />
                 )}
 
@@ -4857,13 +5126,175 @@
                             }));
                             setSxtDraftData({
                                 channel: 'Sản Xuất Tồn',
-                                customer: 'Kho Tổng',
+                                customer: currentUser || 'Kho Tổng',
+                                responsibleUser: currentUser,
                                 items: draftItems
                             });
                             setShowAddSXTModal(true);
                         }}
                         triggerToast={triggerToast}
                     />
+                )}
+
+                {/* MODAL PHÁT TÍN HIỆU SOS KHẨN CẤP XƯỞNG SẢN XUẤT */}
+                {showSOSModal && (
+                    <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+                        <div className="bg-[#09090b] border border-rose-500/40 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-[0_0_50px_rgba(244,63,94,0.25)] relative text-zinc-100 animate-scale-up">
+                            {/* Header Modal */}
+                            <div className="flex items-center justify-between pb-4 border-b border-rose-500/20">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shadow-sm animate-pulse">
+                                        <i className="fas fa-triangle-exclamation text-lg"></i>
+                                    </div>
+                                    <div>
+                                        <div className="font-black text-base sm:text-lg text-rose-400 tracking-tight flex items-center gap-2">
+                                            PHÁT TÍN HIỆU SOS XƯỞNG
+                                            <span className="text-[9px] bg-rose-500/30 text-rose-300 font-mono px-2 py-0.5 rounded-full border border-rose-500/40 font-black">KHẨN CẤP</span>
+                                        </div>
+                                        <div className="text-zinc-400 text-xs mt-0.5">Báo động trực tiếp tới Ban Quản Lý, Thợ Trưởng & KCS</div>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowSOSModal(false)}
+                                    className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                                >
+                                    <i className="fas fa-times"></i>
+                                </button>
+                            </div>
+
+                            {/* Body Modal */}
+                            <div className="mt-4 space-y-4">
+                                <div>
+                                    <label className="text-xs font-black text-zinc-300 uppercase tracking-wider block mb-2">
+                                        1. Loại sự cố / Yêu cầu khẩn cấp:
+                                    </label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {[
+                                            { id: 'Vỡ Kính / Hỏng Phôi', icon: 'fa-burst', color: 'text-rose-400', border: 'border-rose-500/30', bg: 'bg-rose-500/10' },
+                                            { id: 'Hỏng Máy Mài / Cắt CNC', icon: 'fa-gears', color: 'text-amber-400', border: 'border-amber-500/30', bg: 'bg-amber-500/10' },
+                                            { id: 'Hết Vật Tư Cấp Bách (Keo/Kính)', icon: 'fa-boxes-packing', color: 'text-orange-400', border: 'border-orange-500/30', bg: 'bg-orange-500/10' },
+                                            { id: 'Cần Trợ Giúp Thợ Gấp', icon: 'fa-hands-holding-child', color: 'text-purple-400', border: 'border-purple-500/30', bg: 'bg-purple-500/10' },
+                                            { id: 'Sự Cố An Toàn Lao Động', icon: 'fa-shield-halved', color: 'text-red-400', border: 'border-red-500/30', bg: 'bg-red-500/10' }
+                                        ].map(item => {
+                                            const isSelected = sosType === item.id;
+                                            return (
+                                                <button
+                                                    key={item.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (typeof window.triggerHaptic === 'function') window.triggerHaptic('light');
+                                                        setSosType(item.id);
+                                                    }}
+                                                    className={`p-3 rounded-2xl text-left border transition-all flex items-center gap-2.5 cursor-pointer ${
+                                                        isSelected
+                                                            ? 'bg-rose-500/20 border-rose-500 text-white shadow-[0_0_12px_rgba(244,63,94,0.3)] font-black'
+                                                            : `${item.bg} ${item.border} text-zinc-300 hover:border-white/20`
+                                                    }`}
+                                                >
+                                                    <i className={`fas ${item.icon} ${item.color} text-sm`}></i>
+                                                    <span className="text-xs">{item.id}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-black text-zinc-300 uppercase tracking-wider block mb-1.5">
+                                        2. Chi tiết sự cố / Ghi chú cho xưởng:
+                                    </label>
+                                    <textarea
+                                        value={sosNote}
+                                        onChange={e => setSosNote(e.target.value)}
+                                        placeholder="Mô tả cụ thể: Vị trí bàn làm việc, mã đơn bị ảnh hưởng, kích thước bể vỡ, cần thợ nào qua hỗ trợ..."
+                                        rows={3}
+                                        className="w-full bg-[#141418] border border-white/10 focus:border-rose-500 rounded-2xl p-3 text-xs text-zinc-100 placeholder-zinc-500 outline-none transition-all resize-none"
+                                    ></textarea>
+                                </div>
+
+                                <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-start gap-2.5 text-[11px] text-rose-300">
+                                    <i className="fas fa-bullhorn text-rose-400 mt-0.5 shrink-0"></i>
+                                    <span>
+                                        Khi bấm xác nhận, hệ thống sẽ kích hoạt <b>Còi Báo Động (Web Audio)</b>, <b>Rung Haptic dồn dập</b> và gửi <b>Web Push Notification</b> khẩn cấp tới toàn bộ thiết bị đang mở app.
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="mt-6 flex items-center justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSOSModal(false)}
+                                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+                                >
+                                    HỦY BỎ
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={isSendingSOS}
+                                    onClick={async () => {
+                                        setIsSendingSOS(true);
+                                        try {
+                                            if (typeof window.triggerHaptic === 'function') window.triggerHaptic('sos');
+                                            if (typeof window.playEmergencyAlarm === 'function') window.playEmergencyAlarm('sos');
+
+                                            const sosMsg = `[SOS XƯỞNG] ${sosType}: ${sosNote ? sosNote.trim() : 'Cần trợ giúp khẩn cấp!'} (Báo bởi: ${currentUser || 'Thợ Xưởng'})`;
+
+                                            // 1. Broadcast Firebase Realtime
+                                            if (typeof window.firebase !== 'undefined' && window.firebase.database) {
+                                                try {
+                                                    window.firebase.database().ref('rf_realtime_delta').set({
+                                                        client_id: window._rf_client_id || 'sos_trigger',
+                                                        timestamp: Date.now(),
+                                                        trigger_by: currentUser || 'Thợ Xưởng',
+                                                        alert_type: 'FACTORY_SOS',
+                                                        is_sos: true,
+                                                        message: sosMsg,
+                                                        payload: {
+                                                            Tracking_Log: [{
+                                                                id: 'SOS_' + Date.now(),
+                                                                'Thời gian': new Date().toISOString(),
+                                                                'Tên nhân sự': currentUser || 'Thợ Xưởng',
+                                                                'Hoàn thành': 'PHÁT TÍN HIỆU SOS',
+                                                                'Hỏi AI': sosType,
+                                                                'Ghi chú thêm': sosNote || ''
+                                                            }]
+                                                        }
+                                                    });
+                                                } catch (fbErr) {
+                                                    console.warn('Firebase SOS broadcast error:', fbErr);
+                                                }
+                                            }
+
+                                            // 2. Ghi nhận Tracking Log qua pushDeltas
+                                            if (typeof pushDeltas === 'function') {
+                                                pushDeltas({
+                                                    Tracking_Log: [{
+                                                        id: 'SOS_' + Date.now(),
+                                                        'Thời gian': new Date().toISOString(),
+                                                        'Tên nhân sự': currentUser || 'Thợ Xưởng',
+                                                        'Hoàn thành': 'PHÁT TÍN HIỆU SOS',
+                                                        'Hỏi AI': sosType,
+                                                        'Ghi chú thêm': sosNote || ''
+                                                    }]
+                                                }, 'Đã gửi tín hiệu SOS khẩn cấp', 'fa-triangle-exclamation');
+                                            }
+
+                                            triggerToast('🚨 ĐÃ PHÁT TÍN HIỆU SOS TỚI TOÀN BỘ HỆ THỐNG!', 'fa-triangle-exclamation', 'danger');
+                                            setShowSOSModal(false);
+                                            setSosNote('');
+                                        } finally {
+                                            setIsSendingSOS(false);
+                                        }
+                                    }}
+                                    className="px-5 py-2.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-[0_0_20px_rgba(244,63,94,0.4)] flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
+                                >
+                                    {isSendingSOS ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-bullhorn"></i>}
+                                    <span>PHÁT TÍN HIỆU SOS NGAY</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
         );

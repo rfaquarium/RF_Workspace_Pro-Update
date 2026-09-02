@@ -983,7 +983,7 @@ const MonthlyPenaltyLedger = React.memo(function MonthlyPenaltyLedger({
 // -------------------------------------------------------------------------
 // 🏆 BỘ PHẬN GIAO VIỆC & NHIỆM VỤ CHUNG TRÊN DASHBOARD
 // -------------------------------------------------------------------------
-const DashboardTasksSection = React.memo(function DashboardTasksSection({ prodItems = [], currentUser, pushDeltas, triggerToast, isAdmin, userConfigs, reimbursements = [], products = [] }) {
+const DashboardTasksSection = React.memo(function DashboardTasksSection({ importExport = [], currentUser, pushDeltas, triggerToast, isAdmin, userConfigs, reimbursements = [], products = [], isBoss }) {
   const [showAddReminder, setShowAddReminder] = React.useState(false);
   // States for material order request
   const [selectedProdId, setSelectedProdId] = React.useState('');
@@ -996,31 +996,52 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ prodIt
   const selectableProducts = React.useMemo(() => {
       const filtered = (products || []).filter(p => {
           const cat = String(p.category || '').toUpperCase();
-          return cat.includes('PHỤ KIỆN') || cat.includes('SẢN XUẤT') || !p.category;
+          return cat.includes('PHỤ KIỆN') || cat.includes('SẢN XUẤT') || cat.includes('NGUYÊN LIỆU') || !p.category;
       });
       return filtered.length > 0 ? filtered : (products || []);
   }, [products]);
 
-  // Extract staff names from userConfigs
-  const staffNames = React.useMemo(() => {
-      if (!userConfigs || !userConfigs.pins) return [];
-      return Object.values(userConfigs.pins)
-          .map(u => u.name)
-          .filter(name => name && name !== 'admin' && name !== 'Boss' && name !== 'TỐI CAO' && name !== 'Khách');
-  }, [userConfigs]);
-
-  // Lọc danh sách báo nhập hàng (orderId === 'MATERIAL_REQ')
+  // Lọc danh sách phiếu đặt hàng từ bảng ImportExport (Chứng từ Kho Hàng)
   const materialRequests = React.useMemo(() => {
-    return (prodItems || []).filter(i => i.orderId === 'MATERIAL_REQ');
-  }, [prodItems]);
+    return (importExport || []).filter(ie => ie && (ie.type === 'ĐẶT HÀNG' || ie.type === 'YÊU CẦU NHẬP HÀNG'));
+  }, [importExport]);
+
+  const parseReqDetails = React.useCallback((req) => {
+    let items = [];
+    try {
+      if (req.itemsData) {
+        items = typeof req.itemsData === 'string' ? JSON.parse(req.itemsData) : req.itemsData;
+      }
+    } catch(e) { items = []; }
+    const firstItem = items[0] || {};
+    const itemName = firstItem.name || req.target || 'Vật tư / Hàng hoá';
+    const itemQty = firstItem.quantity || 1;
+    const itemUnit = firstItem.unit || 'cái';
+    const isOrdered = Boolean(req.note && req.note.includes('[ĐÃ ĐẶT HÀNG]'));
+    
+    let creator = 'Nhân viên';
+    if (req.note) {
+      const match = req.note.match(/báo nhập vật tư từ:?\s*([^(]+)/i);
+      if (match) creator = match[1].trim();
+      else if (req.note.includes('từ:')) creator = req.note.split('từ:')[1].split('(')[0].trim();
+    }
+
+    return {
+      displayName: `${itemName} x${itemQty} ${itemUnit}`,
+      creator,
+      isOrdered,
+      firstItem,
+      cleanNote: req.note ? req.note.replace(/\[ĐÃ ĐẶT HÀNG\]/g, '').trim() : ''
+    };
+  }, []);
 
   const pendingOrderRequests = React.useMemo(() => {
-    return materialRequests.filter(r => r.status === 'Chờ đặt hàng');
-  }, [materialRequests]);
+    return materialRequests.filter(r => !parseReqDetails(r).isOrdered);
+  }, [materialRequests, parseReqDetails]);
 
   const orderedRequests = React.useMemo(() => {
-    return materialRequests.filter(r => r.status === 'Đã đặt hàng');
-  }, [materialRequests]);
+    return materialRequests.filter(r => parseReqDetails(r).isOrdered);
+  }, [materialRequests, parseReqDetails]);
 
   const handleCreateMaterialRequest = async () => {
     const selectedProd = selectableProducts.find(p => String(p.id) === String(selectedProdId)) || (selectedProdId ? null : selectableProducts[0]);
@@ -1036,21 +1057,21 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ prodIt
     const prodUnit = selectedProd ? (selectedProd.unit || 'cái') : 'cái';
     const prodCostPrice = selectedProd ? Number(selectedProd.costPrice || selectedProd.price || 0) : 0;
     const totalCost = prodCostPrice * qty;
-    const prodCat = selectedProd ? (selectedProd.category || 'Vật tư') : 'Vật tư';
 
     setProcessing(true);
     try {
       const nowIso = new Date().toISOString();
       const nowStr = nowIso.slice(0, 19).replace('T', ' ');
 
-      // 1. Tạo phiếu ĐẶT HÀNG chính thức trong bảng ImportExport (Chứng từ Kho)
+      // Tạo DUY NHẤT phiếu ĐẶT HÀNG trong bảng ImportExport (Chứng từ Kho)
+      // TUYỆT ĐỐI KHÔNG TẠO LỆNH TRONG BẢNG PRODUCTION
       const ieTicket = {
         id: 'IE_' + Date.now(),
         type: 'ĐẶT HÀNG',
         target: (selectedProd && selectedProd.supplier) ? selectedProd.supplier : 'Khác',
         totalAmount: totalCost,
         date: nowStr,
-        note: `Báo nhập vật tư từ nhân sự: ${currentUser}${reqNote ? ' (' + reqNote.trim() + ')' : ''}`,
+        note: `Báo nhập vật tư từ: ${currentUser}${reqNote ? ' (' + reqNote.trim() + ')' : ''}`,
         itemsData: JSON.stringify([{
           id: selectedProd ? selectedProd.id : ('ITEM_' + Date.now()),
           sku: prodSku,
@@ -1061,32 +1082,8 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ prodIt
         }])
       };
 
-      // 2. Tạo record hiển thị trên Bảng Báo Nhập Hàng ở Dashboard
-      const task = {
-        id: 'MAT_REQ_' + Date.now(),
-        orderId: 'MATERIAL_REQ',
-        type: 'Báo Nhập Hàng',
-        name: `[${prodCat}] ${prodName} x${qty} ${prodUnit}${reqNote ? ' (' + reqNote.trim() + ')' : ''}`,
-        note: reqNote ? reqNote.trim() : '',
-        status: 'Chờ đặt hàng',
-        deadline: nowIso,
-        fulfilledFromStock: false,
-        phases: {
-          phase1: {
-            name: 'Yêu cầu',
-            status: 'Chờ đặt hàng',
-            user: currentUser,
-            start: nowStr.slice(0, 16),
-            endTime: '',
-            photo: '',
-            reward_vnd: 0
-          },
-          phase2: { name: '', status: '', user: '', start: '', endTime: '', photo: '', reward_vnd: 0 }
-        }
-      };
-
-      await pushDeltas({ ImportExport: [ieTicket], prodItems: [task] }, `Đã báo nhập vật tư & tạo phiếu ĐẶT HÀNG: ${prodName} x${qty}`, 'fa-boxes');
-      triggerToast('Đã gửi yêu cầu & tạo phiếu ĐẶT HÀNG thành công!', 'fa-check', 'success');
+      await pushDeltas({ ImportExport: [ieTicket] }, `Đã gửi yêu cầu & tạo phiếu ĐẶT HÀNG: ${prodName} x${qty}`, 'fa-boxes');
+      triggerToast('Đã tạo phiếu ĐẶT HÀNG thành công trong kho hàng!', 'fa-check', 'success');
       
       setSelectedProdId('');
       setReqQty('1');
@@ -1100,13 +1097,12 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ prodIt
   };
 
   const handleMarkAsOrdered = async (req) => {
-    if (!window.confirm(`Xác nhận ĐÃ ĐẶT HÀNG cho: ${req.name}?`)) return;
+    const details = parseReqDetails(req);
+    if (!window.confirm(`Xác nhận ĐÃ ĐẶT HÀNG cho: ${details.displayName}?`)) return;
     setProcessing(true);
     try {
-      const upd = JSON.parse(JSON.stringify(req));
-      upd.status = 'Đã đặt hàng';
-      upd.phases.phase1.status = 'Đã đặt hàng';
-      await pushDeltas({ prodItems: [upd] }, `Xác nhận đã đặt hàng cho: ${req.name}`, 'fa-truck-loading');
+      const upd = { ...req, note: (req.note || '') + ' [ĐÃ ĐẶT HÀNG]' };
+      await pushDeltas({ ImportExport: [upd] }, `Xác nhận đã đặt hàng: ${details.displayName}`, 'fa-truck-loading');
       triggerToast('Đã cập nhật trạng thái Đã đặt hàng!', 'fa-truck-loading', 'success');
     } catch(e) {
       triggerToast('Lỗi cập nhật!', 'fa-times', 'danger');
@@ -1115,24 +1111,25 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ prodIt
   };
 
   const handleMarkAsImported = (req) => {
+    const details = parseReqDetails(req);
     // Kích hoạt việc mở form nhập kho bên Tab Nhập Xuất
     window.pendingAction = 'createImportTicket';
     window.dispatchEvent(new CustomEvent('globalNavigateAndTrigger', { 
         detail: { 
             tab: 'import_export', 
             trigger: 'triggerCreateImportTicket', 
-            data: { linkedRequestId: req.id, linkedMaterialName: req.name }, 
+            data: { linkedRequestId: req.id, linkedMaterialName: details.displayName, itemsData: req.itemsData }, 
             mode: 'ERP' 
         } 
     }));
   };
 
   const handleDeleteRequest = async (req) => {
-    if (!window.confirm('Xác nhận huỷ/xoá thông báo báo nhập hàng này?')) return;
+    if (!window.confirm('Xác nhận huỷ/xoá phiếu báo đặt hàng này?')) return;
     setProcessing(true);
     try {
-      await pushDeltas({ deletes: { Production: [req.id] } }, 'Đã xoá thông báo báo nhập hàng', 'fa-trash');
-      triggerToast('Đã xoá thành công!', 'fa-trash', 'success');
+      await pushDeltas({ deletes: { ImportExport: [req.id] } }, 'Đã xoá phiếu đặt hàng', 'fa-trash');
+      triggerToast('Đã xoá phiếu đặt hàng thành công!', 'fa-trash', 'success');
     } catch(e) {
       triggerToast('Lỗi khi xoá!', 'fa-times', 'danger');
     }
@@ -1148,23 +1145,26 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ prodIt
             <div className="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
             <div className="flex items-center gap-2 border-b border-[#27272a] pb-3 mb-4">
               <div className="w-6 h-6 rounded-md bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
-                  <i className="fas fa-hand-holding-usd text-rose-500 animate-pulse text-[11px]"></i>
+                <i className="fas fa-receipt text-rose-500 text-[11px]"></i>
               </div>
-              <span className="font-black text-[12px] text-rose-500 uppercase tracking-widest">Yêu Cầu Hoàn Tiền ({reimbursements.length})</span>
+              <span className="font-black text-[12px] text-zinc-100 uppercase tracking-widest">Yêu Cầu Hoàn Tiền Vật Tư ({reimbursements.length})</span>
             </div>
             <div className="space-y-2">
-              {reimbursements.map(req => (
-                <div key={req.id} 
-                     onClick={() => window.dispatchEvent(new CustomEvent('openAdminApprovalModal', { detail: req }))}
-                     className="p-3 bg-[#121214] border border-[#27272a] rounded-lg flex items-center justify-between cursor-pointer hover:border-rose-500/50 transition-colors shadow-sm group"
-                >
-                  <div>
-                    <span className="text-zinc-200 font-extrabold text-[12px] block group-hover:text-rose-400 transition-colors">{req.reason}</span>
-                    <span className="text-[10px] font-medium text-zinc-500 block mt-1"><i className="fas fa-user-circle mr-1"></i> {req.staffName}</span>
+              {reimbursements.map(rb => (
+                <div key={rb.id} className="p-3 bg-[#121214] border border-[#27272a] rounded-lg flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <span className="font-bold text-[12px] text-zinc-100 block">{rb.reason || rb.name}</span>
+                    <span className="text-[10px] font-medium text-zinc-500 block mt-0.5">Người yêu cầu: <span className="text-rose-400 font-bold">{rb.staffName || rb.user}</span> - Số tiền: <span className="text-emerald-400 font-bold">{Number(rb.amount || 0).toLocaleString('vi-VN')}đ</span></span>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[13px] font-black text-emerald-400">{Number(req.amount).toLocaleString('vi-VN')} đ</span>
-                    <span className="block mt-1 text-[9px] text-[#d4af37] font-bold uppercase"><i className="fas fa-search"></i> Bấm để duyệt</span>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent('openAdminApprovalModal', { detail: rb }));
+                      }} 
+                      className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 active:scale-95 text-white rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                    >
+                      <i className="fas fa-money-check-alt"></i> Duyệt Chi
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1172,10 +1172,10 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ prodIt
           </div>
       )}
 
-      {/* ==================== 1. KHUNG BẢNG THÔNG BÁO NHẬP HÀNG ==================== */}
+      {/* ==================== 1. KHUNG BÁO NHẬP HÀNG / ĐẶT HÀNG ==================== */}
       <div className="bg-[#09090b] border border-[#27272a] rounded-xl p-4 shadow-sm relative overflow-hidden">
         <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
-        <div className="flex justify-between items-center border-b border-[#27272a] pb-3 mb-4">
+        <div className="flex items-center justify-between border-b border-[#27272a] pb-3 mb-4">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
                 <i className="fas fa-boxes text-emerald-500 text-[11px]"></i>
@@ -1187,7 +1187,7 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ prodIt
               setRemText('');
               setShowAddReminder(!showAddReminder);
             }} 
-            className="bg-[#121214] hover:bg-[#121214] text-emerald-500 border border-[#27272a] hover:border-emerald-500/50 font-bold text-[10px] px-3 py-1.5 rounded flex items-center gap-1.5 uppercase tracking-wide transition-all"
+            className="bg-[#121214] hover:bg-[#121214] text-emerald-500 border border-[#27272a] hover:border-emerald-500/50 font-bold text-[10px] px-3 py-1.5 rounded flex items-center gap-1.5 uppercase tracking-wide transition-all cursor-pointer"
           >
             <i className={`fas ${showAddReminder ? 'fa-times text-zinc-400' : 'fa-plus'}`}></i> {showAddReminder ? 'Đóng' : 'Báo Nhập'}
           </button>
@@ -1241,11 +1241,11 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ prodIt
             <div className="flex justify-end gap-2 pt-2 border-t border-[#27272a]">
               <button 
                 onClick={() => { setSelectedProdId(''); setReqQty('1'); setReqNote(''); setRemText(''); setShowAddReminder(false); }} 
-                className="bg-transparent hover:bg-[#27272a] text-zinc-400 font-bold px-4 py-2 rounded transition-colors uppercase text-[10px] tracking-wide"
+                className="bg-transparent hover:bg-[#27272a] text-zinc-400 font-bold px-4 py-2 rounded transition-colors uppercase text-[10px] tracking-wide cursor-pointer"
               >
                 Huỷ
               </button>
-              <button onClick={handleCreateMaterialRequest} disabled={processing} className="bg-emerald-500 hover:bg-emerald-600 text-[#09090b] font-black px-5 py-2 rounded transition-colors uppercase text-[10px] tracking-wide flex items-center gap-1.5">
+              <button onClick={handleCreateMaterialRequest} disabled={processing} className="bg-emerald-500 hover:bg-emerald-600 text-[#09090b] font-black px-5 py-2 rounded transition-colors uppercase text-[10px] tracking-wide flex items-center gap-1.5 cursor-pointer">
                 <i className="fas fa-check"></i> Tạo Phiếu Đặt
               </button>
             </div>
@@ -1263,22 +1263,25 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ prodIt
           {pendingOrderRequests.length > 0 && (
             <div className="space-y-2">
               <div className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-2 flex items-center gap-1.5"><i className="fas fa-hourglass-half"></i> Chờ đặt hàng ({pendingOrderRequests.length})</div>
-              {pendingOrderRequests.map(req => (
-                <div key={req.id} className="p-3 bg-[#121214] border border-[#27272a] rounded-lg flex items-center justify-between gap-3 flex-wrap group hover:border-amber-500/30 transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <span className="font-bold text-[12px] text-zinc-100 block">{req.name}</span>
-                    <span className="text-[10px] font-medium text-zinc-500 block mt-1"><i className="fas fa-user-circle mr-1"></i> {req.phases.phase1.user}</span>
+              {pendingOrderRequests.map(req => {
+                const details = parseReqDetails(req);
+                return (
+                  <div key={req.id} className="p-3 bg-[#121214] border border-[#27272a] rounded-lg flex items-center justify-between gap-3 flex-wrap group hover:border-amber-500/30 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <span className="font-bold text-[12px] text-zinc-100 block">{details.displayName}</span>
+                      <span className="text-[10px] font-medium text-zinc-500 block mt-1"><i className="fas fa-user-circle mr-1"></i> {details.creator} {details.cleanNote && <span className="text-zinc-400">({details.cleanNote})</span>}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      {(isAdmin || isBoss || currentUser === details.creator) && (
+                          <button onClick={() => handleDeleteRequest(req)} disabled={processing} className="text-[10px] font-bold w-7 h-7 flex items-center justify-center bg-[#121214] hover:bg-rose-500/10 text-zinc-400 hover:text-rose-500 border border-[#27272a] hover:border-rose-500/30 rounded transition-colors cursor-pointer"><i className="fas fa-trash"></i></button>
+                      )}
+                      {(isAdmin || isBoss) && (
+                          <button onClick={() => handleMarkAsOrdered(req)} disabled={processing} className="text-[10px] font-bold px-3 h-7 bg-amber-500 hover:bg-amber-600 text-[#09090b] rounded uppercase tracking-wide cursor-pointer">Xác nhận Đã Đặt</button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    {(isAdmin || isBoss || currentUser === req.phases.phase1.user) && (
-                        <button onClick={() => handleDeleteRequest(req)} disabled={processing} className="text-[10px] font-bold w-7 h-7 flex items-center justify-center bg-[#121214] hover:bg-rose-500/10 text-zinc-400 hover:text-rose-500 border border-[#27272a] hover:border-rose-500/30 rounded transition-colors"><i className="fas fa-trash"></i></button>
-                    )}
-                    {(isAdmin || isBoss) && (
-                        <button onClick={() => handleMarkAsOrdered(req)} disabled={processing} className="text-[10px] font-bold px-3 h-7 bg-amber-500 hover:bg-amber-600 text-[#09090b] rounded uppercase tracking-wide">Xác nhận Đã Đặt</button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -1286,22 +1289,27 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ prodIt
           {orderedRequests.length > 0 && (
             <div className="space-y-2">
               <div className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1.5 mt-4"><i className="fas fa-truck-loading"></i> Đã đặt - Chờ nhận ({orderedRequests.length})</div>
-              {orderedRequests.map(req => (
-                <div key={req.id} className="p-3 bg-[#121214] border border-[#27272a] rounded-lg flex items-center justify-between gap-3 flex-wrap group hover:border-blue-500/30 transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <span className="font-bold text-[12px] text-zinc-100 block">{req.name}</span>
-                    <span className="text-[10px] font-medium text-blue-400/80 block mt-1"><i className="fas fa-check-circle mr-1"></i> Đang giao hàng</span>
+              {orderedRequests.map(req => {
+                const details = parseReqDetails(req);
+                return (
+                  <div key={req.id} className="p-3 bg-[#121214] border border-[#27272a] rounded-lg flex items-center justify-between gap-3 flex-wrap group hover:border-blue-500/30 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <span className="font-bold text-[12px] text-zinc-100 block">{details.displayName}</span>
+                      <span className="text-[10px] font-medium text-blue-400/80 block mt-1"><i className="fas fa-check-circle mr-1"></i> Đã đặt hàng {details.creator && `(${details.creator})`}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      {(isAdmin || isBoss || currentUser === details.creator) && (
+                          <button onClick={() => handleDeleteRequest(req)} disabled={processing} className="text-[10px] font-bold w-7 h-7 flex items-center justify-center bg-[#121214] hover:bg-rose-500/10 text-zinc-400 hover:text-rose-500 border border-[#27272a] hover:border-rose-500/30 rounded transition-colors cursor-pointer"><i className="fas fa-trash"></i></button>
+                      )}
+                      {['QUẢN LÝ KHO', 'KẾ TOÁN', 'TỐI CAO', 'KHO VẬN', 'QUẢN LÝ KHO VẬN'].includes(String(localStorage.getItem('rf_role')).toUpperCase()) && (
+                          <button onClick={() => handleMarkAsImported(req)} className="text-[10px] font-bold px-3 h-7 bg-blue-500 hover:bg-blue-600 text-[#09090b] rounded uppercase tracking-wide flex items-center gap-1.5 cursor-pointer">
+                              <i className="fas fa-sign-in-alt"></i> Nhập Kho
+                          </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    {/* Chỉ Quản lý kho / Admin mới thấy nút Đã nhập hàng */}
-                    {['QUẢN LÝ KHO', 'KẾ TOÁN', 'TỐI CAO', 'KHO VẬN', 'QUẢN LÝ KHO VẬN'].includes(String(localStorage.getItem('rf_role')).toUpperCase()) && (
-                        <button onClick={() => handleMarkAsImported(req)} className="text-[10px] font-bold px-3 h-7 bg-blue-500 hover:bg-blue-600 text-[#09090b] rounded uppercase tracking-wide flex items-center gap-1.5">
-                            <i className="fas fa-sign-in-alt"></i> Nhập Kho
-                        </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -1583,87 +1591,6 @@ const DashboardTab = React.memo(function DashboardTab({ reimbursements = [], ord
   const filteredLogs = categoryFilter === 'Tất cả' ? allLogs : allLogs.filter(log => log.category === categoryFilter);
   const categories = ['Tất cả', 'Đơn hàng', 'Sản xuất', 'Đóng gói', 'Chấm công', 'KPI / Thưởng', 'Xuất nhập kho'];
 
-  // =========================================================================
-  // 🚨 BỘ LỌC TỰ ĐỘNG: CẢNH BÁO ĐÓNG GÓI SAU 19:00 & GHI COMBAT LOG (TRỪ CHỦ NHẬT)
-  // =========================================================================
-  const readyToPackOrders = React.useMemo(() => {
-    // Ngày Chủ Nhật xưởng nghỉ -> Không tính đơn tồn SLA đóng gói trong ngày
-    const isSunday = new Date().getDay() === 0;
-    if (isSunday) return [];
-
-    const allPackings = packings || erpData?.Packings || [];
-    return (orders || []).filter(o => {
-      // 1. Loại bỏ hoàn toàn các lệnh nội bộ sản xuất tồn / bù kho (Không phải đơn giao khách của bộ phận đóng gói)
-      const ch = String(o.channel || '').toUpperCase().trim();
-      if (ch === 'SẢN XUẤT TỒN' || ch === 'SẢN XUẤT BÙ KHO' || ch.includes('SẢN XUẤT TỒN') || ch.includes('BÙ KHO') || ch.includes('SX TỒN')) {
-        return false;
-      }
-
-      const s = String(o._effectiveStatus || o.status || '').toUpperCase().trim();
-      const exclude = ['ĐÃ BÀN GIAO', 'HOÀN THÀNH', 'ĐƠN HUỶ', 'HÀNG HOÀN', 'ĐÃ NHẬP KHO', 'ĐỐI SOÁT THÀNH CÔNG', 'ĐÃ GIAO', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED'];
-      if (exclude.includes(s)) return false;
-
-      const oIdStr = String(o.id || '').trim();
-      const oCodeStr = String(o.orderCode || '').trim();
-      const baseCodeStr = oCodeStr.split(' | ')[0].split('|')[0].trim();
-
-      const hasDonePack = allPackings.some(p => {
-        const pOrd = String(p.orderId || '').trim();
-        const isMatch = pOrd && (pOrd === oIdStr || pOrd === oCodeStr || pOrd === baseCodeStr);
-        const ps = String(p.status || '').toUpperCase().trim();
-        return isMatch && (ps === 'DONE' || ps === 'ĐÃ ĐÓNG GÓI' || ps === 'HOÀN THÀNH' || ps === 'ĐÃ XONG') && (!p.note || !p.note.includes('kho'));
-      });
-      if (hasDonePack) return false;
-
-      const linkedProds = (prodItems || []).filter(p => {
-        const pOrd = String(p.orderId || '').trim();
-        return pOrd && (pOrd === oIdStr || pOrd === oCodeStr || pOrd === baseCodeStr);
-      });
-
-      if (linkedProds.length > 0) {
-        return linkedProds.every(p => {
-          const ps = String(p.status || '').toUpperCase().trim();
-          return ps === 'DONE' || ps === 'ĐÃ XONG' || ps === 'HOÀN KHO ĐẠT' || p.fulfilledFromStock;
-        });
-      }
-
-      return s === 'SẴN SÀNG ĐÓNG GÓI' || s === 'SẴN SÀNG' || s === 'READY_PACK';
-    });
-  }, [orders, prodItems, packings, erpData?.Packings]);
-
-  const isAfter1900 = React.useMemo(() => {
-    const now = new Date();
-    // Chủ nhật xưởng nghỉ -> Tuyệt đối không bật cảnh báo SLA đóng gói
-    if (now.getDay() === 0) return false;
-    return now.getHours() >= 19;
-  }, [currentTimeMins]);
-
-  // Nhân sự phụ trách đóng gói chính thức của xưởng
-  const packingStaffResponsible = React.useMemo(() => {
-    const todayAtt = (attendance || []).find(a => {
-      const d = String(a.date || '');
-      const u = String(a.user || '');
-      return d.includes(todayStr) && (u.includes('Diệu Hương') || u.includes('Hương'));
-    });
-    return todayAtt ? todayAtt.user : 'Nguyễn Thị Diệu Hương';
-  }, [attendance, todayStr]);
-
-  // Tự động kích hoạt ghi nhận vi phạm vào Combat Log & BonusPenalty khi phát hiện sau 19:00 (trừ Chủ Nhật)
-  React.useEffect(() => {
-    const isSunday = new Date().getDay() === 0;
-    if (!isSunday && isAfter1900 && readyToPackOrders.length > 0) {
-      const cacheKey = `rf_sla_pack_logged_${todayStr}`;
-      if (!sessionStorage.getItem(cacheKey)) {
-        sessionStorage.setItem(cacheKey, 'true');
-        if (typeof window.runGAS === 'function') {
-          window.runGAS('api_auditEndOfDayPackingSLA')
-            .then(res => console.log('⚡ Đã ghi nhận cảnh báo đóng gói sau 19:00 vào Combat Log:', res))
-            .catch(err => console.warn('Lỗi ghi nhận Combat Log:', err));
-        }
-      }
-    }
-  }, [isAfter1900, readyToPackOrders.length, todayStr]);
-
   const getCategoryStyle = (category) => {
     switch (category) {
       case 'Đơn hàng': return { icon: <i className="fas fa-file-invoice-dollar"></i>, color: '#3b82f6', bg: 'bg-[#3b82f6]/10' };
@@ -1675,9 +1602,6 @@ const DashboardTab = React.memo(function DashboardTab({ reimbursements = [], ord
       default: return { icon: <i className="fas fa-info-circle"></i>, color: '#9ca3af', bg: 'bg-gray-400/10' };
     }
   };
-
-  // State bật/tắt xem danh sách đơn tồn
-  const [showOrderList, setShowOrderList] = React.useState(false);
 
   return (
     <div className="space-y-4 sm:space-y-5 pb-4 sm:pb-6 w-full relative">
@@ -1692,66 +1616,6 @@ const DashboardTab = React.memo(function DashboardTab({ reimbursements = [], ord
           </p>
         </div>
       </div>
-
-      {/* 🚨 BÁO ĐỘNG SLA ĐÓNG GÓI SAU 19:00 (GIAO DIỆN SIÊU GỌN GÀNG) */}
-      {isAfter1900 && readyToPackOrders.length > 0 && (
-        <div className="w-full bg-[#13090b] border border-rose-800/60 rounded-xl p-2.5 sm:p-3 shadow-sm relative overflow-hidden transition-all">
-          <div className="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
-
-          <div className="flex items-center justify-between gap-3 pl-1">
-            {/* Cột trái: Thông tin vi phạm */}
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-6 h-6 rounded bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 text-[11px] shrink-0">
-                <i className="fas fa-exclamation-triangle"></i>
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-black text-[12px] text-zinc-100 uppercase tracking-wider">
-                    Cảnh Báo SLA Đóng Gói (Sau 19:00)
-                  </span>
-                  <span className="bg-rose-500/20 border border-rose-500/40 text-rose-300 font-mono font-bold text-[10px] px-2 py-0.2 rounded-full">
-                    {readyToPackOrders.length} đơn tồn
-                  </span>
-                </div>
-                <div className="text-[10.5px] text-zinc-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                  <span>Phụ trách: <strong className="text-zinc-200 bg-black/40 px-1.5 py-0.2 rounded border border-zinc-800">{packingStaffResponsible}</strong></span>
-                  <span className="text-zinc-600 hidden sm:inline">•</span>
-                  <span className="text-amber-400/90 text-[10px] font-medium"><i className="fas fa-clock text-[9px] mr-1"></i>21:00 phạt 20k/đơn Shopee VN</span>
-                  <span className="text-zinc-600 hidden sm:inline">•</span>
-                  <span className="text-rose-400/90 text-[10px] font-medium"><i className="fas fa-camera text-[9px] mr-1"></i>Ảnh không khớp trừ 10.000đ</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Cột phải: Nút Chi tiết nhỏ gọn */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button 
-                onClick={() => setShowOrderList(prev => !prev)}
-                className="bg-[#1c1013] hover:bg-[#28151a] text-zinc-300 hover:text-white text-[10px] font-bold px-2.5 py-1 rounded-md border border-rose-900/50 transition-colors flex items-center gap-1.5 cursor-pointer"
-                title={showOrderList ? 'Thu gọn danh sách đơn' : 'Xem chi tiết danh sách đơn'}
-              >
-                <span>{showOrderList ? 'Thu gọn' : 'Chi tiết'}</span>
-                <i className={`fas fa-chevron-${showOrderList ? 'up' : 'down'} text-[8px]`}></i>
-              </button>
-            </div>
-          </div>
-
-          {/* Dải chip danh sách đơn (chỉ hiện khi bấm Chi tiết) */}
-          {showOrderList && (
-            <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2 border-t border-rose-950/80 pl-1">
-              {readyToPackOrders.map((o, idx) => (
-                <span key={idx} className="text-[10px] font-mono font-medium bg-[#1a0f12] text-rose-300/90 border border-rose-900/40 px-2 py-0.5 rounded flex items-center gap-1">
-                  <i className="fas fa-box text-[8px] text-amber-500/80"></i>
-                  <span className="text-zinc-200">{o.orderCode || o.id}</span>
-                  <span className={`text-[9px] ${String(o.channel || '').toUpperCase().includes('SHOPEE') ? 'text-amber-400 font-bold' : 'text-zinc-500'}`}>
-                    ({o.channel || 'Trực tiếp'})
-                  </span>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* THÔNG BÁO TỪ BAN QUẢN LÝ (BOSS) */}
       {(!isEditingNotice && (!displayNotice || displayNotice === 'Chưa có thông báo nội bộ nào.')) ? (
@@ -1951,11 +1815,12 @@ const DashboardTab = React.memo(function DashboardTab({ reimbursements = [], ord
 
       {/* KHUNG GIAO VIỆC / NHẮC VIỆC & NHIỆM VỤ CHUNG */}
       <DashboardTasksSection 
-          prodItems={prodItems} 
+          importExport={(typeof importExport !== 'undefined' ? importExport : null) || erpData?.ImportExport || []}
           currentUser={currentUser} 
           pushDeltas={pushDeltas} 
           triggerToast={triggerToast} 
           isAdmin={isSuperAdmin} 
+          isBoss={isBoss}
           userConfigs={userConfigs}
           reimbursements={reimbursements}
           products={(typeof erpProducts !== 'undefined' ? erpProducts : null) || erpData?.Products || []}

@@ -6,6 +6,15 @@
 !*.html
 !Code.js
 !Operations.js
+!SetupShopeeDB.js
+!ShopeeDbService.js
+!ShopeeWebhookHandler.js
+!ShopeeApiService.js
+!ShopeeSyncEngine.js
+!ShopeeController.js
+!ShopeeDataMigration.js
+!MasterGovernanceAgent.js
+!RFEnterpriseCore.js
 
 # 3. Tuyệt đối loại trừ thư mục kỹ năng AI, môi trường và service worker
 .agents/**

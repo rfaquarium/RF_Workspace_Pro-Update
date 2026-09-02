@@ -3,8 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport"
-    content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>RF Workspace Pro</title>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#09090b">
@@ -26,34 +25,22 @@
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', 'Plus Jakarta Sans', 'sans-serif'],
-            display: ['Plus Jakarta Sans', 'Inter', 'sans-serif']
+            sans: ['Inter', 'sans-serif'],
+            display: ['Plus Jakarta Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
           },
           colors: {
-            paper: {
-              1: 'oklch(var(--color-paper-1) / <alpha-value>)',
-              2: 'oklch(var(--color-paper-2) / <alpha-value>)',
-              3: 'oklch(var(--color-paper-3) / <alpha-value>)',
-            },
-            ink: {
-              1: 'oklch(var(--color-ink-1) / <alpha-value>)',
-              2: 'oklch(var(--color-ink-2) / <alpha-value>)',
-              3: 'oklch(var(--color-ink-3) / <alpha-value>)',
-            },
+            canvas: 'var(--bg-canvas)',
             surface: {
-              1: 'oklch(var(--color-surface-1) / <alpha-value>)',
-              2: 'oklch(var(--color-surface-2) / <alpha-value>)',
+              1: 'var(--bg-surface-1)',
+              2: 'var(--bg-surface-2)'
             },
             accent: {
-              DEFAULT: 'oklch(var(--color-accent) / <alpha-value>)',
-              hover: 'oklch(var(--color-accent-hover) / <alpha-value>)',
-              text: 'oklch(var(--color-accent-text) / <alpha-value>)',
+              gold: 'var(--accent-gold)',
+              light: 'var(--accent-gold-light)'
             },
-            status: {
-              success: 'oklch(var(--color-success) / <alpha-value>)',
-              warning: 'oklch(var(--color-warning) / <alpha-value>)',
-              danger: 'oklch(var(--color-danger) / <alpha-value>)',
-              info: 'oklch(var(--color-info) / <alpha-value>)',
+            border: {
+              hairline: 'var(--border-hairline)'
             }
           }
         }
@@ -61,9 +48,7 @@
     }
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
-    rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -126,36 +111,47 @@
        ========================================================================= */
 
     :root {
-      --color-paper-1: #09090b;
-      --color-paper-2: #121215;
-      --color-paper-3: #1a1a20;
+      --bg-canvas: #09090b;
+      --bg-surface-1: #121215;
+      --bg-surface-2: #1a1a20;
+      --border-hairline: rgba(255, 255, 255, 0.08);
+      --accent-gold: #d4af37;
+      --accent-gold-light: #f0ca5e;
+    }
 
-      --color-ink-1: #fafafa;
-      --color-ink-2: #a1a1aa;
-      --color-ink-3: #71717a;
-
-      --color-surface-1: #18181c;
-      --color-surface-2: #222228;
-
-      --color-accent: #d4af37;
-      --color-accent-hover: #f0ca5e;
-      --color-accent-text: #09090b;
-
-      --color-border-hairline: rgba(255, 255, 255, 0.08);
-      --color-border-hover: rgba(212, 175, 55, 0.35);
-
-      --color-success: #10b981;
-      --color-warning: #f59e0b;
-      --color-danger: #ef4444;
-      --color-info: #3b82f6;
-
-      --rf-bg-main: #09090b;
-      --rf-card-bg: #121215;
-      --rf-border: rgba(255, 255, 255, 0.08);
-      --rf-primary: #d4af37;
-      --rf-primary-hover: #f0ca5e;
-      --rf-text-main: #fafafa;
-      --rf-text-muted: #a1a1aa;
+    /* --- GAMIFICATION: FLOATING EXP & REWARD PARTICLES --- */
+    @keyframes floatExpUp {
+      0% {
+        opacity: 1;
+        transform: translate3d(-50%, 0, 0) scale(0.85);
+      }
+      35% {
+        opacity: 1;
+        transform: translate3d(-50%, -24px, 0) scale(1.15);
+      }
+      100% {
+        opacity: 0;
+        transform: translate3d(-50%, -52px, 0) scale(0.9);
+      }
+    }
+    .rf-exp-float-particle {
+      position: fixed;
+      pointer-events: none;
+      z-index: 999999;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-weight: 900;
+      font-size: 13px;
+      letter-spacing: -0.02em;
+      padding: 3px 9px;
+      border-radius: 8px;
+      background: rgba(12, 12, 16, 0.94);
+      border: 1px solid rgba(212, 175, 55, 0.5);
+      color: #fde047;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7), 0 0 16px rgba(234, 179, 8, 0.4);
+      animation: floatExpUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      white-space: nowrap;
+      will-change: transform, opacity;
+      user-select: none;
     }
 
     /* --- BASE RESET & MOBILE SCREEN LOCK (100DVH + SAFE AREA INSETS) --- */
@@ -163,17 +159,19 @@
     body {
       width: 100%;
       height: 100%;
-      min-height: 100vh;
-      min-height: 100dvh; /* Bắt trọn chiều cao động của màn hình mobile */
+      min-height: 100dvh;
       margin: 0;
       padding: 0;
-      overflow-x: hidden;
-      background-color: #09090b; /* Màu nền Obsidian tránh lộ vệt trắng khi nạp */
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      background-color: var(--bg-canvas);
       color: #fafafa;
-      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
       text-rendering: optimizeLegibility;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
+      overscroll-behavior: none;
+      overflow-x: clip;
+      touch-action: pan-y pinch-zoom;
     }
 
     /* Container chính của ứng dụng (#root và wrapper ngoài cùng) */
@@ -201,7 +199,7 @@
     .rf-mono,
     code,
     kbd {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace ;
     }
 
     /* --- WORKBENCH ATOMIC UTILITIES --- */
@@ -221,31 +219,31 @@
     }
 
     .rf-input-glass {
-      background-color: #0e1015 !important;
-      border: 1px solid rgba(255, 255, 255, 0.12) !important;
-      color: #ffffff !important;
-      border-radius: 12px !important;
-      padding: 10px 14px !important;
-      font-size: 13px !important;
-      font-weight: 600 !important;
-      outline: none !important;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      background-color: #0e1015 ;
+      border: 1px solid rgba(255, 255, 255, 0.12) ;
+      color: #ffffff ;
+      border-radius: 12px ;
+      padding: 10px 14px ;
+      font-size: 13px ;
+      font-weight: 600 ;
+      outline: none ;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) ;
     }
 
     .rf-input-glass:focus,
     .rf-input-glass.is-focus {
-      border-color: #d4af37 !important;
-      box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2) !important;
-      background-color: #141720 !important;
+      border-color: #d4af37 ;
+      box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2) ;
+      background-color: #141720 ;
     }
 
     .rf-input-glass option {
-      background-color: #121215 !important;
-      color: #ffffff !important;
+      background-color: #121215 ;
+      color: #ffffff ;
     }
 
     .rf-input-glass::placeholder {
-      color: #71717a !important;
+      color: #71717a ;
     }
 
     .rf-input-glass::-webkit-calendar-picker-indicator {
@@ -267,27 +265,25 @@
     button:not(:disabled):active,
     button.is-active,
     .active\:scale-95:active {
-      transform: scale(0.96) !important;
-      filter: brightness(0.96) !important;
+      transform: scale(0.96) ;
+      filter: brightness(0.96) ;
     }
 
     button:focus-visible,
     button.is-focus {
-      outline: 2px solid #d4af37 !important;
+      outline: 2px solid #d4af37 ;
       outline-offset: 2px;
     }
 
     button:disabled {
-      opacity: 0.45 !important;
-      cursor: not-allowed !important;
-      filter: none !important;
-      transform: none !important;
+      opacity: 0.45 ;
+      cursor: not-allowed ;
+      filter: none ;
+      transform: none ;
     }
 
     /* --- HARDWARE ACCELERATION & ZERO-LATENCY TAB VIEWS --- */
     .rf-gpu-accelerated {
-      transform: translate3d(0, 0, 0);
-      will-change: transform, opacity;
       backface-visibility: hidden;
     }
 
@@ -296,13 +292,13 @@
     }
 
     .rf-tab-view.hidden {
-      display: none !important;
+      display: none ;
       content-visibility: hidden;
     }
 
     @keyframes tabFadeIn {
-      from { opacity: 0; transform: translate3d(0, 4px, 0); }
-      to { opacity: 1; transform: translate3d(0, 0, 0); }
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
 
     /* --- ANIMATIONS & MICRO-INTERACTIONS --- */
@@ -354,13 +350,17 @@
       background: rgba(212, 175, 55, 0.5);
     }
 
-    .hide-scrollbar::-webkit-scrollbar {
-      display: none;
+    .hide-scrollbar::-webkit-scrollbar,
+    .no-scrollbar::-webkit-scrollbar {
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
     }
 
-    .hide-scrollbar {
-      scrollbar-width: none;
-      -ms-overflow-style: none;
+    .hide-scrollbar,
+    .no-scrollbar {
+      scrollbar-width: none !important;
+      -ms-overflow-style: none !important;
     }
 
     * {
@@ -380,10 +380,10 @@
     /* --- MODAL DIALOGS --- */
     .modal-content,
     .rf-modal-content {
-      background-color: #121215 !important;
-      border: 1px solid rgba(255, 255, 255, 0.12) !important;
-      border-radius: 16px !important;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75) !important;
+      background-color: #121215 ;
+      border: 1px solid rgba(255, 255, 255, 0.12) ;
+      border-radius: 16px ;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75) ;
       color: #fafafa;
     }
 
@@ -395,14 +395,14 @@
 
     /* --- TOP HEADER & ACTIVE PILL --- */
     .gen2-nav-btn {
-      transition: all 0.2s ease !important;
-      border-radius: 9999px !important;
+      transition: all 0.2s ease ;
+      border-radius: 9999px ;
     }
 
     .gen2-nav-btn.text-\[\#d4af37\] {
-      background: rgba(212, 175, 55, 0.12) !important;
-      box-shadow: 0 0 16px rgba(212, 175, 55, 0.18) !important;
-      border: 1px solid rgba(212, 175, 55, 0.25) !important;
+      background: rgba(212, 175, 55, 0.12) ;
+      box-shadow: 0 0 16px rgba(212, 175, 55, 0.18) ;
+      border: 1px solid rgba(212, 175, 55, 0.25) ;
     }
   </style>
 </head>
@@ -483,11 +483,14 @@
     <script id="jsx-Tab_ImportExport" type="text/plain"><?!= include('Tab_ImportExport'); ?></script>
     <script id="jsx-Tab_Suppliers" type="text/plain"><?!= include('Tab_Suppliers'); ?></script>
     <script id="jsx-Tab_Finance" type="text/plain"><?!= include('Tab_Finance'); ?></script>
+    <script id="jsx-Tab_BusinessReport" type="text/plain"><?!= include('Tab_BusinessReport'); ?></script>
     <script id="jsx-Tab_HR" type="text/plain"><?!= include('Tab_HR'); ?></script>
     <script id="jsx-Tab_Documents" type="text/plain"><?!= include('Tab_Documents'); ?></script>
     <script id="jsx-Tab_Viewer3D" type="text/plain"><?!= include('Tab_Viewer3D'); ?></script>
     <script id="jsx-Tab_Affiliate" type="text/plain"><?!= include('Tab_Affiliate'); ?></script>
     <script id="jsx-Tab_Analytics" type="text/plain"><?!= include('Tab_Analytics'); ?></script>
+    <script id="jsx-Tab_Workspaces" type="text/plain"><?!= include('Tab_Workspaces'); ?></script>
+    <script id="jsx-ShopeeGlobalTab" type="text/plain"><?!= include('ShopeeGlobalTab'); ?></script>
     <script id="jsx-App_Main" type="text/plain"><?!= include('App_Main'); ?></script>
   </div>
   <script>
@@ -509,7 +512,7 @@
       // Defer ~1.4 MB: Tất cả tab còn lại, biên dịch nền sau khi app hiện
       // ═══════════════════════════════════════════════════════════════════
       var coreFileIds = ['Config', 'Components', 'Modals', 'Modals_Orders', 'Tab_Dashboard', 'Tab_Orders', 'App_Main'];
-      var deferredFileIds = ['Tab_Production', 'Tab_Inventory', 'Tab_ImportExport', 'Tab_Suppliers', 'Tab_Finance', 'Tab_HR', 'Tab_Documents', 'Tab_Viewer3D', 'Tab_Affiliate', 'Tab_Analytics'];
+      var deferredFileIds = ['Tab_Production', 'Tab_Inventory', 'Tab_ImportExport', 'Tab_Suppliers', 'Tab_Finance', 'Tab_BusinessReport', 'Tab_HR', 'Tab_Documents', 'Tab_Viewer3D', 'Tab_Affiliate', 'Tab_Analytics', 'Tab_Workspaces', 'ShopeeGlobalTab'];
 
       function buildJsx(ids) {
         var jsx = '';
@@ -663,6 +666,7 @@
           // Deferred lỗi — dò tìm file cụ thể
           var errMsgs = diagnoseSyntaxErrors(deferredFileIds);
           errMsgs.forEach(function (m) { console.error(m); });
+          cleanCacheByPrefix('rf_deferred_');
         }
 
         // Thông báo cho React re-render để phát hiện component mới
@@ -743,17 +747,17 @@
     .rf-modal-content select,
     .rf-modal-content textarea {
       width: 100%;
-      padding: 11px 14px !important;
-      background: #0e1015 !important;
-      background-color: #0e1015 !important;
-      border: 1px solid #2d3748 !important;
-      border-radius: 12px !important;
-      color: #ffffff !important;
-      font-size: 13px !important;
-      font-weight: 600 !important;
-      box-sizing: border-box !important;
-      outline: none !important;
-      transition: all 0.2s ease !important;
+      padding: 11px 14px ;
+      background: #0e1015 ;
+      background-color: #0e1015 ;
+      border: 1px solid #2d3748 ;
+      border-radius: 12px ;
+      color: #ffffff ;
+      font-size: 13px ;
+      font-weight: 600 ;
+      box-sizing: border-box ;
+      outline: none ;
+      transition: all 0.2s ease ;
     }
 
     .rf-form-control:focus,
@@ -761,24 +765,24 @@
     .rf-modal-content input:focus,
     .rf-modal-content select:focus,
     .rf-modal-content textarea:focus {
-      outline: none !important;
-      border-color: #f59e0b !important;
-      background-color: #141720 !important;
-      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25) !important;
+      outline: none ;
+      border-color: #f59e0b ;
+      background-color: #141720 ;
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25) ;
     }
 
     .rf-form-control option,
     .rf-input-glass option,
     .rf-modal-content option {
-      background-color: #0e1015 !important;
-      color: #ffffff !important;
+      background-color: #0e1015 ;
+      color: #ffffff ;
     }
 
     .rf-form-control::placeholder,
     .rf-input-glass::placeholder,
     .rf-modal-content input::placeholder,
     .rf-modal-content textarea::placeholder {
-      color: #71717a !important;
+      color: #71717a ;
     }
 
     .rf-form-control::-webkit-calendar-picker-indicator,
@@ -842,17 +846,35 @@
       </div>
 
       <!-- 1. Select User -->
+      <!-- 1. Select User -->
       <div class="form-group" style="margin-bottom: 14px;">
         <label for="kpiUserSelect"
           style="display: block; font-size: 11px; font-weight: 700; color: #a0aec0; text-transform: uppercase; margin-bottom: 6px;">Nhân
           sự nhận KPI *</label>
-        <select id="kpiUserSelect"
+        <select id="kpiUserSelect" onchange="onStandaloneUserChange(this.value)"
           style="width: 100%; padding: 12px 14px; background: #0e1015; border: 1px solid #2d3748; border-radius: 12px; color: #fff; font-weight: 700; font-size: 13px; outline: none;">
           <option value="">-- Chọn nhân sự --</option>
         </select>
       </div>
 
-      <!-- 2. KPI Type Preset -->
+      <!-- 2. Chu kỳ đánh giá KPI (Tuần / Tháng) -->
+      <div class="form-group" style="margin-bottom: 14px; background: #0e1015; padding: 12px; border-radius: 12px; border: 1px solid #2d3748;">
+        <label style="display: block; font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase; margin-bottom: 8px;">
+          🔄 Chu kỳ đánh giá KPI *
+        </label>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" id="btnCycleWeek" onclick="selectKpiCycle('WEEK')"
+            style="flex: 1; padding: 10px; border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer; border: 1px solid #0284c7; background: rgba(56, 189, 248, 0.2); color: #7dd3fc; transition: all 0.2s;">
+            📅 Hàng Tuần (T2 ➔ CN)
+          </button>
+          <button type="button" id="btnCycleMonth" onclick="selectKpiCycle('MONTH')"
+            style="flex: 1; padding: 10px; border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer; border: 1px solid #334155; background: rgba(0, 0, 0, 0.3); color: #94a3b8; transition: all 0.2s;">
+            🗓️ Hàng Tháng (Ngày 1 ➔ Cuối)
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. KPI Type Preset -->
       <div class="form-group" style="margin-bottom: 14px;">
         <label for="kpiPresetSelect"
           style="display: block; font-size: 11px; font-weight: 700; color: #fbbf24; text-transform: uppercase; margin-bottom: 6px;">⚡
@@ -860,27 +882,35 @@
         <select id="kpiPresetSelect" onchange="applyKpiPreset(this.value)"
           style="width: 100%; padding: 10px 14px; background: #1e222d; border: 1px solid #f59e0b; border-radius: 12px; color: #fbbf24; font-weight: 700; font-size: 12px; outline: none;">
           <option value="">-- Chọn loại KPI mẫu (Hoặc tự nhập bên dưới) --</option>
-          <option value="khieu_nai">🛡️ Vận hành: Tỷ lệ thắng khiếu nại sàn (&gt; 60%)</option>
-          <option value="hang_hoan">🔄 Vận hành: Xử lý hàng huỷ hoàn &amp; gắn trách nhiệm (&gt; 90%)</option>
-          <option value="ban_hang">💰 Bán hàng: Doanh thu chốt đơn thực nhận (&gt; 20 triệu)</option>
-          <option value="dong_goi">📦 Đóng gói: Năng suất đóng gói chuẩn SLA 19:30</option>
-          <option value="khau_1">🔨 Sản xuất: Năng suất Khâu 1 (Cắt Dán / Dựng Khung)</option>
-          <option value="khau_2">✨ Sản xuất: Năng suất Khâu 2 (Gọt Keo / Gia Cố)</option>
-          <option value="san_xuat">🏭 Sản xuất: Tổng khâu hoàn thành</option>
+          <optgroup label="👑 DÀNH CHO FOUNDER & BAN ĐIỀU HÀNH">
+            <option value="founder_intl">🌍 [FOUNDER] 1 Cột mốc Kênh Quốc tế / Tuần</option>
+            <option value="founder_sprint">⚡ [FOUNDER] Hoàn thành Sprint Tính năng RF Workspace Pro</option>
+            <option value="founder_kcs">🛡️ [FOUNDER] Tỷ lệ Tự chủ KCS Layout &gt;= 80%</option>
+            <option value="founder_review">📊 [FOUNDER] Review Hiệu suất &amp; Dòng tiền Chủ Nhật</option>
+          </optgroup>
+          <optgroup label="🏭 DÀNH CHO VẬN HÀNH & SẢN XUẤT">
+            <option value="be_kinh">🪟 [BỂ KÍNH] Cắt dán phôi đạt KCS</option>
+            <option value="layout">🌿 [LAYOUT] Gia cố và dán rêu đúng định mức</option>
+            <option value="dong_goi">📦 [ĐÓNG GÓI] Hoàn tất kiện trước 19:00</option>
+            <option value="sales_chat">💬 [SALES] Phản hồi chat &gt; 96%</option>
+            <option value="khieu_nai">🛡️ [VẬN HÀNH] Tỷ lệ thắng khiếu nại sàn (&gt; 60%)</option>
+            <option value="hang_hoan">🔄 [VẬN HÀNH] Xử lý hàng huỷ hoàn &amp; gắn trách nhiệm (&gt; 90%)</option>
+            <option value="ban_hang">💰 [BÁN HÀNG] Doanh thu chốt đơn thực nhận (&gt; 20 triệu)</option>
+          </optgroup>
         </select>
       </div>
 
-      <!-- 3. KPI Name -->
+      <!-- 4. KPI Name -->
       <div class="form-group" style="margin-bottom: 14px;">
         <label for="kpiNameInput"
           style="display: block; font-size: 11px; font-weight: 700; color: #a0aec0; text-transform: uppercase; margin-bottom: 6px;">Tên
           mục tiêu (KPI) *</label>
         <input type="text" id="kpiNameInput"
           style="width: 100%; padding: 12px 14px; background: #0e1015; border: 1px solid #2d3748; border-radius: 12px; color: #fff; font-weight: 700; font-size: 13px; outline: none;"
-          placeholder="VD: Tỉ lệ thắng khiếu nại > 60% hoặc Doanh thu bán hàng">
+          placeholder="VD: [FOUNDER] Hoàn thành Sprint Tính năng RF Workspace Pro">
       </div>
 
-      <!-- 4. SOP Guide -->
+      <!-- 5. SOP Guide -->
       <div class="form-group" style="margin-bottom: 14px;">
         <label for="kpiGuideInput"
           style="display: block; font-size: 11px; font-weight: 700; color: #fbbf24; text-transform: uppercase; margin-bottom: 6px;">💡
@@ -890,7 +920,7 @@
           placeholder="Mô tả rõ nhân sự phải làm gì, chụp ảnh ở đâu hoặc quy chuẩn hệ thống duyệt KPI này..."></textarea>
       </div>
 
-      <!-- 5. Target & Manual Unit Input -->
+      <!-- 6. Target & Manual Unit Input -->
       <div class="form-group" style="margin-bottom: 14px; display: flex; gap: 10px;">
         <div style="flex: 2;">
           <label for="kpiTargetInput"
@@ -898,7 +928,7 @@
             tiêu (Target) *</label>
           <input type="number" id="kpiTargetInput"
             style="width: 100%; padding: 12px 14px; background: #0e1015; border: 1px solid #2d3748; border-radius: 12px; color: #fbbf24; font-weight: 800; font-size: 14px; outline: none;"
-            placeholder="VD: 60, 100, 20000000...">
+            placeholder="VD: 1, 80, 100, 20000000...">
         </div>
         <div style="flex: 1;">
           <label for="kpiUnitSelect"
@@ -906,11 +936,11 @@
             vị *</label>
           <input type="text" id="kpiUnitSelect"
             style="width: 100%; padding: 12px 14px; background: #0e1015; border: 1px solid #2d3748; border-radius: 12px; color: #38bdf8; font-weight: 800; font-size: 13px; outline: none; text-align: center;"
-            placeholder="%, Kiện, Bộ...">
+            placeholder="Cột mốc, %, Kiện...">
         </div>
       </div>
 
-      <!-- 6. Reward & Penalty -->
+      <!-- 7. Reward & Penalty -->
       <div class="form-group" style="margin-bottom: 18px; display: flex; gap: 10px;">
         <div style="flex: 1;">
           <label for="kpiRewardInput"
@@ -918,7 +948,7 @@
             thưởng (VNĐ)</label>
           <input type="number" id="kpiRewardInput"
             style="width: 100%; padding: 12px 14px; background: #091a13; border: 1px solid rgba(52,211,153,0.4); border-radius: 12px; color: #34d399; font-weight: 800; font-size: 14px; outline: none;"
-            placeholder="VD: 875000">
+            placeholder="VD: 1000000">
         </div>
         <div style="flex: 1;">
           <label for="kpiPenaltyInput"
@@ -926,7 +956,7 @@
             phạt vi phạm (VNĐ)</label>
           <input type="number" id="kpiPenaltyInput"
             style="width: 100%; padding: 12px 14px; background: #200d11; border: 1px solid rgba(251,113,133,0.4); border-radius: 12px; color: #fb7185; font-weight: 800; font-size: 14px; outline: none;"
-            placeholder="VD: 100000">
+            placeholder="VD: 0 hoặc 50000">
         </div>
       </div>
 
@@ -938,6 +968,7 @@
         <button class="rf-btn-submit" onclick="submitKPIStandalone()"
           style="flex: 2; background: #f59e0b; color: #000; border: none; padding: 12px 20px; border-radius: 12px; cursor: pointer; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Lưu
           Thiết Lập KPI</button>
+      </div>
       </div>
     </div>
   </div>
@@ -1020,58 +1051,161 @@
   </div>
 
   <script>
+    let currentStandaloneKpiCycle = 'MONTH';
+
+    function selectKpiCycle(cycle) {
+      currentStandaloneKpiCycle = cycle;
+      const btnWeek = document.getElementById('btnCycleWeek');
+      const btnMonth = document.getElementById('btnCycleMonth');
+      if (btnWeek && btnMonth) {
+        if (cycle === 'WEEK') {
+          btnWeek.style.background = 'rgba(56, 189, 248, 0.2)';
+          btnWeek.style.border = '1px solid #0284c7';
+          btnWeek.style.color = '#7dd3fc';
+          btnMonth.style.background = 'rgba(0, 0, 0, 0.3)';
+          btnMonth.style.border = '1px solid #334155';
+          btnMonth.style.color = '#94a3b8';
+        } else {
+          btnMonth.style.background = 'rgba(245, 158, 11, 0.2)';
+          btnMonth.style.border = '1px solid #f59e0b';
+          btnMonth.style.color = '#fde68a';
+          btnWeek.style.background = 'rgba(0, 0, 0, 0.3)';
+          btnWeek.style.border = '1px solid #334155';
+          btnWeek.style.color = '#94a3b8';
+        }
+      }
+    }
+
+    function onStandaloneUserChange(userName) {
+      if (!userName) return;
+      const u = String(userName).toLowerCase();
+      if (u.includes('tiến') || u.includes('founder')) {
+        selectKpiCycle('WEEK');
+      } else {
+        selectKpiCycle('MONTH');
+      }
+    }
+
+    const STANDALONE_KPI_PRESETS = {
+      'founder_intl': {
+        name: '[FOUNDER] 1 Cột mốc Kênh Quốc tế / Tuần',
+        target: '1',
+        unit: 'Cột mốc',
+        reward: '1000000',
+        penalty: '0',
+        cycle: 'WEEK',
+        note: 'Đạt ít nhất 1 cột mốc chiến lược mở rộng thị trường quốc tế (Shopee Global/TikTok Global/Amazon/Lazada cross-border) hoặc hợp đồng phân phối ngoại tệ trong tuần.'
+      },
+      'founder_sprint': {
+        name: '[FOUNDER] Hoàn thành Sprint Tính năng RF Workspace Pro',
+        target: '100',
+        unit: '% Sprint',
+        reward: '800000',
+        penalty: '0',
+        cycle: 'WEEK',
+        note: 'Hoàn tất đúng tiến độ 100% các đầu việc sprint công nghệ và tối ưu hệ thống RF Workspace Pro trong tuần.'
+      },
+      'founder_kcs': {
+        name: '[FOUNDER] Tỷ lệ Tự chủ KCS Layout >= 80%',
+        target: '80',
+        unit: '% Tự chủ',
+        reward: '500000',
+        penalty: '0',
+        cycle: 'WEEK',
+        note: 'Đội ngũ thợ tự chủ hoàn thiện và kiểm định KCS Layout đạt chuẩn từ 80% trở lên mà không cần Founder can thiệp chỉnh sửa thủ công.'
+      },
+      'founder_review': {
+        name: '[FOUNDER] Review Hiệu suất & Dòng tiền Chủ Nhật',
+        target: '100',
+        unit: '% Đúng hạn',
+        reward: '300000',
+        penalty: '0',
+        cycle: 'WEEK',
+        note: 'Thực hiện đối soát P&L, dòng tiền Sổ Quỹ và tổng kết hiệu suất nhân sự toàn xưởng đúng hạn vào 20:00 tối Chủ Nhật hằng tuần.'
+      },
+      'be_kinh': {
+        name: '[BỂ KÍNH] Cắt dán phôi đạt KCS',
+        target: '80',
+        unit: 'SP',
+        reward: '500000',
+        penalty: '50000',
+        cycle: 'MONTH',
+        note: 'Cắt mài vi tính, dán keo và dựng khung bể kính đạt 100% tiêu chuẩn KCS, không bọt keo, đúng kích thước phôi.'
+      },
+      'layout': {
+        name: '[LAYOUT] Gia cố và dán rêu đúng định mức',
+        target: '80',
+        unit: 'SP',
+        reward: '500000',
+        penalty: '50000',
+        cycle: 'MONTH',
+        note: 'Gia cố khung lũa/đá, gọt keo thẩm mỹ và dán rêu đúng định mức kỹ thuật xưởng Rich Fish.'
+      },
+      'dong_goi': {
+        name: '[ĐÓNG GÓI] Hoàn tất kiện trước 19:00',
+        target: '290',
+        unit: 'Kiện',
+        reward: '500000',
+        penalty: '50000',
+        cycle: 'MONTH',
+        note: 'Đóng gói kiện hàng an toàn xốp bọc nilon 6 mặt, nghiệm thu đủ 2 ảnh trước 19:00 hằng ngày.'
+      },
+      'sales_chat': {
+        name: '[SALES] Phản hồi chat > 96%',
+        target: '96',
+        unit: '%',
+        reward: '500000',
+        penalty: '100000',
+        cycle: 'MONTH',
+        note: 'Tỷ lệ phản hồi tin nhắn khách hàng trong 15 phút trên Shopee/TikTok/Lazada đạt trên 96%.'
+      },
+      'khieu_nai': {
+        name: '[VẬN HÀNH] Tỷ lệ thắng khiếu nại sàn > 60%',
+        target: '60',
+        unit: '%',
+        reward: '875000',
+        penalty: '100000',
+        cycle: 'MONTH',
+        note: 'Bắt buộc quay video đồng kiểm 6 mặt khi bóc kiện hàng hoàn. Hệ thống tự động quét đơn khiếu nại thắng có tag [KN-THANG].'
+      },
+      'hang_hoan': {
+        name: '[VẬN HÀNH] Xử lý hàng huỷ hoàn & gắn trách nhiệm > 90%',
+        target: '90',
+        unit: '%',
+        reward: '750000',
+        penalty: '50000',
+        cycle: 'MONTH',
+        note: 'Hàng hoàn về kho phải được phân loại và xử lý trong 48h. Tỷ lệ tính trên tổng đơn hoàn phát sinh trong tháng.'
+      },
+      'ban_hang': {
+        name: '[BÁN HÀNG] Doanh thu chốt đơn thực nhận > 20 triệu',
+        target: '20000000',
+        unit: 'VNĐ',
+        reward: '500000',
+        penalty: '0',
+        cycle: 'MONTH',
+        note: 'Hệ thống tự động cộng dồn tổng doanh thu từ tất cả các đơn hàng chốt thành công của nhân sự phụ trách trong kỳ.'
+      }
+    };
+
     function applyKpiPreset(type) {
       const nameInput = document.getElementById('kpiNameInput');
-      const unitSelect = document.getElementById('kpiUnitSelect');
+      const unitInput = document.getElementById('kpiUnitSelect');
       const targetInput = document.getElementById('kpiTargetInput');
       const rewardInput = document.getElementById('kpiRewardInput');
+      const penaltyInput = document.getElementById('kpiPenaltyInput');
       const guideInput = document.getElementById('kpiGuideInput');
 
-      if (!type) return;
+      if (!type || !STANDALONE_KPI_PRESETS[type]) return;
 
-      if (type === 'san_xuat') {
-        if (nameInput) nameInput.value = 'Tổng khâu sản xuất hoàn thành';
-        if (unitSelect) unitSelect.value = 'SP';
-        if (targetInput) targetInput.value = '150';
-        if (rewardInput) rewardInput.value = '500000';
-        if (guideInput) guideInput.value = 'Hệ thống tự động quét tổng số khâu (Khâu 1, Khâu 2, Đóng gói) đạt trạng thái Done trong tháng của nhân sự.';
-      } else if (type === 'khau_1') {
-        if (nameInput) nameInput.value = 'Năng suất Khâu 1 (Cắt & Dán)';
-        if (unitSelect) unitSelect.value = 'SP';
-        if (targetInput) targetInput.value = '80';
-        if (rewardInput) rewardInput.value = '300000';
-        if (guideInput) guideInput.value = 'Hệ thống tự động đếm số lượng lệnh sản xuất Khâu 1 mà nhân sự hoàn thành đạt chuẩn.';
-      } else if (type === 'khau_2') {
-        if (nameInput) nameInput.value = 'Năng suất Khâu 2 (Gọt keo & Gia cố)';
-        if (unitSelect) unitSelect.value = 'SP';
-        if (targetInput) targetInput.value = '80';
-        if (rewardInput) rewardInput.value = '300000';
-        if (guideInput) guideInput.value = 'Hệ thống tự động đếm số lượng lệnh sản xuất Khâu 2 mà nhân sự hoàn thành đạt chuẩn.';
-      } else if (type === 'dong_goi') {
-        if (nameInput) nameInput.value = 'Năng suất Đóng gói hoàn thành';
-        if (unitSelect) unitSelect.value = 'Đơn';
-        if (targetInput) targetInput.value = '200';
-        if (rewardInput) rewardInput.value = '300000';
-        if (guideInput) guideInput.value = 'Hệ thống tự động đếm số đơn hàng đóng gói thành công có ảnh QC nghiệm thu.';
-      } else if (type === 'ban_hang') {
-        if (nameInput) nameInput.value = 'Doanh thu bán hàng tháng';
-        if (unitSelect) unitSelect.value = 'VNĐ';
-        if (targetInput) targetInput.value = '50000000';
-        if (rewardInput) rewardInput.value = '1000000';
-        if (guideInput) guideInput.value = 'Hệ thống tự động cộng dồn tổng doanh thu từ tất cả các đơn hàng chốt thành công của nhân sự phụ trách trong kỳ.';
-      } else if (type === 'khieu_nai') {
-        if (nameInput) nameInput.value = 'Tỷ lệ thắng khiếu nại sàn > 60%';
-        if (unitSelect) unitSelect.value = '%';
-        if (targetInput) targetInput.value = '60';
-        if (rewardInput) rewardInput.value = '300000';
-        if (guideInput) guideInput.value = 'Hệ thống tự động quét tỷ lệ đơn khiếu nại thành công có tag [KN-THANG] trên tổng số khiếu nại.';
-      } else if (type === 'hang_hoan') {
-        if (nameInput) nameInput.value = 'Tỷ lệ xử lý hàng hoàn > 80%';
-        if (unitSelect) unitSelect.value = '%';
-        if (targetInput) targetInput.value = '80';
-        if (rewardInput) rewardInput.value = '300000';
-        if (guideInput) guideInput.value = 'Hệ thống tự động tính tỷ lệ đơn hàng hoàn đã được kiểm tra và đối soát nhập kho.';
-      }
+      const p = STANDALONE_KPI_PRESETS[type];
+      if (nameInput) nameInput.value = p.name;
+      if (unitInput) unitInput.value = p.unit;
+      if (targetInput) targetInput.value = p.target;
+      if (rewardInput) rewardInput.value = p.reward;
+      if (penaltyInput) penaltyInput.value = p.penalty;
+      if (guideInput) guideInput.value = p.note;
+      if (p.cycle) selectKpiCycle(p.cycle);
     }
 
     function populateUserSelect(selectElem, targetVal) {
@@ -1112,6 +1246,7 @@
         modal.style.display = 'flex';
         const userSelect = document.getElementById('kpiUserSelect');
         populateUserSelect(userSelect, targetUserName);
+        if (targetUserName) onStandaloneUserChange(targetUserName);
       }
     }
     function closeKpiModalStandalone() {
@@ -1133,68 +1268,6 @@
       if (modal) modal.style.display = 'none';
     }
 
-    function applyKpiPreset(type) {
-      const nameInput = document.getElementById('kpiNameInput');
-      const unitInput = document.getElementById('kpiUnitSelect');
-      const targetInput = document.getElementById('kpiTargetInput');
-      const rewardInput = document.getElementById('kpiRewardInput');
-      const penaltyInput = document.getElementById('kpiPenaltyInput');
-      const guideInput = document.getElementById('kpiGuideInput');
-
-      if (!type) return;
-
-      if (type === 'san_xuat') {
-        if (nameInput) nameInput.value = 'Tổng khâu sản xuất hoàn thành';
-        if (unitInput) unitInput.value = 'SP';
-        if (targetInput) targetInput.value = '150';
-        if (rewardInput) rewardInput.value = '500000';
-        if (penaltyInput) penaltyInput.value = '0';
-        if (guideInput) guideInput.value = 'Hệ thống tự động quét tổng số khâu (Khâu 1, Khâu 2, Đóng gói) đạt trạng thái Done trong tháng của nhân sự.';
-      } else if (type === 'khau_1') {
-        if (nameInput) nameInput.value = 'Năng suất Khâu 1 (Cắt & Dán / Dựng Khung)';
-        if (unitInput) unitInput.value = 'SP';
-        if (targetInput) targetInput.value = '80';
-        if (rewardInput) rewardInput.value = '300000';
-        if (penaltyInput) penaltyInput.value = '50000';
-        if (guideInput) guideInput.value = 'Hệ thống tự động đếm số lượng lệnh sản xuất Khâu 1 mà nhân sự hoàn thành đạt chuẩn KCS.';
-      } else if (type === 'khau_2') {
-        if (nameInput) nameInput.value = 'Năng suất Khâu 2 (Gọt Keo & Gia Cố)';
-        if (unitInput) unitInput.value = 'SP';
-        if (targetInput) targetInput.value = '80';
-        if (rewardInput) rewardInput.value = '300000';
-        if (penaltyInput) penaltyInput.value = '50000';
-        if (guideInput) guideInput.value = 'Hệ thống tự động đếm số lượng lệnh sản xuất Khâu 2 mà nhân sự hoàn thành đạt chuẩn KCS.';
-      } else if (type === 'dong_goi') {
-        if (nameInput) nameInput.value = 'Năng suất Đóng gói hoàn thành trước 19:30';
-        if (unitInput) unitInput.value = 'Kiện';
-        if (targetInput) targetInput.value = '290';
-        if (rewardInput) rewardInput.value = '300000';
-        if (penaltyInput) penaltyInput.value = '50000';
-        if (guideInput) guideInput.value = 'Hệ thống tự động đếm số đơn hàng đóng gói thành công có đủ 2 ảnh nghiệm thu trước 19:30 hằng ngày.';
-      } else if (type === 'ban_hang') {
-        if (nameInput) nameInput.value = 'Doanh thu bán hàng tháng chốt đơn';
-        if (unitInput) unitInput.value = 'VNĐ';
-        if (targetInput) targetInput.value = '20000000';
-        if (rewardInput) rewardInput.value = '500000';
-        if (penaltyInput) penaltyInput.value = '0';
-        if (guideInput) guideInput.value = 'Hệ thống tự động cộng dồn tổng doanh thu từ tất cả các đơn hàng chốt thành công của nhân sự phụ trách trong kỳ.';
-      } else if (type === 'khieu_nai') {
-        if (nameInput) nameInput.value = 'Tỷ lệ thắng khiếu nại sàn > 60%';
-        if (unitInput) unitInput.value = '%';
-        if (targetInput) targetInput.value = '60';
-        if (rewardInput) rewardInput.value = '875000';
-        if (penaltyInput) penaltyInput.value = '100000';
-        if (guideInput) guideInput.value = 'Bắt buộc quay video đồng kiểm 6 mặt khi bóc kiện hàng hoàn. Hệ thống tự động quét đơn khiếu nại thắng có tag [KN-THANG].';
-      } else if (type === 'hang_hoan') {
-        if (nameInput) nameInput.value = 'Xử lý hàng huỷ hoàn & gắn trách nhiệm > 90%';
-        if (unitInput) unitInput.value = '%';
-        if (targetInput) targetInput.value = '90';
-        if (rewardInput) rewardInput.value = '750000';
-        if (penaltyInput) penaltyInput.value = '50000';
-        if (guideInput) guideInput.value = 'Hàng hoàn về kho phải được phân loại và xử lý trong 48h. Tỷ lệ tính trên tổng đơn hoàn phát sinh trong tháng.';
-      }
-    }
-
     // Submit KPI -> Bảng KPI_Progress
     function submitKPIStandalone() {
       const btn = event ? event.target : document.querySelector('#modal-kpi-standalone .rf-btn-submit');
@@ -1208,7 +1281,8 @@
         unit: document.getElementById('kpiUnitSelect').value,
         reward: document.getElementById('kpiRewardInput').value,
         penalty: document.getElementById('kpiPenaltyInput') ? document.getElementById('kpiPenaltyInput').value : '0',
-        guide: document.getElementById('kpiGuideInput').value
+        guide: document.getElementById('kpiGuideInput').value,
+        cycle: currentStandaloneKpiCycle || 'MONTH'
       };
 
       if (!payload.user || !payload.kpiName || !payload.target || !payload.unit) {
@@ -1221,7 +1295,7 @@
         .withSuccessHandler(function (res) {
           if (btn) { btn.innerHTML = originalText; btn.disabled = false; }
           if (res && res.success) {
-            alert("Đã thiết lập KPI thành công!");
+            alert("Đã thiết lập KPI " + (payload.cycle === 'WEEK' ? 'Hàng Tuần' : 'Hàng Tháng') + " thành công!");
             closeKpiModalStandalone();
             // Reset form
             document.getElementById('kpiNameInput').value = '';

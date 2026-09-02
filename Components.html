@@ -209,7 +209,11 @@ const RFButton = React.memo(({ children, onClick, variant = 'primary', className
 
     const handleClick = (e) => {
         if (disabled || isLoading) return;
-        try { if (navigator.vibrate) navigator.vibrate(15); } catch(err) {}
+        if (typeof window.triggerHaptic === 'function') {
+            window.triggerHaptic(variant === 'danger' ? 'heavy' : variant === 'success' ? 'success' : 'light');
+        } else {
+            try { if (navigator.vibrate) navigator.vibrate(15); } catch(err) {}
+        }
         if (onClick) onClick(e);
     };
 

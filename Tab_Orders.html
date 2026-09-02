@@ -6,6 +6,48 @@
     // =========================================================================
     // -------------------------------------------------------------------------
 
+    // HÀM PARSE NGÀY ĐA NĂNG (HỖ TRỢ DD/MM/YYYY, YYYY-MM-DD, TIMESTAMP, TIẾNG VIỆT)
+    window.parseOrderDateSafe = function(dateInput) {
+        if (!dateInput) return null;
+        if (dateInput instanceof Date) return isNaN(dateInput.getTime()) ? null : dateInput;
+
+        var str = String(dateInput).trim();
+        if (!str || str === '0' || str === '') return null;
+
+        // Lấy phần ngày (bỏ phần giờ nếu có)
+        var datePart = str.split(' ')[0].split('T')[0];
+
+        // 1. Xử lý định dạng DD/MM/YYYY hoặc DD-MM-YYYY
+        if (datePart.indexOf('/') !== -1 || (datePart.indexOf('-') !== -1 && datePart.split('-')[0].length !== 4)) {
+            var sep = datePart.indexOf('/') !== -1 ? '/' : '-';
+            var parts = datePart.split(sep);
+            if (parts.length === 3) {
+                var d = parseInt(parts[0], 10);
+                var m = parseInt(parts[1], 10) - 1;
+                var y = parseInt(parts[2], 10);
+                if (parts[0].length === 4) { // Trường hợp YYYY/MM/DD
+                    y = parseInt(parts[0], 10);
+                    m = parseInt(parts[1], 10) - 1;
+                    d = parseInt(parts[2], 10);
+                }
+                var res = new Date(y, m, d);
+                return isNaN(res.getTime()) ? null : res;
+            }
+        }
+
+        // 2. Xử lý định dạng YYYY-MM-DD (ISO standard)
+        if (datePart.indexOf('-') !== -1) {
+            var parts2 = datePart.split('-');
+            if (parts2.length === 3 && parts2[0].length === 4) {
+                var res2 = new Date(parseInt(parts2[0], 10), parseInt(parts2[1], 10) - 1, parseInt(parts2[2], 10));
+                return isNaN(res2.getTime()) ? null : res2;
+            }
+        }
+
+        var fallback = new Date(str);
+        return isNaN(fallback.getTime()) ? null : fallback;
+    };
+
     // ---------------------------------// COMPONENT: MÁY QUÉT ĐƠN HOÀN (EMAIL, FILE EXCEL ORDER.ALL, FILE PDF BIÊN BẢN, SÚNG MÃ VẠCH)
     function ReturnScannerModal({ onClose, orders, pushDeltas, triggerToast }) {
         const [scanVal, setScanVal] = React.useState('');
@@ -190,10 +232,59 @@
                         }
                         const headers = rows[headerIdx].map(h => String(h).toLowerCase().trim());
                         const iCode = headers.findIndex(h => h.includes('mã đơn') || h.includes('order id') || h.includes('order no') || h.includes('หมายเลขคำสั่งซื้อ') || h.includes('คำสั่งซื้อ'));
-                        let statusCols = [];
-                        headers.forEach((h, idx) => {
-                            if (h.includes('trạng thái') || h.includes('lý do') || h.includes('status') || h.includes('hoàn tiền') || h.includes('trả hàng') || h.includes('refund') || h.includes('returned') || h.includes('สถานะ') || h.includes('คืนเงิน') || h.includes('คืนสินค้า')) statusCols.push(idx);
-                        });
+                        
+                        // Định vị chính xác các cột trạng thái theo chuẩn Shopee / TikTok
+                        const iOrderStatus = headers.findIndex(h => h === 'trạng thái đơn hàng' || h === 'trạng thái' || h === 'order status' || h === 'status' || h.includes('trạng thái đơn hàng') || h.includes('สถานะ'));
+                        const iReturnStatus = headers.findIndex(h => h.includes('trạng thái trả hàng') || h.includes('trả hàng/hoàn tiền') || h.includes('trả hàng / hoàn tiền') || h.includes('return / refund status') || h.includes('return status'));
+                        const iCancelReason = headers.findIndex(h => h.includes('lý do hủy') || h.includes('lý do huỷ') || h.includes('cancellation reason') || h.includes('cancel reason'));
+
+                        const isActualReturnOrder = (cols) => {
+                            const orderStatus = String((iOrderStatus >= 0 ? cols[iOrderStatus] : '') || '').trim();
+                            const returnStatus = String((iReturnStatus >= 0 ? cols[iReturnStatus] : '') || '').trim();
+                            const cancelReason = String((iCancelReason >= 0 ? cols[iCancelReason] : '') || '').trim();
+
+                            const lowerOrderStatus = orderStatus.toLowerCase();
+                            const lowerReturnStatus = returnStatus.toLowerCase();
+                            const lowerCancelReason = cancelReason.toLowerCase();
+
+                            // 1. NẾU LÀ ĐƠN KHÁCH ĐÃ NHẬN HÀNG -> TUYỆT ĐỐI KHÔNG PHẢI ĐƠN HOÀN!
+                            if (lowerOrderStatus.includes('người mua xác nhận đã nhận được hàng') || 
+                                lowerOrderStatus.includes('đã nhận được hàng') ||
+                                lowerOrderStatus === 'hoàn thành' || 
+                                lowerOrderStatus === 'đã giao' ||
+                                lowerOrderStatus === 'completed' ||
+                                lowerOrderStatus === 'delivered') {
+                                // Chỉ là đơn hoàn nếu cột Trả hàng/Hoàn tiền thực sự có yêu cầu khiếu nại được chấp thuận/chờ xử lý:
+                                if (returnStatus && (
+                                    lowerReturnStatus.includes('đã chấp thuận') || 
+                                    lowerReturnStatus.includes('yêu cầu chờ xử lý') || 
+                                    lowerReturnStatus.includes('đã giải quyết khiếu nại') ||
+                                    lowerReturnStatus.includes('approved') ||
+                                    lowerReturnStatus.includes('pending')
+                                )) {
+                                    return true;
+                                }
+                                return false; // Đơn giao thành công bình thường
+                            }
+
+                            // 2. NẾU LÀ TRẢ HÀNG/HOÀN TIỀN TRỰC TIẾP
+                            if (lowerOrderStatus === 'trả hàng/hoàn tiền' || lowerOrderStatus === 'trả hàng / hoàn tiền' || lowerOrderStatus === 'trả hàng' || lowerOrderStatus === 'hàng hoàn' || lowerOrderStatus === 'return/refund' || lowerOrderStatus === 'returned') {
+                                return true;
+                            }
+
+                            // 3. NẾU LÀ ĐƠN HỦY DO GIAO HÀNG THẤT BẠI (Boom hàng hoàn về)
+                            if ((lowerOrderStatus.includes('hủy') || lowerOrderStatus.includes('huỷ') || lowerOrderStatus.includes('cancelled')) && 
+                                (lowerCancelReason.includes('giao hàng thất bại') || lowerCancelReason.includes('không thể giao') || lowerCancelReason.includes('delivery failed') || lowerCancelReason.includes('buyer rejected'))) {
+                                return true;
+                            }
+
+                            // 4. CỘT TRẢ HÀNG/HOÀN TIỀN CÓ NỘI DUNG YÊU CẦU HỢP LỆ
+                            if (returnStatus && returnStatus !== '' && returnStatus !== '0' && returnStatus !== 'N/A' && returnStatus !== '-' && !lowerReturnStatus.includes('không có') && !lowerReturnStatus.includes('none')) {
+                                return true;
+                            }
+
+                            return false;
+                        };
 
                         let foundOrders = [];
                         let notFound = [];
@@ -212,10 +303,7 @@
                             }
                             if (!oCode || oCode.length < 5 || oCode.toLowerCase().includes('mã đơn')) continue;
 
-                            let rowStatus = '';
-                            statusCols.forEach(idx => { if (cols[idx]) rowStatus += String(cols[idx]).toLowerCase() + ' '; });
-
-                            if ((rowStatus.includes('hoàn') && !rowStatus.includes('hoàn thành') && !rowStatus.includes('hoàn tất')) || rowStatus.includes('trả hàng') || rowStatus.includes('return') || rowStatus.includes('refund')) {
+                            if (isActualReturnOrder(cols)) {
                                 const cleanCode = oCode.split(' | ')[0].trim().toUpperCase();
                                 const matchOrder = orders.find(o => {
                                     const dbCode = String(o.orderCode || '').toUpperCase();
@@ -743,18 +831,42 @@
     }
 
     // -------------------------------------------------------------------------
-    // MODAL: LƯU TRỮ ĐƠN HÀNG HÀNG LOẠT (ARCHIVING ENGINE MODAL)
+    // MODAL: LƯU TRỮ ĐƠN HÀNG HÀNG LOẠT (ARCHIVING ENGINE MODAL - HALLMARK PRO)
     // -------------------------------------------------------------------------
     function ArchiveEngineModal({ onClose, triggerToast }) {
         const [cutoffDays, setCutoffDays] = React.useState(60);
         const [isArchiving, setIsArchiving] = React.useState(false);
+        const [isSettingTrigger, setIsSettingTrigger] = React.useState(false);
+        const [stats, setStats] = React.useState(null);
+        const [isLoadingStats, setIsLoadingStats] = React.useState(true);
+
+        const loadStats = React.useCallback(async () => {
+            setIsLoadingStats(true);
+            try {
+                if (typeof runGAS === 'function') {
+                    const pin = localStorage.getItem('rf_pin') || '';
+                    const res = await runGAS('getArchiveStats', { pin: pin });
+                    if (res && res.success) {
+                        setStats(res);
+                    }
+                }
+            } catch (e) {
+                console.error("Lỗi nạp Archive Stats:", e);
+            } finally {
+                setIsLoadingStats(false);
+            }
+        }, []);
+
+        React.useEffect(() => {
+            loadStats();
+        }, [loadStats]);
 
         const handleRunArchive = async () => {
-            if (!window.confirm(`Bạn có chắc chắn muốn chuyển toàn bộ đơn hàng đã hoàn tất / đối soát cũ hơn ${cutoffDays} ngày sang bảng lưu trữ Orders_Archive? Thao tác này giúp giải phóng bộ nhớ và tăng tốc ứng dụng.`)) {
+            if (!window.confirm(`Bạn có chắc chắn muốn chuyển toàn bộ đơn hàng đã hoàn tất / đối soát cũ hơn ${cutoffDays} ngày sang bảng lưu trữ Orders_Archive?\n\nThao tác này giúp giải phóng bộ nhớ RAM và duy trì thời gian tải ứng dụng < 1.5 giây.`)) {
                 return;
             }
             setIsArchiving(true);
-            triggerToast(`Đang chạy nén và chuyển đơn cũ sang Orders_Archive...`, 'fa-spinner fa-spin', 'info');
+            triggerToast(`Đang quét nén và chuyển đơn cũ > ${cutoffDays} ngày sang Orders_Archive...`, 'fa-spinner fa-spin', 'info');
             try {
                 if (typeof runGAS === 'function') {
                     const pin = localStorage.getItem('rf_pin') || '';
@@ -762,7 +874,7 @@
                     if (res && res.success) {
                         triggerToast(res.message || `Đã chuyển ${res.movedCount || 0} đơn sang Orders_Archive!`, 'fa-check-circle', 'success');
                         window.dispatchEvent(new CustomEvent('triggerReloadData'));
-                        onClose();
+                        loadStats();
                     } else {
                         triggerToast(res?.message || 'Lỗi xử lý lưu trữ đơn hàng!', 'fa-times', 'danger');
                     }
@@ -776,17 +888,41 @@
             }
         };
 
+        const handleSetupTrigger = async () => {
+            setIsSettingTrigger(true);
+            try {
+                if (typeof runGAS === 'function') {
+                    const pin = localStorage.getItem('rf_pin') || '';
+                    const res = await runGAS('setupAutoArchiveTrigger', { pin: pin });
+                    if (res && res.success) {
+                        triggerToast(res.message || 'Đã cài đặt Auto-Archive hàng đêm 02:00 AM!', 'fa-check-circle', 'success');
+                        loadStats();
+                    } else {
+                        triggerToast(res?.message || 'Không thể cài đặt trigger tự động.', 'fa-times', 'danger');
+                    }
+                }
+            } catch (err) {
+                triggerToast('Lỗi cài đặt trigger: ' + (err?.message || err), 'fa-times', 'danger');
+            } finally {
+                setIsSettingTrigger(false);
+            }
+        };
+
         return (
             <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-                <div className="bg-[#121214] border border-[#d4af37]/40 w-full max-w-lg rounded-2xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.8)] relative space-y-4">
+                <div className="bg-[#121214] border border-[#d4af37]/40 w-full max-w-xl rounded-2xl p-5 shadow-[0_25px_60px_rgba(0,0,0,0.9)] relative space-y-4">
+                    {/* HEADER */}
                     <div className="flex justify-between items-center border-b border-white/[0.08] pb-3">
                         <div className="flex items-center gap-2.5">
-                            <div className="w-9 h-9 rounded-xl bg-[#d4af37]/15 flex items-center justify-center text-[#d4af37] border border-[#d4af37]/30 shadow-sm">
-                                <i className="fas fa-archive text-base"></i>
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#d4af37]/20 to-amber-600/10 flex items-center justify-center text-[#d4af37] border border-[#d4af37]/30 shadow-inner">
+                                <i className="fas fa-box-archive text-lg"></i>
                             </div>
                             <div>
-                                <h3 className="text-sm font-black text-white uppercase tracking-wider">Lưu Trữ Đơn Cũ (Archiving Engine)</h3>
-                                <p className="text-[10px] text-gray-400 font-medium">Tối ưu dung lượng RAM & Tăng tốc khởi động ứng dụng &lt; 1s</p>
+                                <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                                    <span>Tối Ưu Hóa Archive Engine</span>
+                                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Tải &lt; 1.5s</span>
+                                </h3>
+                                <p className="text-[10px] text-gray-400 font-medium">Tự động nén & lưu trữ đơn hàng &gt; 60 ngày sang sheet Orders_Archive</p>
                             </div>
                         </div>
                         <button onClick={onClose} disabled={isArchiving} className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 flex items-center justify-center transition-colors">
@@ -794,25 +930,72 @@
                         </button>
                     </div>
 
-                    <div className="bg-[#09090b] border border-white/[0.08] rounded-xl p-3.5 space-y-2.5 text-[11px] leading-relaxed text-zinc-300">
-                        <div className="flex items-center gap-2 text-amber-400 font-bold">
-                            <i className="fas fa-bolt"></i>
-                            <span>Cơ Chế Bóc Tách Tự Động:</span>
+                    {/* LIVE STATS BENTO CARDS */}
+                    <div className="grid grid-cols-3 gap-2.5">
+                        <div className="bg-[#09090b] border border-white/[0.06] rounded-xl p-3 flex flex-col justify-between">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Orders Chính</span>
+                            <div className="flex items-baseline gap-1.5 mt-1">
+                                <span className="text-lg font-black text-white">{isLoadingStats ? '...' : (stats?.ordersCount || 0).toLocaleString('vi-VN')}</span>
+                                <span className="text-[10px] text-zinc-500 font-medium">đơn</span>
+                            </div>
+                            <div className="text-[9px] text-emerald-400 font-bold mt-1 flex items-center gap-1">
+                                <i className="fas fa-circle-check text-[8px]"></i>
+                                <span>{stats?.targetAppLoadTime || '< 1.5s'}</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-[#09090b] border border-white/[0.06] rounded-xl p-3 flex flex-col justify-between">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Kho Lưu Trữ</span>
+                            <div className="flex items-baseline gap-1.5 mt-1">
+                                <span className="text-lg font-black text-[#d4af37]">{isLoadingStats ? '...' : (stats?.archiveCount || 0).toLocaleString('vi-VN')}</span>
+                                <span className="text-[10px] text-zinc-500 font-medium">đơn</span>
+                            </div>
+                            <div className="text-[9px] text-zinc-400 font-medium mt-1">
+                                <span>Lazy-load tức thì</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-[#09090b] border border-white/[0.06] rounded-xl p-3 flex flex-col justify-between">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Lần Chạy Gần Nhất</span>
+                            <div className="text-[11px] font-bold text-zinc-200 mt-1 truncate" title={stats?.lastArchivedAt || 'Chưa chạy'}>
+                                {isLoadingStats ? '...' : (stats?.lastArchivedAt ? String(stats.lastArchivedAt).substring(0, 16) : 'Chưa chạy')}
+                            </div>
+                            <div className="text-[9px] text-amber-400 font-medium mt-1 flex items-center gap-1">
+                                <i className="fas fa-clock text-[8px]"></i>
+                                <span>Auto: 02:00 AM</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* MECHANISM DESCRIPTION & TRIGGER TOGGLE */}
+                    <div className="bg-[#09090b] border border-white/[0.08] rounded-xl p-3.5 space-y-2 text-[11px] leading-relaxed text-zinc-300">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-amber-400 font-bold">
+                                <i className="fas fa-robot"></i>
+                                <span>Cron Trigger Tự Động Hàng Đêm:</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleSetupTrigger}
+                                disabled={isSettingTrigger}
+                                className="px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-[#d4af37]/20 border border-white/[0.1] hover:border-[#d4af37]/40 text-[#d4af37] text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                            >
+                                <i className={isSettingTrigger ? "fas fa-spinner fa-spin" : "fas fa-bolt"}></i>
+                                <span>{stats?.hasNightlyTrigger ? "Cập Nhật Trigger (02:00 AM)" : "Kích Hoạt Auto Trigger"}</span>
+                            </button>
                         </div>
                         <p>
-                            Đơn hàng có trạng thái <strong className="text-white">Đối Soát Thành Công</strong>, <strong className="text-white">Đã Bàn Giao</strong> hoặc <strong className="text-white">Đơn Huỷ</strong> cũ hơn mốc thời gian sẽ được di chuyển sang bảng <code className="text-[#d4af37] bg-white/[0.06] px-1 py-0.5 rounded font-mono">Orders_Archive</code>.
-                        </p>
-                        <p className="text-[10px] text-zinc-400">
-                            💡 Khi xem lại các tháng quá khứ hoặc tìm kiếm đơn cũ, ứng dụng sẽ <strong>Lazy-load on-demand</strong> tự động mà không làm nặng phiên làm việc.
+                            Đơn hàng hoàn tất (<strong className="text-white">Đối Soát Thành Công</strong>, <strong className="text-white">Đã Bàn Giao</strong>, <strong className="text-white">Đơn Huỷ</strong>) cũ hơn mốc thời gian sẽ tự động di chuyển sang <code className="text-[#d4af37] bg-white/[0.06] px-1 py-0.5 rounded font-mono">Orders_Archive</code>, giúp file vận hành chính duy trì dung lượng tối ưu, đảm bảo thời gian tải app <strong className="text-emerald-400">&lt; 1.5 giây</strong>.
                         </p>
                     </div>
 
+                    {/* CUTOFF DAYS SELECTION */}
                     <div className="space-y-2">
                         <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider block">Chọn Mốc Thời Gian Lưu Trữ (Cutoff):</label>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                             {[
                                 { days: 45, label: '45 Ngày' },
-                                { days: 60, label: '60 Ngày (Chuẩn)' },
+                                { days: 60, label: '60 Ngày (Chuẩn SLA)' },
                                 { days: 90, label: '90 Ngày (1 Quý)' },
                                 { days: 180, label: '180 Ngày (6 Tháng)' }
                             ].map(item => (
@@ -820,7 +1003,7 @@
                                     key={item.days}
                                     type="button"
                                     onClick={() => setCutoffDays(item.days)}
-                                    className={`py-2.5 px-2 rounded-xl text-[11px] font-bold border transition-all active:scale-95 text-center ${cutoffDays === item.days ? 'bg-[#d4af37]/20 border-[#d4af37] text-[#d4af37] shadow-sm font-black' : 'bg-[#121214] border-white/[0.08] text-zinc-400 hover:text-white'}`}
+                                    className={`py-2.5 px-2 rounded-xl text-[11px] font-bold border transition-all active:scale-95 text-center cursor-pointer ${cutoffDays === item.days ? 'bg-[#d4af37]/20 border-[#d4af37] text-[#d4af37] shadow-sm font-black' : 'bg-[#121214] border-white/[0.08] text-zinc-400 hover:text-white'}`}
                                 >
                                     {item.label}
                                 </button>
@@ -828,7 +1011,8 @@
                         </div>
                     </div>
 
-                    <div className="pt-2 flex gap-2">
+                    {/* ACTIONS */}
+                    <div className="pt-2 flex gap-2.5">
                         <button
                             onClick={onClose}
                             disabled={isArchiving}
@@ -842,7 +1026,7 @@
                             className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black font-black text-[12px] uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                         >
                             <i className={isArchiving ? "fas fa-spinner fa-spin" : "fas fa-box-archive"}></i>
-                            <span>{isArchiving ? "Đang xử lý..." : "Kích Hoạt Lưu Trữ"}</span>
+                            <span>{isArchiving ? "Đang xử lý nén..." : `Chạy Lưu Trữ Ngay (> ${cutoffDays} ngày)`}</span>
                         </button>
                     </div>
                 </div>
@@ -918,13 +1102,17 @@
         erpData,
         isAdmin,
         currentUser,
+        userRole: propUserRole,
+        hasPerm: propHasPerm,
         pushDeltas,
         userConfigs,
         triggerToast,
         kpiConfig,
-        configGiaLayout
+        configGiaLayout,
+        documents
     }) {
         const [searchCode, setSearchCode] = React.useState('');
+        const deferredSearchCode = React.useDeferredValue ? React.useDeferredValue(searchCode) : searchCode;
         const [filterTime, setFilterTime] = React.useState('Tháng Này');
         const [customMonth, setCustomMonth] = React.useState(() => {
             const d = new Date();
@@ -946,11 +1134,20 @@
         const [showRules, setShowRules] = React.useState(false);
         const [editingOrder, setEditingOrder] = React.useState(null);
         const [collapsedGroups, setCollapsedGroups] = React.useState({});
-        const currentRole = localStorage.getItem('rf_role') || '';
-        const isBossRole = localStorage.getItem('rf_boss') === 'true';
-        const isBoss = isBossRole || currentRole === 'TỐI CAO' || Boolean(isAdmin);
+        const currentRole = propUserRole || localStorage.getItem('rf_role') || '';
+        const isBossRole = localStorage.getItem('rf_boss') === 'true' || currentRole === 'TỐI CAO';
+        const isBoss = isBossRole || Boolean(isAdmin);
         const isCTV = currentRole === 'CTV' || currentRole === 'CỘNG TÁC VIÊN';
+
+        const hasPerm = React.useCallback((actionCode) => {
+            if (isBossRole || currentRole === 'TỐI CAO') return true;
+            if (typeof propHasPerm === 'function') return propHasPerm(actionCode);
+            if (typeof canUserDo === 'function') return canUserDo(actionCode, currentRole, currentUser);
+            return isBoss;
+        }, [propHasPerm, currentRole, currentUser, isBoss, isBossRole]);
+
         const [showRevenueStats, setShowRevenueStats] = React.useState(false);
+        const [showQuickNotes, setShowQuickNotes] = React.useState(false);
 
         // STATE ARCHIVING ENGINE & LAZY LOADING
         const [isArchiveEngineOpen, setIsArchiveEngineOpen] = React.useState(false);
@@ -1061,17 +1258,8 @@
             if (!dateStr) return false;
             if (filterStr === 'Tất Cả') return true;
 
-            let d = null;
-            if (typeof parseDateTimeSafe === 'function') {
-                const parsed = parseDateTimeSafe(dateStr);
-                if (parsed && parsed.timestamp && parsed.timestamp > 0) {
-                    d = new Date(parsed.timestamp);
-                }
-            }
-            if (!d || isNaN(d.getTime())) {
-                d = new Date(dateStr);
-            }
-            if (isNaN(d.getTime())) return false; // Không hợp lệ thì không match tháng
+            const d = typeof window.parseOrderDateSafe === 'function' ? window.parseOrderDateSafe(dateStr) : null;
+            if (!d || isNaN(d.getTime())) return false; // Không hợp lệ thì không match tháng
 
             const today = new Date();
             if (filterStr === 'Hôm Nay') return d.toDateString() === today.toDateString();
@@ -1198,35 +1386,60 @@
             return set;
         }, [packings, erpData?.Packings]);
 
-        // 2. Pre-index out of stock non-production accessories into a fast Set
-        const outOfStockAccSet = React.useMemo(() => {
-            const set = new Set();
+        // 2. Pre-index product inventory map for fast O(1) stock lookup
+        const productStockMap = React.useMemo(() => {
+            const map = new Map();
             const list = erpProducts || erpData?.Products || [];
             list.forEach(prd => {
                 if (prd && prd.name) {
+                    const rawName = String(prd.name).trim();
+                    const cleanName = rawName.toLowerCase().replace(/\s+/g, ' ');
+                    const normName = cleanName.replace(/[^a-z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/gi, ' ').replace(/\s+/g, ' ').trim();
+                    const qty = Number(prd.quantity || 0);
                     const cat = String(prd.category || '').toUpperCase().trim();
                     const subCat = String(prd.sub_category || '').toUpperCase().trim();
-                    if (cat !== 'LAYOUT' && cat !== 'BỂ KÍNH' && subCat !== 'LAYOUT' && subCat !== 'BỂ KÍNH') {
-                        if (Number(prd.quantity || 0) <= 0) {
-                            set.add(String(prd.name).trim().toLowerCase().replace(/\s+/g, ' '));
-                        }
-                    }
+                    const isProdCat = cat === 'LAYOUT' || cat === 'BỂ KÍNH' || subCat === 'LAYOUT' || subCat === 'BỂ KÍNH';
+                    
+                    const info = { qty, isProdCat, prd };
+                    map.set(cleanName, info);
+                    if (normName && !map.has(normName)) map.set(normName, info);
+                    if (prd.sku) map.set(String(prd.sku).trim().toUpperCase(), info);
                 }
             });
-            return set;
+            return map;
         }, [erpProducts, erpData?.Products]);
 
-        // 3. Helper compute status once per order (O(1) lookups)
-        const computeOrderStatus = React.useCallback((o) => {
-            let eff = String(o._effectiveStatus || o.status || '').toUpperCase().trim();
-            if (eff !== 'CHỜ SẢN XUẤT' && eff !== 'QUÉT TỰ ĐỘNG' && eff !== 'ĐANG SẢN XUẤT' && eff !== 'SẴN SÀNG ĐÓNG GÓI' && eff !== 'CHỜ PHỤ KIỆN' && eff !== 'CHỜ MÃ VẬN ĐƠN' && eff !== 'CHỜ BÀN GIAO') {
-                return eff;
-            }
-
+        // 3. Helper compute metadata flags (Warning Badges) without overriding DB status
+        const computeOrderMetadata = React.useCallback((o) => {
             const oIdStr = String(o.id || '').trim();
             const oCodeStr = String(o.orderCode || '').trim();
             const baseCodeStr = oCodeStr.split(' | ')[0].trim();
             const hasDonePack = donePackSet.has(oIdStr) || donePackSet.has(oCodeStr) || donePackSet.has(baseCodeStr);
+
+            const rawSt = String(o.status || '').toUpperCase().trim();
+            const isRec = o.isReconciled === true || o.isReconciled === 'true' || o.isReconciled === 'TRUE';
+            const isOrderClosedOrPacked = (
+                hasDonePack ||
+                rawSt === 'ĐÃ BÀN GIAO' ||
+                rawSt === 'CHỜ BÀN GIAO' ||
+                rawSt === 'HOÀN THÀNH' ||
+                rawSt === 'ĐỐI SOÁT THÀNH CÔNG' ||
+                rawSt === 'ĐƠN HUỶ' ||
+                rawSt === 'HUỶ' ||
+                rawSt === 'HỦY' ||
+                rawSt === 'HÀNG HOÀN' ||
+                rawSt.includes('HOÀN') ||
+                rawSt.includes('HUỶ') ||
+                rawSt.includes('HỦY') ||
+                rawSt.includes('CANCEL') ||
+                isRec
+            );
+
+            const related = getMatchedProds(o);
+            let allProdDone = true;
+            if (related.length > 0) {
+                allProdDone = related.every(p => checkItemReady(p));
+            }
 
             const isGHNShipping = String(o.shippingMethod || '').trim() === 'Gửi GHN' || String(o.shippingMethod || '').toLowerCase().includes('ghn');
             const isGuiXeShipping = String(o.shippingMethod || '').trim() === 'Gửi Xe';
@@ -1238,145 +1451,218 @@
             }
             const hasShippingCode = Boolean(pureShippingCode && pureShippingCode.length >= 3);
             const requiresShippingCode = isTMDT || isGHNShipping || isGuiXeShipping;
-            const isMissingMVD = requiresShippingCode && !hasShippingCode;
+            
+            // CHỈ XÉT THIẾU MVĐ KHI ĐƠN ĐÃ XONG SẢN XUẤT (allProdDone) VÀ CHƯA ĐÓNG GÓI/CHƯA GIAO
+            const isMissingMVD = !isOrderClosedOrPacked && allProdDone && requiresShippingCode && !hasShippingCode;
 
-            if (hasDonePack) {
-                return isMissingMVD ? 'CHỜ MÃ VẬN ĐƠN' : 'CHỜ BÀN GIAO';
+            // PHỤ KIỆN CHO PHÉP ÂM KHO: Không chặn đơn, đơn luôn sẵn sàng đóng gói
+            const isMissingAccessories = false;
+
+            return {
+                hasDonePack,
+                isMissingMVD,
+                allProdDone,
+                isMissingAccessories
+            };
+        }, [donePackSet, productStockMap, getMatchedProds]);
+
+        const isReconciledSafe = (val) => {
+            return val === true || val === 'true' || val === 'TRUE';
+        };
+
+        // Đồng bộ nguồn dữ liệu tham chiếu
+        React.useEffect(() => {
+            if (Array.isArray(orders)) {
+                window.GLOBAL_ALL_ORDERS = orders;
+            }
+        }, [orders]);
+
+        const matchTimeFilter = React.useCallback((order) => {
+            if (!filterTime || filterTime === 'ALL' || filterTime === 'Tất Cả') return true;
+
+            const st = String(order.status || order._effectiveStatus || '').toUpperCase().trim();
+            const isClosed = (
+                st === 'HOÀN THÀNH' || 
+                st === 'ĐỐI SOÁT THÀNH CÔNG' || 
+                st === 'ĐÃ BÀN GIAO' || 
+                st === 'ĐƠN HUỶ' || 
+                st === 'ĐÃ NHẬP KHO' ||
+                st === 'HÀNG HOÀN' ||
+                st.includes('HOÀN CHỜ XỬ') ||
+                isReconciledSafe(order.isReconciled)
+            );
+
+            if (!isClosed && (filterTime === 'Tháng Này' || filterTime === 'this_month')) {
+                return true;
             }
 
-            const related = getMatchedProds(o);
-            let allProdDone = true;
-            if (related.length > 0) {
-                allProdDone = related.every(p => checkItemReady(p));
-            }
+            const dateCandidate = order.date || order.createdAt || order.reconciledAt || order.returnedAt || order.updatedAt;
+            const orderDateObj = (typeof window.parseOrderDateSafe === 'function') 
+                ? window.parseOrderDateSafe(dateCandidate)
+                : null;
 
-            let isMissingAccessories = false;
-            if (allProdDone && !isMissingMVD) {
-                const accs = Array.isArray(o.accessories) ? o.accessories : (typeof o.accessories === 'string' ? safeJSONParse(o.accessories) : []);
-                if (Array.isArray(accs)) {
-                    for (let a of accs) {
-                        if (!a || a.hasProduction === true || a.hasProduction === 'true') continue;
-                        const aName = String(a.name || a.Name || '').trim().toLowerCase().replace(/\s+/g, ' ');
-                        if (aName && outOfStockAccSet.has(aName)) {
-                            isMissingAccessories = true;
-                            break;
-                        }
-                    }
+            const now = new Date();
+            const curY = now.getFullYear();
+            const curM = now.getMonth() + 1;
+            const curMStr = String(curM).padStart(2, '0');
+            const prevM = curM === 1 ? 12 : curM - 1;
+            const prevY = curM === 1 ? curY - 1 : curY;
+            const prevMStr = String(prevM).padStart(2, '0');
+
+            if (!orderDateObj) {
+                const rawStr = String(dateCandidate || '');
+                if (filterTime === 'Tháng Này' || filterTime === 'this_month') {
+                    return rawStr.includes(`${curY}-${curMStr}`) || rawStr.includes(`/${curMStr}/${curY}`) || rawStr.includes(`/${curM}/${curY}`) || rawStr.includes(`-${curMStr}-${curY}`) || rawStr.includes(`-${curM}-${curY}`);
                 }
+                if (filterTime === 'Tháng Trước' || filterTime === 'last_month') {
+                    return rawStr.includes(`${prevY}-${prevMStr}`) || rawStr.includes(`/${prevMStr}/${prevY}`) || rawStr.includes(`/${prevM}/${prevY}`) || rawStr.includes(`-${prevMStr}-${prevY}`) || rawStr.includes(`-${prevM}-${prevY}`);
+                }
+                if ((filterTime === 'Tuỳ Chỉnh' || filterTime === 'Chọn Tháng') && customMonth) {
+                    const [y, m] = customMonth.split('-');
+                    return rawStr.includes(`${y}-${m}`) || rawStr.includes(`/${m}/${y}`) || rawStr.includes(`-${m}-${y}`);
+                }
+                return true;
             }
 
-            if (!allProdDone) return 'CHỜ SẢN XUẤT';
-            if (isMissingMVD) return 'CHỜ MÃ VẬN ĐƠN';
-            if (isMissingAccessories) return 'CHỜ PHỤ KIỆN';
-            return 'SẴN SÀNG ĐÓNG GÓI';
-        }, [donePackSet, outOfStockAccSet, getMatchedProds]);
+            const y = orderDateObj.getFullYear();
+            const m = orderDateObj.getMonth() + 1;
 
-        const baseFiltered = React.useMemo(() => {
-            return (orders || []).map(o => {
+            if (filterTime === 'Tháng Này' || filterTime === 'this_month') {
+                return y === curY && m === curM;
+            }
+            if (filterTime === 'Tháng Trước' || filterTime === 'last_month') {
+                return y === prevY && m === prevM;
+            }
+            if ((filterTime === 'Tuỳ Chỉnh' || filterTime === 'Chọn Tháng') && customMonth) {
+                const [targetY, targetM] = customMonth.split('-').map(Number);
+                return y === targetY && m === targetM;
+            }
+
+            return true;
+        }, [filterTime, customMonth]);
+
+        const sourceOrders = React.useMemo(() => {
+            return orders || [];
+        }, [orders]);
+
+        const timeFilteredOrders = React.useMemo(() => {
+            return sourceOrders.map(o => {
                 let rawStatus = String(o.status || '').toUpperCase().trim();
                 let eff = String(o._effectiveStatus || o.status || '').toUpperCase().trim();
+                const isRec = isReconciledSafe(o.isReconciled);
+
                 if (!rawStatus || rawStatus === '0' || rawStatus === 'NULL' || rawStatus === 'UNDEFINED') {
                     rawStatus = 'CHỜ SẢN XUẤT';
                     eff = 'CHỜ SẢN XUẤT';
                 }
                 
-                // Chuẩn hóa trạng thái đơn hàng
-                if (rawStatus === 'HOÀN THÀNH' || rawStatus === 'ĐỐI SOÁT THÀNH CÔNG' || eff === 'HOÀN THÀNH' || eff === 'ĐỐI SOÁT THÀNH CÔNG' || o.isReconciled || Boolean(o.isReconciled)) {
+                if (rawStatus === 'HOÀN THÀNH' || rawStatus === 'ĐỐI SOÁT THÀNH CÔNG' || isRec) {
                     eff = 'HOÀN THÀNH';
-                } else if (rawStatus === 'HÀNG HOÀN' || rawStatus === 'HOÀN' || rawStatus.includes('HOÀN CHỜ XỬ') || rawStatus.includes('HOÀN TRẢ') || eff === 'HÀNG HOÀN' || eff.includes('HOÀN CHỜ XỬ')) {
+                } else if (rawStatus === 'HÀNG HOÀN' || rawStatus === 'HOÀN' || rawStatus.includes('HOÀN CHỜ XỬ') || rawStatus.includes('HOÀN TRẢ')) {
                     eff = 'HÀNG HOÀN CHỜ XỬ LÝ';
-                } else if (rawStatus.includes('HUỶ') || rawStatus.includes('HỦY') || rawStatus.includes('CANCEL') || rawStatus.includes('ยกเลิก') || eff.includes('HUỶ') || eff.includes('HỦY') || eff.includes('CANCEL')) {
+                } else if (rawStatus.includes('HUỶ') || rawStatus.includes('HỦY') || rawStatus.includes('CANCEL') || rawStatus.includes('ยกเลิก')) {
                     eff = 'ĐƠN HUỶ';
                 }
-                const normalized = { ...o, status: o.status && o.status !== '0' ? o.status : 'Chờ Sản Xuất', _effectiveStatus: eff };
-                normalized._computedStatus = computeOrderStatus(normalized);
+                const meta = computeOrderMetadata(o);
+                
+                if (meta.allProdDone && (eff === 'CHỜ SẢN XUẤT' || eff === 'QUÉT TỰ ĐỘNG' || eff === 'ĐANG SẢN XUẤT' || eff === 'CHỜ PHỤ KIỆN')) {
+                    eff = 'SẴN SÀNG ĐÓNG GÓI';
+                }
+
+                const normalized = { 
+                    ...o, 
+                    status: eff === 'SẴN SÀNG ĐÓNG GÓI' ? 'Sẵn Sàng Đóng Gói' : (o.status && o.status !== '0' ? o.status : 'Chờ Sản Xuất'), 
+                    _effectiveStatus: eff,
+                    _isMissingAccessories: false,
+                    _isMissingMVD: meta.isMissingMVD,
+                    _allProdDone: meta.allProdDone,
+                    _hasDonePack: meta.hasDonePack,
+                    _computedStatus: eff
+                };
                 return normalized;
             }).filter(o => {
                 const isCtvOrder = String(o.channel || '').toUpperCase().includes('CỘNG TÁC VIÊN') || String(o.channel || '').toUpperCase() === 'CTV';
                 if (isCTV && o.createdBy !== currentUser && o.sale !== currentUser && o.responsibleUser !== currentUser && !isCtvOrder) return false;
                 if (o.channel === 'Sản Xuất Tồn' || o.channel === 'Sản Xuất Bù Kho') return false;
 
+                return matchTimeFilter(o);
+            });
+        }, [sourceOrders, matchTimeFilter, currentUser, isCTV, computeOrderMetadata]);
+
+        // TẦNG 2: LỌC TÌM KIẾM MÃ ĐƠN & KHÁCH HÀNG (CHO DANH SÁCH HIỂN THỊ VẬN HÀNH)
+        const baseFiltered = React.useMemo(() => {
+            if (!deferredSearchCode || !deferredSearchCode.trim()) return timeFilteredOrders;
+            const searchLower = deferredSearchCode.toLowerCase().trim();
+            return timeFilteredOrders.filter(o => {
                 const mvd = String(o.orderCode || '').toLowerCase();
                 const cus = String(o.customer || '').toLowerCase();
-                const matchSearch = mvd.includes(searchCode.toLowerCase()) || cus.includes(searchCode.toLowerCase());
-
-                // Với đơn hoàn hoặc đơn đối soát, dùng ngày xử lý (reconciledAt / returnedAt / updatedAt) để luôn hiển thị ở tháng xử lý hiện tại
-                const isReturnStatus = o._effectiveStatus === 'HÀNG HOÀN CHỜ XỬ LÝ' || String(o.status || '').toUpperCase().includes('HOÀN');
-                let dateToFilter = o.date || o.createdAt;
-                if (isReturnStatus) {
-                    dateToFilter = o.returnedAt || o.updatedAt || o.date || o.createdAt;
-                } else if (o.isReconciled || o.reconciledAt || o._effectiveStatus === 'HOÀN THÀNH') {
-                    dateToFilter = o.reconciledAt || o.updatedAt || o.date || o.createdAt;
-                }
-
-                // Đơn hàng đã đóng (Hoàn thành, Bàn giao, Đơn huỷ, Hàng hoàn) thì so ngày theo tháng lọc
-                const isClosed = (
-                    o._effectiveStatus === 'HOÀN THÀNH' || 
-                    o._effectiveStatus === 'ĐÃ BÀN GIAO' || 
-                    o._effectiveStatus === 'ĐƠN HUỶ' || 
-                    o._effectiveStatus === 'ĐÃ NHẬP KHO' ||
-                    o._effectiveStatus === 'HÀNG HOÀN CHỜ XỬ LÝ'
-                );
-                let dateMatch = true;
-                if (filterTime === 'Tất Cả') {
-                    dateMatch = true;
-                } else if (isClosed) {
-                    dateMatch = isDateInRangeLocal(dateToFilter, filterTime, customMonth);
-                } else {
-                    // Đơn đang chạy (chưa đóng): Nếu chọn Tháng Này thì luôn hiện để làm việc, nếu chọn tháng khác thì so theo tháng
-                    if (filterTime === 'Tháng Này') {
-                        dateMatch = true;
-                    } else {
-                        dateMatch = isDateInRangeLocal(dateToFilter, filterTime, customMonth);
-                    }
-                }
-
-                return matchSearch && dateMatch;
+                const phone = String(o.phone || '').toLowerCase();
+                return mvd.includes(searchLower) || cus.includes(searchLower) || (phone && phone.includes(searchLower));
             });
-        }, [orders, searchCode, filterTime, customMonth, currentUser, computeOrderStatus]);
+        }, [timeFilteredOrders, deferredSearchCode]);
+
+        const getOrderTabGroup = React.useCallback((o) => {
+            const st = String(o.status || o._effectiveStatus || '').toUpperCase().trim();
+            if (st === 'ĐƠN HUỶ' || st === 'HUỶ' || st === 'ĐƠN HỦY' || st === 'HỦY' || st.includes('HUỶ') || st.includes('HỦY') || st.includes('CANCEL') || st.includes('ยกเลิก')) {
+                return 'Đơn Huỷ';
+            }
+            if (st === 'HÀNG HOÀN' || st === 'KIỂM HÀNG HOÀN' || st.includes('HOÀN TRẢ') || st.includes('HOÀN CHỜ XỬ')) {
+                return 'Hàng Hoàn';
+            }
+            if (st === 'HOÀN THÀNH' || st === 'ĐỐI SOÁT THÀNH CÔNG' || isReconciledSafe(o.isReconciled)) {
+                return 'Hoàn Thành';
+            }
+            if (st === 'ĐÃ BÀN GIAO' || st === 'ĐÃ NHẬP KHO') {
+                return 'Đã Bàn Giao';
+            }
+            if (st === 'CHỜ BÀN GIAO' || o._hasDonePack) {
+                return 'Chờ Bàn Giao';
+            }
+            if (st === 'SẴN SÀNG ĐÓNG GÓI' || st === 'CHỜ PHỤ KIỆN') {
+                return 'Sẵn Sàng Đóng Gói';
+            }
+            if (st === 'CHỜ MÃ VẬN ĐƠN') return 'Chờ Mã Vận Đơn';
+            return 'Chờ Sản Xuất';
+        }, []);
+
+        const matchChannelFilter = React.useCallback((o, targetChannel) => {
+            if (!targetChannel || targetChannel === 'ALL') return true;
+            const channel = String(o.channel || '').toUpperCase();
+            const isInter = channel.includes('XUẤT KHẨU') || channel.includes('EXPORT') || channel.includes('QUỐC TẾ') ||
+                channel.includes('SHOPEE SG') || channel.includes('SHOPEE TH') || channel.includes('SHOPEE TW') ||
+                channel.includes('SHOPEE PH') || channel.includes('SHOPEE MA') || channel.includes('SHOPEE MY') ||
+                channel.includes('SINGAPORE') || channel.includes('MALAYSIA') || channel.includes('THAILAND') || channel.includes('PHILIPPINES') ||
+                /\b(SHOPEE_SG|SHOPEE_MY|SHOPEE_TH|SHOPEE_PH|SHOPEE_MA|SHOPEE_TW)\b/i.test(channel);
+
+            if (targetChannel === 'EXPORT') {
+                return isInter;
+            } else if (targetChannel === 'SHOPEE') {
+                return !isInter && (channel.includes('SHOPEE') || channel.includes('SHP') || channel.includes('SPX'));
+            } else if (targetChannel === 'BÁN LẺ') {
+                return channel.includes('BÁN LẺ') || channel.includes('BAN LE') || channel.includes('ZALO') || channel.includes('FACEBOOK') || channel.includes('MESSENGER');
+            } else if (targetChannel === 'CTV') {
+                return channel.includes('CỘNG TÁC VIÊN') || channel.includes('CỘNG TAC') || channel === 'CTV';
+            } else if (targetChannel === 'TIKTOK') {
+                return channel.includes('TIKTOK') || channel.includes('TT') || channel.includes('TIK TOK');
+            }
+            return true;
+        }, []);
+
+        const channelFiltered = React.useMemo(() => {
+            return baseFiltered.filter(o => matchChannelFilter(o, filterChannel));
+        }, [baseFiltered, filterChannel, matchChannelFilter]);
 
         const filtered = React.useMemo(() => {
-            return baseFiltered.filter(o => {
-                // TẦNG 1: LỌC KÊNH BÁN TOÀN CỤC (GLOBAL CHANNEL FILTER)
-                if (filterChannel !== 'ALL') {
-                    const channel = String(o.channel || '').toUpperCase();
-                    const isInter = channel.includes('XUẤT KHẨU') || channel.includes('EXPORT') || channel.includes('QUỐC TẾ') ||
-                        channel.includes('SHOPEE SG') || channel.includes('SHOPEE TH') || channel.includes('SHOPEE TW') ||
-                        channel.includes('SHOPEE PH') || channel.includes('SHOPEE MA') || channel.includes('SHOPEE MY') ||
-                        channel.includes('SINGAPORE') || channel.includes('MALAYSIA') || channel.includes('THAILAND') || channel.includes('PHILIPPINES') ||
-                        /\b(SHOPEE_SG|SHOPEE_MY|SHOPEE_TH|SHOPEE_PH|SHOPEE_MA|SHOPEE_TW)\b/i.test(channel);
-
-                    if (filterChannel === 'EXPORT') {
-                        if (!isInter) return false;
-                    } else if (filterChannel === 'SHOPEE') {
-                        if (isInter || !(channel.includes('SHOPEE') || channel.includes('SHP') || channel.includes('SPX'))) return false;
-                    } else if (filterChannel === 'BÁN LẺ') {
-                        if (!(channel.includes('BÁN LẺ') || channel.includes('BAN LE') || channel.includes('ZALO') || channel.includes('FACEBOOK') || channel.includes('MESSENGER'))) return false;
-                    } else if (filterChannel === 'CTV') {
-                        if (!(channel.includes('CỘNG TÁC VIÊN') || channel === 'CTV')) return false;
-                    } else if (filterChannel === 'TIKTOK') {
-                        if (!(channel.includes('TIKTOK') || channel.includes('TT') || channel.includes('TIK TOK'))) return false;
-                    }
+            return channelFiltered.filter(o => {
+                if (!filterStatus || filterStatus === 'ALL') return true;
+                const group = getOrderTabGroup(o);
+                if (filterStatus === 'Chờ Mã Vận Đơn') {
+                    if (group === 'Đơn Huỷ' || group === 'Hàng Hoàn' || group === 'Hoàn Thành' || group === 'Đã Bàn Giao' || group === 'Chờ Sản Xuất') return false;
+                    return Boolean(o._isMissingMVD);
                 }
-
-                const effectiveStatus = o._computedStatus || 'CHỜ SẢN XUẤT';
-
-                // TẦNG 2: LỌC TRẠNG THÁI
-                const targetStatus = String(filterStatus).toUpperCase().trim();
-                if (targetStatus === 'CHỜ SẢN XUẤT') {
-                    return effectiveStatus === 'CHỜ SẢN XUẤT' || effectiveStatus === 'QUÉT TỰ ĐỘNG' || effectiveStatus === 'ĐANG SẢN XUẤT';
-                }
-                if (targetStatus === 'CHỜ MÃ VẬN ĐƠN') return effectiveStatus === 'CHỜ MÃ VẬN ĐƠN';
-                if (targetStatus === 'CHỜ PHỤ KIỆN') return effectiveStatus === 'CHỜ PHỤ KIỆN';
-                if (targetStatus === 'SẴN SÀNG ĐÓNG GÓI') return effectiveStatus === 'SẴN SÀNG ĐÓNG GÓI';
-                if (targetStatus === 'CHỜ BÀN GIAO') return effectiveStatus === 'CHỜ BÀN GIAO';
-                if (targetStatus === 'ĐÃ BÀN GIAO') return effectiveStatus === 'ĐÃ BÀN GIAO' || effectiveStatus === 'ĐÃ NHẬP KHO';
-                if (targetStatus === 'ĐƠN HUỶ') return effectiveStatus === 'ĐƠN HUỶ' || effectiveStatus === 'HUỶ' || effectiveStatus === 'ĐƠN HỦY';
-                if (targetStatus === 'HÀNG HOÀN') return effectiveStatus === 'HÀNG HOÀN' || effectiveStatus === 'KIỂM HÀNG HOÀN' || effectiveStatus.includes('HOÀN CHỜ XỬ');
-                if (targetStatus === 'HOÀN THÀNH') return effectiveStatus === 'HOÀN THÀNH' || effectiveStatus === 'ĐỐI SOÁT THÀNH CÔNG';
-                return true;
+                return group === filterStatus;
             });
-        }, [baseFiltered, filterStatus, filterChannel]);
+        }, [channelFiltered, filterStatus, getOrderTabGroup]);
 
         const sortedFiltered = React.useMemo(() => {
             return [...filtered].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
@@ -1397,32 +1683,44 @@
         }, [packings, erpData?.Packings]);
 
         const stats = React.useMemo(() => {
-            let pending = 0; let waitMVD = 0; let waitAcc = 0; let ready = 0; let shipping = 0; let done = 0; let cancel = 0; let returns = 0; let completed = 0;
-            (baseFiltered || []).forEach(o => {
-                const finalStatus = o._computedStatus || 'CHỜ SẢN XUẤT';
-                if (finalStatus === 'CHỜ SẢN XUẤT' || finalStatus === 'QUÉT TỰ ĐỘNG' || finalStatus === 'ĐANG SẢN XUẤT') pending++;
-                else if (finalStatus === 'CHỜ MÃ VẬN ĐƠN') waitMVD++;
-                else if (finalStatus === 'CHỜ PHỤ KIỆN') waitAcc++;
-                else if (finalStatus === 'SẴN SÀNG ĐÓNG GÓI') ready++;
-                else if (finalStatus === 'CHỜ BÀN GIAO') shipping++;
-                else if (finalStatus === 'ĐÃ BÀN GIAO') done++;
-                else if (finalStatus === 'ĐƠN HUỶ' || finalStatus === 'HUỶ' || finalStatus === 'ĐƠN HỦY' || finalStatus === 'HỦY' || finalStatus.includes('HUỶ') || finalStatus.includes('HỦY') || finalStatus.includes('CANCEL') || finalStatus.includes('ยกเลิก')) cancel++;
-                else if (finalStatus === 'HÀNG HOÀN' || finalStatus.includes('HOÀN TRẢ') || finalStatus.includes('HOÀN CHỜ XỬ')) returns++;
-                else completed++;
+            let pending = 0; let waitMVD = 0; let ready = 0; let shipping = 0; let done = 0; let cancel = 0; let returns = 0; let completed = 0;
+            (channelFiltered || []).forEach(o => {
+                const group = getOrderTabGroup(o);
+                if (group === 'Sẵn Sàng Đóng Gói') {
+                    if (o._isMissingMVD) waitMVD++;
+                }
+
+                if (group === 'Chờ Sản Xuất') pending++;
+                else if (group === 'Sẵn Sàng Đóng Gói') ready++;
+                else if (group === 'Chờ Bàn Giao') shipping++;
+                else if (group === 'Đã Bàn Giao') done++;
+                else if (group === 'Đơn Huỷ') cancel++;
+                else if (group === 'Hàng Hoàn') returns++;
+                else if (group === 'Hoàn Thành') completed++;
             });
-            return { pending, waitMVD, waitAcc, ready, shipping, done, cancel, returns, completed };
-        }, [baseFiltered]);
+            return { pending, waitMVD, ready, shipping, done, cancel, returns, completed };
+        }, [channelFiltered, getOrderTabGroup]);
 
         const tabs = React.useMemo(() => [
+            {
+                id: 'ALL',
+                label: 'Tất Cả',
+                count: channelFiltered.length,
+                icon: 'fa-layer-group',
+                activeClass: 'bg-white text-zinc-950 shadow-md font-black',
+                inactiveClass: 'bg-white/10 text-zinc-300 border border-white/20 hover:bg-white/20 hover:text-white',
+                activeBadgeClass: 'bg-black text-white font-black',
+                inactiveBadgeClass: 'bg-white/20 text-zinc-300 font-bold'
+            },
             {
                 id: 'Chờ Sản Xuất',
                 label: 'Chờ Sản Xuất',
                 count: stats.pending,
                 icon: 'fa-tools',
                 activeClass: 'bg-amber-400 text-zinc-950 shadow-md font-black',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                inactiveClass: 'bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 hover:text-amber-300',
                 activeBadgeClass: 'bg-black text-amber-400 font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
+                inactiveBadgeClass: 'bg-amber-500/20 text-amber-300 font-bold'
             },
             {
                 id: 'Chờ Mã Vận Đơn',
@@ -1430,19 +1728,9 @@
                 count: stats.waitMVD || 0,
                 icon: 'fa-barcode',
                 activeClass: 'bg-orange-500 text-white shadow-md font-black',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                inactiveClass: 'bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 hover:text-orange-300',
                 activeBadgeClass: 'bg-black/30 text-white font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
-            },
-            {
-                id: 'Chờ Phụ Kiện',
-                label: 'Chờ Phụ Kiện',
-                count: stats.waitAcc,
-                icon: 'fa-puzzle-piece',
-                activeClass: 'bg-cyan-400 text-zinc-950 shadow-md font-black',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
-                activeBadgeClass: 'bg-black text-cyan-400 font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
+                inactiveBadgeClass: 'bg-orange-500/20 text-orange-300 font-bold'
             },
             {
                 id: 'Sẵn Sàng Đóng Gói',
@@ -1450,9 +1738,9 @@
                 count: stats.ready,
                 icon: 'fa-box-open',
                 activeClass: 'bg-purple-500 text-white shadow-md font-black',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                inactiveClass: 'bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 hover:text-purple-300',
                 activeBadgeClass: 'bg-black/30 text-white font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
+                inactiveBadgeClass: 'bg-purple-500/20 text-purple-300 font-bold'
             },
             {
                 id: 'Chờ Bàn Giao',
@@ -1460,9 +1748,9 @@
                 count: stats.shipping,
                 icon: 'fa-truck-loading',
                 activeClass: 'bg-blue-500 text-white shadow-md font-black',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                inactiveClass: 'bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 hover:text-blue-300',
                 activeBadgeClass: 'bg-black/30 text-white font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
+                inactiveBadgeClass: 'bg-blue-500/20 text-blue-300 font-bold'
             },
             {
                 id: 'Đã Bàn Giao',
@@ -1470,41 +1758,41 @@
                 count: stats.done,
                 icon: 'fa-check-double',
                 activeClass: 'bg-emerald-500 text-zinc-950 shadow-md font-black',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                inactiveClass: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:text-emerald-300',
                 activeBadgeClass: 'bg-black text-emerald-300 font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400'
+                inactiveBadgeClass: 'bg-emerald-500/20 text-emerald-300 font-bold'
             },
             {
                 id: 'Đơn Huỷ',
                 label: 'Đơn Huỷ',
                 count: stats.cancel,
                 icon: 'fa-ban',
-                activeClass: 'bg-[#f43f5e]/15 text-[#fb7185] border-[#f43f5e]/30 shadow-[0_0_10px_rgba(244,63,94,0.15)] font-bold',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.08] hover:border-white/[0.12] hover:text-zinc-200 hover:bg-white/[0.02]',
-                activeBadgeClass: 'bg-[#f43f5e] text-white font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.08]'
+                activeClass: 'bg-rose-500 text-white shadow-md font-black',
+                inactiveClass: 'bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 hover:text-rose-300',
+                activeBadgeClass: 'bg-black/30 text-white font-black',
+                inactiveBadgeClass: 'bg-rose-500/20 text-rose-300 font-bold'
             },
             {
                 id: 'Hàng Hoàn',
                 label: 'Hàng Hoàn Chờ Xử',
                 count: stats.returns,
                 icon: 'fa-undo-alt',
-                activeClass: 'bg-[#f97316]/15 text-[#fb923c] border-[#f97316]/30 shadow-[0_0_10px_rgba(249,115,22,0.15)] font-bold',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.08] hover:border-white/[0.12] hover:text-zinc-200 hover:bg-white/[0.02]',
-                activeBadgeClass: 'bg-[#f97316] text-white font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.08]'
+                activeClass: 'bg-orange-500 text-white shadow-md font-black',
+                inactiveClass: 'bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 hover:text-orange-300',
+                activeBadgeClass: 'bg-black/30 text-white font-black',
+                inactiveBadgeClass: 'bg-orange-500/20 text-orange-300 font-bold'
             },
             {
                 id: 'Hoàn Thành',
                 label: 'Hoàn Thành',
                 count: stats.completed,
                 icon: 'fa-certificate',
-                activeClass: 'bg-[#14b8a6]/15 text-[#2dd4bf] border-[#14b8a6]/30 shadow-[0_0_10px_rgba(20,184,166,0.15)] font-bold',
-                inactiveClass: 'bg-[#121214] text-zinc-400 border-white/[0.08] hover:border-white/[0.12] hover:text-zinc-200 hover:bg-white/[0.02]',
-                activeBadgeClass: 'bg-[#14b8a6] text-white font-black',
-                inactiveBadgeClass: 'bg-zinc-800 text-zinc-400 border border-white/[0.08]'
+                activeClass: 'bg-teal-500 text-zinc-950 shadow-md font-black',
+                inactiveClass: 'bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 hover:text-teal-300',
+                activeBadgeClass: 'bg-black text-teal-300 font-black',
+                inactiveBadgeClass: 'bg-teal-500/20 text-teal-300 font-bold'
             }
-        ], [stats]);
+        ], [stats, channelFiltered.length]);
 
         const realTimeSummary = React.useMemo(() => {
             const todayStr = new Date().toISOString().split('T')[0];
@@ -1561,8 +1849,8 @@
 
             if (isNaN(num) || !isFinite(num) || num <= 0) return 0;
 
-            // Failsafe chống rác dữ liệu: Mã vận đơn / Số điện thoại / ID đơn (> 100 triệu dạng nguyên 10-15 số) dán nhầm vào cột Doanh thu
-            if (num > 100000000 && Number.isInteger(num)) {
+            // Failsafe chống rác dữ liệu: Mã vận đơn / Số điện thoại / ID đơn dán nhầm vào cột Doanh thu (Ngưỡng 2 Tỷ đồng)
+            if (num > 2000000000) {
                 return 0;
             }
 
@@ -1587,50 +1875,49 @@
             let totalRetail = 0;
             let totalCtv = 0;
 
-            (baseFiltered || []).forEach(o => {
-                const val = parseRevenue(o.revenue, o.channel);
+            // BẮT BUỘC: Tính KPI dựa trên danh sách 100% ĐÃ LỌC THEO THỜI GIAN (timeFilteredOrders)
+            // TUYỆT ĐỐI KHÔNG TÍNH THEO DANH SÁCH BỊ LỌC TÌM KIẾM, PHÂN TRANG HOẶC TAB KÊNH BÊN DƯỚI
+            (timeFilteredOrders || []).forEach(o => {
+                let val = parseRevenue(o.revenue, o.channel);
                 const st = String(o._effectiveStatus || o.status || '').toUpperCase().trim();
                 const rawStatus = String(o.status || '').toUpperCase().trim();
                 const note = String(o.note || '').toLowerCase();
                 const ch = String(o.channel || '').toUpperCase().trim();
 
-                // Nhận diện đơn trả hàng (bao gồm cả hàng hoàn đang chờ xử lý và hàng hoàn đã xử lý / đối soát xong nhảy sang Hoàn Thành)
+                // Nhận diện đơn trả hàng hoặc hết hạn 72h bị phạt
+                const isOverdue72h = note.includes('quá hạn 72h') || note.includes('xuất huỷ quá hạn') || note.includes('[phat-cogs]') || note.includes('phạt cogs');
                 const isReturned = st === 'HÀNG HOÀN' || st === 'KIỂM HÀNG HOÀN' || st === 'HÀNG HOÀN CHỜ XỬ LÝ' || st.includes('HOÀN CHỜ XỬ') || 
-                    rawStatus === 'HÀNG HOÀN' || rawStatus.includes('HOÀN TRẢ') || 
-                    Boolean(o.returnedAt) || 
-                    note.includes('[kn-thang]') || note.includes('[kn-thua]') || note.includes('hàng hoàn') || note.includes('trả hàng');
+                    rawStatus === 'HÀNG HOÀN' || rawStatus.includes('HOÀN TRẢ') || isOverdue72h ||
+                    (Boolean(o.returnedAt) && st !== 'HOÀN THÀNH' && st !== 'ĐỐI SOÁT THÀNH CÔNG' && st !== 'ĐÃ BÀN GIAO');
 
                 // Nhận diện đơn huỷ triệt để (Không tính vào doanh thu và không tính vào số đơn bán)
                 const isCancelled = !isReturned && (
                     st === 'ĐƠN HUỶ' || st === 'HUỶ' || st === 'ĐƠN HỦY' || st === 'HỦY' || 
-                    st.includes('HUỶ') || st.includes('HỦY') || st.includes('CANCEL') ||
-                    rawStatus.includes('HUỶ') || rawStatus.includes('HỦY') || rawStatus.includes('CANCEL') ||
-                    rawStatus.includes('ยกเลิก') ||
-                    note.includes('[đã hủy]') || note.includes('[đơn huỷ]') || note.includes('[đơn hủy]') || 
-                    note.includes('[huỷ]') || note.includes('[hủy]') || note.includes('hủy đơn') || note.includes('huỷ đơn') ||
+                    rawStatus === 'ĐƠN HUỶ' || rawStatus === 'HUỶ' || rawStatus === 'ĐƠN HỦY' || rawStatus === 'HỦY' || 
+                    rawStatus === 'CANCELLED' || rawStatus === 'CANCEL' ||
                     Boolean(o.isCancelled)
                 );
 
                 if (isReturned) {
                     totalReturnedValue += val;
-                    totalReturnOrders++;
+                    totalReturnOrders += 1;
                 } else if (!isCancelled) {
-                    // CHỈ CỘNG DOANH THU VÀ ĐƠN BÁN CHO ĐƠN HỢP LỆ (ĐÃ LOẠI BỎ ĐƠN HỦY & ĐƠN HOÀN)
                     totalRevenue += val;
-                    totalSoldOrders++;
-
-                    if (ch.includes('BÁN LẺ') || ch.includes('BAN LE') || ch.includes('ZALO') || ch.includes('FACEBOOK') || ch.includes('MESSENGER')) {
-                        totalRetail += val;
-                    }
-
-                    if (ch.includes('CỘNG TÁC VIÊN') || ch === 'CTV') {
+                    totalSoldOrders += 1;
+                    if (ch.includes('CỘNG TÁC') || ch.includes('CỘNG TAC') || ch.includes('CTV') || ch === 'CTV') {
                         totalCtv += val;
+                    } else if (
+                        ch.includes('BÁN LẺ') || ch.includes('BAN LE') || ch.includes('OFFLINE') || 
+                        ch.includes('ZALO') || ch.includes('FACEBOOK') || ch.includes('MESSENGER') || 
+                        ch === 'RETAIL' || ch === 'LẺ' || ch === 'LE'
+                    ) {
+                        totalRetail += val;
                     }
                 }
             });
 
             return { totalRevenue, totalSoldOrders, totalReturnedValue, totalReturnOrders, totalRetail, totalCtv };
-        }, [baseFiltered]);
+        }, [timeFilteredOrders]);
 
         const formatMoney = (n) => Math.round(Number(n) || 0).toLocaleString('vi-VN');
 
@@ -1675,7 +1962,6 @@
                 // Động cơ safeDeductInventoryOnHandover trên Apps Script Backend sẽ tự động trừ tồn kho (cho phép âm kho phụ kiện) và tạo log xuất kho ngầm.
                 await pushDeltas({ orders: updatedOrders }, `Đã xuất kho & bàn giao thành công ${selectedOrders.length} đơn!`, 'fa-truck');
                 clearSelection();
-                window.dispatchEvent(new CustomEvent('triggerReloadData'));
             } catch (e) {
                 console.error("Lỗi handleBulkHandover:", e);
                 triggerToast(e?.message || 'Lỗi khi xử lý xuất kho bàn giao!', 'fa-times', 'danger');
@@ -2220,7 +2506,7 @@
                 <div className="flex flex-col gap-2.5 mb-3">
                     <div className="flex items-center justify-between gap-2 overflow-x-auto custom-scrollbar no-scrollbar py-0.5">
                         <div className="flex items-center gap-1.5 shrink-0">
-                            {(isAdmin || isCTV) && (
+                            {hasPerm('ORDER_CREATE') && (
                                 <button
                                     onClick={() => setAddingMode(true)}
                                     className="w-9 h-9 rounded-xl bg-gradient-to-r from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 text-amber-300 flex items-center justify-center border border-amber-500/40 shadow-sm transition-all duration-200 active:scale-95 cursor-pointer shrink-0"
@@ -2229,15 +2515,54 @@
                                     <i className="fas fa-plus text-amber-400 text-[13px]"></i>
                                 </button>
                             )}
-                            {isAdmin && (
+                            <button
+                                type="button"
+                                onClick={() => setShowQuickNotes(prev => !prev)}
+                                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 active:scale-95 cursor-pointer shrink-0 ${showQuickNotes ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50' : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30'} shadow-sm`}
+                                title="Ghi chú & nhắc việc đơn hàng"
+                            >
+                                <i className="fas fa-sticky-note text-amber-400 text-[13px]"></i>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const orderCodeInput = window.prompt("Nhập Mã Đơn Hàng cần phát tín hiệu GẤP tới xưởng:");
+                                    if (!orderCodeInput) return;
+                                    const matched = (orders || []).find(o => String(o.orderCode || '').toLowerCase().includes(orderCodeInput.toLowerCase().trim()));
+                                    const targetCode = matched ? matched.orderCode : orderCodeInput.trim().toUpperCase();
+                                    
+                                    if (typeof window.triggerHaptic === 'function') window.triggerHaptic('urgent');
+                                    if (typeof window.playEmergencyAlarm === 'function') window.playEmergencyAlarm('urgent');
+
+                                    if (typeof window.firebase !== 'undefined' && window.firebase.database) {
+                                        window.firebase.database().ref('rf_realtime_delta').set({
+                                            client_id: window._rf_client_id || 'urgent_trigger',
+                                            timestamp: Date.now(),
+                                            trigger_by: currentUser || 'Bán Hàng',
+                                            alert_type: 'URGENT_ORDER',
+                                            is_urgent: true,
+                                            orderCode: targetCode,
+                                            message: `Đơn gấp ${targetCode} cần xưởng ưu tiên sản xuất & đóng gói ngay!`
+                                        });
+                                    }
+                                    triggerToast(`⚡ ĐÃ PHÁT TÍN HIỆU ĐƠN GẤP: ${targetCode}!`, 'fa-bolt', 'warning');
+                                }}
+                                className="w-9 h-9 rounded-xl bg-amber-950/60 hover:bg-amber-900/70 text-amber-300 flex items-center justify-center border border-amber-500/60 shadow-[0_0_10px_rgba(245,158,11,0.25)] transition-all duration-200 active:scale-95 cursor-pointer shrink-0"
+                                title="Phát thông báo Đơn Gấp / Hỏa Tốc tới toàn bộ xưởng sản xuất"
+                            >
+                                <i className="fas fa-bolt text-amber-400 text-[13px] animate-pulse"></i>
+                            </button>
+                            {hasPerm('ORDER_IMPORT') && (
+                                <button
+                                    onClick={() => window.dispatchEvent(new CustomEvent('openBulkImport'))}
+                                    className="w-9 h-9 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 flex items-center justify-center border border-emerald-500/40 transition-all duration-200 active:scale-95 cursor-pointer shrink-0"
+                                    title="Nhập File Excel Order.all"
+                                >
+                                    <i className="fas fa-file-excel text-emerald-400 text-[13px]"></i>
+                                </button>
+                            )}
+                            {hasPerm('ORDER_STATUS_RECONCILED') && (
                                 <>
-                                    <button
-                                        onClick={() => window.dispatchEvent(new CustomEvent('openBulkImport'))}
-                                        className="w-9 h-9 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 flex items-center justify-center border border-emerald-500/40 transition-all duration-200 active:scale-95 cursor-pointer shrink-0"
-                                        title="Nhập File Excel Order.all"
-                                    >
-                                        <i className="fas fa-file-excel text-emerald-400 text-[13px]"></i>
-                                    </button>
                                     <button
                                         onClick={() => setIsScanningReturn(true)}
                                         className="w-9 h-9 rounded-xl bg-purple-950/60 hover:bg-purple-900/70 text-purple-300 flex items-center justify-center border border-purple-500/60 shadow-[0_0_10px_rgba(168,85,247,0.2)] transition-all duration-200 active:scale-95 cursor-pointer shrink-0"
@@ -2260,31 +2585,50 @@
                                     >
                                         <i className={isSyncingGHN ? "fas fa-spinner fa-spin text-amber-400 text-[13px]" : "fas fa-bolt text-amber-400 text-[13px]"}></i>
                                     </button>
-                                    <button
-                                        onClick={() => setIsScanningCancel(true)}
-                                        className="w-9 h-9 rounded-xl bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 flex items-center justify-center border border-rose-500/40 transition-all duration-200 active:scale-95 cursor-pointer shrink-0"
-                                        title="Quét & Hủy Đơn Tự Động"
-                                    >
-                                        <i className="fas fa-ban text-rose-400 text-[13px]"></i>
-                                    </button>
-                                    <button
-                                        onClick={() => setShowRevenueStats(prev => !prev)}
-                                        className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 active:scale-95 cursor-pointer shrink-0 ${showRevenueStats ? 'bg-fuchsia-950/60 text-fuchsia-300 border border-fuchsia-500/60 shadow-[0_0_10px_rgba(217,70,239,0.3)]' : 'bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 border border-white/[0.1]'}`}
-                                        title="Xem Thống Kê Doanh Thu"
-                                    >
-                                        <i className="fas fa-chart-bar text-fuchsia-400 text-[13px]"></i>
-                                    </button>
-                                    <button
-                                        onClick={() => setIsArchiveEngineOpen(true)}
-                                        className="w-9 h-9 rounded-xl bg-gradient-to-r from-amber-950/50 to-yellow-950/50 hover:from-amber-900/60 hover:to-yellow-900/60 text-amber-300 flex items-center justify-center border border-amber-500/40 shadow-sm transition-all duration-200 active:scale-95 cursor-pointer shrink-0"
-                                        title="Quản lý Lưu Trữ Đơn Cũ (Orders_Archive) & Giải phóng RAM"
-                                    >
-                                        <i className="fas fa-box-archive text-amber-400 text-[13px]"></i>
-                                    </button>
                                 </>
                             )}
+                            {hasPerm('ORDER_CANCEL') && (
+                                <button
+                                    onClick={() => setIsScanningCancel(true)}
+                                    className="w-9 h-9 rounded-xl bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 flex items-center justify-center border border-rose-500/40 transition-all duration-200 active:scale-95 cursor-pointer shrink-0"
+                                    title="Quét & Hủy Đơn Tự Động"
+                                >
+                                    <i className="fas fa-ban text-rose-400 text-[13px]"></i>
+                                </button>
+                            )}
+                            {hasPerm('ORDER_STATUS_RECONCILED') && (
+                                <button
+                                    onClick={() => setShowRevenueStats(prev => !prev)}
+                                    className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 active:scale-95 cursor-pointer shrink-0 ${showRevenueStats ? 'bg-fuchsia-950/60 text-fuchsia-300 border border-fuchsia-500/60 shadow-[0_0_10px_rgba(217,70,239,0.3)]' : 'bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 border border-white/[0.1]'}`}
+                                    title="Xem Thống Kê Doanh Thu"
+                                >
+                                    <i className="fas fa-chart-bar text-fuchsia-400 text-[13px]"></i>
+                                </button>
+                            )}
+                            {hasPerm('ORDER_ARCHIVE_VIEW') && (
+                                <button
+                                    onClick={() => setIsArchiveEngineOpen(true)}
+                                    className="w-9 h-9 rounded-xl bg-gradient-to-r from-amber-950/50 to-yellow-950/50 hover:from-amber-900/60 hover:to-yellow-900/60 text-amber-300 flex items-center justify-center border border-amber-500/40 shadow-sm transition-all duration-200 active:scale-95 cursor-pointer shrink-0"
+                                    title="Quản lý Lưu Trữ Đơn Cũ (Orders_Archive) & Giải phóng RAM"
+                                >
+                                    <i className="fas fa-box-archive text-amber-400 text-[13px]"></i>
+                                </button>
+                            )}
+
                         </div>
                     </div>
+
+                    {/* KHUNG GHI CHÚ NHANH */}
+                    {showQuickNotes && (
+                        <window.QuickNotesPanel 
+                            targetTab="DON_HANG" 
+                            documents={documents || erpData?.Documents || window._rf_documents || []} 
+                            pushDeltas={pushDeltas} 
+                            currentUser={currentUser} 
+                            isBoss={isBoss} 
+                            triggerToast={triggerToast} 
+                        />
+                    )}
 
                     {/* KHUNG THỐNG KÊ DOANH THU & ĐƠN HÀNG (NGAY BÊN DƯỚI HÀNG NÚT THAO TÁC) */}
                     {!isCTV && showRevenueStats && (
@@ -2370,7 +2714,7 @@
 
                 {/* CẢNH BÁO URGENT TỰ ĐỘNG (TĨNH, KHÔNG NHẤP NHÁY) */}
                 {!isCTV && realTimeSummary.urgentAlerts.length > 0 && (
-                    <div className="bg-[#241212] border border-rose-900/40 rounded-2xl p-3 mb-3 space-y-2">
+                    <div className="bg-transparent border border-rose-500/30 rounded-2xl p-3 mb-3 space-y-2">
                         <div className="flex items-center gap-2 text-rose-400 font-black text-[10px] uppercase tracking-wider border-b border-rose-950/60 pb-1.5">
                             <i className="fas fa-exclamation-triangle text-rose-500 text-sm"></i>
                             <span>CẢNH BÁO: ĐƠN HỦY & HOÀN TRẢ</span>
@@ -2379,7 +2723,7 @@
                             {realTimeSummary.urgentAlerts.map(alertOrder => {
                                 const isHuy = String(alertOrder.status || '').toUpperCase().includes('HỦY') || String(alertOrder.status || '').toUpperCase() === 'HUỶ';
                                 return (
-                                    <div key={alertOrder.id} className="flex justify-between items-center bg-black/40 border border-rose-950/50 px-2.5 py-1.5 rounded-xl text-[11px] font-bold">
+                                    <div key={alertOrder.id} className="flex justify-between items-center bg-rose-500/5 border border-rose-500/20 px-2.5 py-1.5 rounded-xl text-[11px] font-bold">
                                         <div className="flex items-center gap-2 truncate">
                                             <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${isHuy ? 'bg-rose-600 text-white' : 'bg-orange-500 text-white'}`}>
                                                 {isHuy ? 'HUỶ' : 'HOÀN'}
@@ -2416,54 +2760,54 @@
                             label: 'Tất Cả',
                             icon: 'fa-store',
                             activeClass: 'bg-white text-zinc-950 shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-white',
+                            inactiveClass: 'bg-white/5 text-zinc-300 border border-white/10 hover:bg-white/10 hover:text-white',
                             activeIconClass: 'text-zinc-950',
-                            inactiveIconClass: 'text-zinc-400'
+                            inactiveIconClass: 'text-zinc-300'
                         },
                         {
                             id: 'SHOPEE',
                             label: 'Shopee',
                             icon: 'fa-shopping-bag',
                             activeClass: 'bg-[#f97316] text-white shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#f97316]',
+                            inactiveClass: 'bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 hover:text-orange-300',
                             activeIconClass: 'text-white',
-                            inactiveIconClass: 'text-zinc-400'
+                            inactiveIconClass: 'text-orange-400'
                         },
                         {
                             id: 'EXPORT',
                             label: 'Xuất Khẩu',
                             icon: 'fa-globe-asia',
                             activeClass: 'bg-[#10b981] text-zinc-950 shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#10b981]',
+                            inactiveClass: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:text-emerald-300',
                             activeIconClass: 'text-zinc-950',
-                            inactiveIconClass: 'text-zinc-400'
+                            inactiveIconClass: 'text-emerald-400'
                         },
                         {
                             id: 'TIKTOK',
                             label: 'TikTok',
                             icon: 'fa-video',
-                            activeClass: 'bg-[#06b6d4] text-zinc-950 shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#06b6d4]',
-                            activeIconClass: 'text-zinc-950',
-                            inactiveIconClass: 'text-zinc-400'
+                            activeClass: 'bg-[#ec4899] text-white shadow-md font-black',
+                            inactiveClass: 'bg-pink-500/10 text-pink-400 border border-pink-500/20 hover:bg-pink-500/20 hover:text-pink-300',
+                            activeIconClass: 'text-white',
+                            inactiveIconClass: 'text-pink-400'
                         },
                         {
                             id: 'BÁN LẺ',
                             label: 'Bán Lẻ',
                             icon: 'fa-box',
                             activeClass: 'bg-[#60a5fa] text-zinc-950 shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#60a5fa]',
+                            inactiveClass: 'bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 hover:text-blue-300',
                             activeIconClass: 'text-zinc-950',
-                            inactiveIconClass: 'text-zinc-400'
+                            inactiveIconClass: 'text-blue-400'
                         },
                         {
                             id: 'CTV',
                             label: 'CTV',
                             icon: 'fa-handshake',
                             activeClass: 'bg-[#c084fc] text-zinc-950 shadow-md font-black',
-                            inactiveClass: 'bg-[#121214] text-zinc-400 border border-white/[0.08] hover:text-[#c084fc]',
+                            inactiveClass: 'bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 hover:text-purple-300',
                             activeIconClass: 'text-zinc-950',
-                            inactiveIconClass: 'text-zinc-400'
+                            inactiveIconClass: 'text-purple-400'
                         }
                     ].map(ch => {
                         const isActive = filterChannel === ch.id;
@@ -2528,7 +2872,7 @@
 
                         {/* Right: Actions */}
                         <div className="flex items-center gap-1.5 shrink-0">
-                            {(filterStatus === 'Hàng Hoàn' || filterStatus === 'HÀNG HOÀN CHỜ XỬ' || filterStatus === 'HÀNG HOÀN CHỜ XỬ LÝ') && (
+                            {(filterStatus === 'Hàng Hoàn' || filterStatus === 'HÀNG HOÀN CHỜ XỬ' || filterStatus === 'HÀNG HOÀN CHỜ XỬ LÝ') && hasPerm('ORDER_STATUS_RECONCILED') && (
                                 <button
                                     type="button"
                                     onClick={handleBulkReturnApprove}
@@ -2540,7 +2884,7 @@
                                 </button>
                             )}
 
-                            {(isAdmin || isBossRole || currentRole === 'TỐI CAO') && (
+                            {hasPerm('ORDER_DELETE') && (
                                 <button
                                     type="button"
                                     onClick={handleBulkDelete}
@@ -2553,15 +2897,17 @@
                                 </button>
                             )}
 
-                            <button 
-                                type="button"
-                                onClick={handleBulkHandover} 
-                                disabled={isBulkHandovering} 
-                                className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[11px] uppercase active:scale-95 transition-all shadow-[0_0_15px_rgba(16,185,129,0.25)] border border-emerald-300 disabled:opacity-50 cursor-pointer"
-                            >
-                                <i className={`fas ${isBulkHandovering ? 'fa-spinner fa-spin' : 'fa-truck-fast'} text-[11px]`}></i>
-                                <span>{isBulkHandovering ? 'Đang Giao...' : `Bàn Giao (${selectedIds.length})`}</span>
-                            </button>
+                            {hasPerm('ORDER_STATUS_DELIVERED') && (
+                                <button 
+                                    type="button"
+                                    onClick={handleBulkHandover} 
+                                    disabled={isBulkHandovering} 
+                                    className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[11px] uppercase active:scale-95 transition-all shadow-[0_0_15px_rgba(16,185,129,0.25)] border border-emerald-300 disabled:opacity-50 cursor-pointer"
+                                >
+                                    <i className={`fas ${isBulkHandovering ? 'fa-spinner fa-spin' : 'fa-truck-fast'} text-[11px]`}></i>
+                                    <span>{isBulkHandovering ? 'Đang Giao...' : `Bàn Giao (${selectedIds.length})`}</span>
+                                </button>
+                            )}
                         </div>
                     </div>
                 )}

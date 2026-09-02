@@ -1,9 +1,21 @@
+# Dependencies & Environment
 node_modules/
 .vscode/
+.gemini/
+.idea/
+
+# Backups, logs & scratch
 backups/
 scratch/
-*.xlsx
-*.csv
 *.log
+*.tmp
+*.bak
 .tmp.driveupload/
+
+# Temporary data files
+*.xlsx
+*.xls
+*.csv
+fix_temp.js
 temp_babel.js
+clasp_output.log

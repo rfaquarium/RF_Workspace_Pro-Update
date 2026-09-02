@@ -36,6 +36,15 @@ const getSubCategoryIcon = (name = '') => {
     return 'fa-layer-group';
 };
 
+// Helper làm tròn tồn kho chuẩn xác tối đa 3 số thập phân (loại bỏ số 0 dư thừa)
+const formatStockQty = (val) => {
+    if (val === undefined || val === null || val === '') return '0';
+    const num = Number(val);
+    if (isNaN(num)) return '0';
+    const rounded = Math.round(num * 1000) / 1000;
+    return Number(rounded.toFixed(3)).toLocaleString('vi-VN', { maximumFractionDigits: 3 });
+};
+
 // =========================================================================
 // 1. COMPONENT: THẺ SẢN PHẨM & PHÂN LOẠI (VariantGroupCard)
 // =========================================================================
@@ -65,9 +74,15 @@ const VariantGroupCard = React.memo(function VariantGroupCard({ group, setEditPr
                             String(group.category || '').trim().toUpperCase() === 'BỂ KÍNH' ||
                             String(selectedVar.sub_category || '').trim().toUpperCase().includes('BỂ');
 
+    // Nhận diện hàng hoá thuộc Kho Nguyên Liệu / Vật Tư
+    const isMaterialGroup = String(group.category || selectedVar.category || '').trim().toUpperCase() === 'DANH MỤC SẢN XUẤT' ||
+                            String(selectedVar.sub_category || '').trim().toUpperCase().includes('NGUYÊN LIỆU') ||
+                            String(selectedVar.sub_category || '').trim().toUpperCase().includes('VẬT TƯ');
+
     const [expanded, setExpanded] = React.useState(false);
     const currentImg = formatImageUrl(selectedVar.image || selectedVar.realImage || group.image);
-    const qty = Number(selectedVar.quantity || 0);
+    const rawQty = Number(selectedVar.quantity || 0);
+    const qty = Math.round(rawQty * 1000) / 1000;
     const minQty = Number(selectedVar.minStock || 0);
     const isOutOfStock = qty <= 0;
     const isLowStock = !isOutOfStock && minQty > 0 && qty <= minQty;
@@ -127,10 +142,16 @@ const VariantGroupCard = React.memo(function VariantGroupCard({ group, setEditPr
                     </h4>
                     {!expanded && (
                         <div className="flex items-center gap-3 mt-1 text-[12px]">
-                            <span className="font-mono font-black text-emerald-400">{formatMoney(selectedVar.price)}đ</span>
+                            {isMaterialGroup ? (
+                                <span className="font-mono font-black text-amber-400">
+                                    {formatMoney(selectedVar.costPrice)}đ <span className="text-[9.5px] text-zinc-500 font-bold uppercase">(Giá nhập)</span>
+                                </span>
+                            ) : (
+                                <span className="font-mono font-black text-emerald-400">{formatMoney(selectedVar.price)}đ</span>
+                            )}
                             {currentRole !== 'CTV' && (
                                 <span className={`font-medium ${isOutOfStock ? 'text-rose-400' : isLowStock ? 'text-amber-400' : 'text-zinc-400'}`}>
-                                    Tồn: <b className="font-mono font-bold text-zinc-200">{qty}</b> <span className="text-[11px] opacity-75">{selectedVar.unit || ''}</span>
+                                    Tồn: <b className="font-mono font-bold text-zinc-200">{formatStockQty(qty)}</b> <span className="text-[11px] opacity-75">{selectedVar.unit || ''}</span>
                                 </span>
                             )}
                         </div>
@@ -167,7 +188,7 @@ const VariantGroupCard = React.memo(function VariantGroupCard({ group, setEditPr
                                             <span>{item.variantLabel || 'Mặc định'}</span>
                                             {currentRole !== 'CTV' && (
                                                 <span className={`text-[10px] font-mono ${isSel ? 'text-zinc-950 font-black' : itemQty <= 0 ? 'text-rose-400' : 'text-zinc-400'}`}>
-                                                    ({itemQty})
+                                                    ({formatStockQty(item.quantity)})
                                                 </span>
                                             )}
                                         </button>
@@ -190,19 +211,25 @@ const VariantGroupCard = React.memo(function VariantGroupCard({ group, setEditPr
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
                         {currentRole !== 'CTV' && (
                             <div className="bg-[#121215] border border-white/[0.08] rounded-xl p-2.5">
-                                <span className="text-[9.5px] font-bold text-zinc-400 uppercase tracking-wider block mb-0.5">Giá Vốn</span>
-                                <span className="text-[13px] font-mono font-bold text-zinc-300">
+                                <span className="text-[9.5px] font-bold text-zinc-400 uppercase tracking-wider block mb-0.5">
+                                    {isMaterialGroup ? 'Giá Nhập (Vốn)' : 'Giá Vốn'}
+                                </span>
+                                <span className={`text-[13px] font-mono font-bold ${isMaterialGroup ? 'text-amber-400' : 'text-zinc-300'}`}>
                                     {canViewCost ? <>{formatMoney(selectedVar.costPrice)}<span className="text-[10px] text-zinc-500">đ</span></> : '******'}
                                 </span>
                             </div>
                         )}
                         <div className="bg-[#121215] border border-white/[0.08] rounded-xl p-2.5">
                             <span className="text-[9.5px] font-bold text-zinc-400 uppercase tracking-wider block mb-0.5">Giá Bán</span>
-                            <span className="text-[14px] font-mono font-black text-emerald-400">
-                                {formatMoney(selectedVar.price)}<span className="text-[10px] text-emerald-500">đ</span>
+                            <span className={`text-[14px] font-mono font-black ${isMaterialGroup ? 'text-zinc-400' : 'text-emerald-400'}`}>
+                                {isMaterialGroup ? (
+                                    selectedVar.price > 0 ? <>{formatMoney(selectedVar.price)}<span className="text-[10px] text-zinc-500">đ</span></> : <span className="text-zinc-500 text-xs italic">N/A</span>
+                                ) : (
+                                    <>{formatMoney(selectedVar.price)}<span className="text-[10px] text-emerald-500">đ</span></>
+                                )}
                             </span>
                         </div>
-                        {selectedVar.price > 0 && selectedVar.costPrice > 0 && canViewCost && currentRole !== 'CTV' && (
+                        {!isMaterialGroup && selectedVar.price > 0 && selectedVar.costPrice > 0 && canViewCost && currentRole !== 'CTV' && (
                             <div className="bg-[#121215] border border-white/[0.08] rounded-xl p-2.5">
                                 <span className="text-[9.5px] font-bold text-zinc-400 uppercase tracking-wider block mb-0.5">Lợi Nhuận Gộp</span>
                                 <span className="text-[13px] font-mono font-black text-[#d4af37]">
@@ -214,10 +241,10 @@ const VariantGroupCard = React.memo(function VariantGroupCard({ group, setEditPr
                             <div className="bg-[#121215] border border-white/[0.08] rounded-xl p-2.5">
                                 <div className="flex justify-between items-center mb-0.5">
                                     <span className="text-[9.5px] font-bold text-zinc-400 uppercase tracking-wider">Tồn Kho</span>
-                                    <span className="text-[9.5px] text-zinc-500 font-mono">Min {selectedVar.minStock || 0} / Max {selectedVar.maxStock || 0}</span>
+                                    <span className="text-[9.5px] text-zinc-500 font-mono">Min {formatStockQty(selectedVar.minStock)} / Max {formatStockQty(selectedVar.maxStock)}</span>
                                 </div>
                                 <div className={`text-[14px] font-mono font-black leading-none ${isOutOfStock ? 'text-rose-400' : isLowStock ? 'text-amber-400' : 'text-zinc-100'}`}>
-                                    {qty} <span className="text-[11px] font-normal text-zinc-400 font-sans">{selectedVar.unit || ''}</span>
+                                    {formatStockQty(qty)} <span className="text-[11px] font-normal text-zinc-400 font-sans">{selectedVar.unit || ''}</span>
                                 </div>
                             </div>
                         )}
@@ -1105,9 +1132,25 @@ function InventoryListView({ data, pushData, pushDeltas, documents, isAdmin, isB
       }
   };
 
-  const totalInventoryValue = uniqueProducts.reduce((sum, p) => sum + (Math.max(0, Number(p.quantity || 0)) * Number(p.costPrice || 0)), 0);
-  const catTotals = { 'LAYOUT': 0, 'BỂ KÍNH': 0, 'PHỤ KIỆN': 0, 'DANH MỤC SẢN XUẤT': 0 };
-  uniqueProducts.forEach(p => { if (catTotals[p.category] !== undefined) catTotals[p.category] += (Math.max(0, Number(p.quantity)) * Number(p.costPrice)); });
+  const catTotals = React.useMemo(() => {
+    const totals = { 'LAYOUT': 0, 'BỂ KÍNH': 0, 'PHỤ KIỆN': 0, 'DANH MỤC SẢN XUẤT': 0 };
+    uniqueProducts.forEach(p => {
+      let cat = String(p.category || '').toUpperCase().trim();
+      if (cat.includes('BỂ') || cat.includes('BE')) cat = 'BỂ KÍNH';
+      else if (cat.includes('LAYOUT')) cat = 'LAYOUT';
+      else if (cat.includes('DANH MỤC SẢN XUẤT') || cat.includes('VẬT TƯ') || cat.includes('NGUYÊN LIỆU')) cat = 'DANH MỤC SẢN XUẤT';
+      else cat = 'PHỤ KIỆN';
+
+      const qty = Math.max(0, Number(p.quantity || 0));
+      const cost = Number(p.costPrice || 0);
+      totals[cat] = (totals[cat] || 0) + (qty * cost);
+    });
+    return totals;
+  }, [uniqueProducts]);
+
+  const totalInventoryValue = React.useMemo(() => {
+    return (catTotals['BỂ KÍNH'] || 0) + (catTotals['LAYOUT'] || 0) + (catTotals['PHỤ KIỆN'] || 0) + (catTotals['DANH MỤC SẢN XUẤT'] || 0);
+  }, [catTotals]);
 
   const isSearching = (deferredSearch || '').trim().length > 0;
   
@@ -1215,22 +1258,65 @@ function InventoryListView({ data, pushData, pushDeltas, documents, isAdmin, isB
                   </div>
                   {showStockRules && (
                       <div className="p-3.5 pt-2.5 border-t border-white/[0.08] bg-[#09090b] animate-fade-in">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-[11px]">
-                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.08]">
-                                  <div className="text-sky-400 font-bold uppercase text-[9.5px] mb-1"><i className="fas fa-cubes mr-1"></i> Bể Kính</div>
-                                  <div className="font-mono text-zinc-300 font-semibold">BE202020, BE202020ND, TERA202025</div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 text-[11px]">
+                              {/* 1. Bể Kính */}
+                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.08] hover:border-cyan-500/30 transition-colors">
+                                  <div className="text-cyan-400 font-bold uppercase text-[9.5px] mb-1 flex items-center gap-1.5">
+                                      <i className="fas fa-fish"></i>
+                                      <span>1. Bể Kính (BE / TERA / BC)</span>
+                                  </div>
+                                  <div className="font-mono text-zinc-300 font-semibold text-[10.5px] leading-relaxed">
+                                      <div><span className="text-cyan-400 font-bold">BE[DxRxC]:</span> BE202020, BE302020</div>
+                                      <div><span className="text-cyan-400 font-bold">Nâng đáy/Tera:</span> BE202020ND, TERA202025</div>
+                                  </div>
                               </div>
-                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.08]">
-                                  <div className="text-amber-400 font-bold uppercase text-[9.5px] mb-1"><i className="fas fa-mountain-sun mr-1"></i> Layout</div>
-                                  <div className="font-mono text-zinc-300 font-semibold">RUN-003-202020, CV-604040</div>
+
+                              {/* 2. Layout */}
+                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.08] hover:border-amber-500/30 transition-colors">
+                                  <div className="text-amber-400 font-bold uppercase text-[9.5px] mb-1 flex items-center gap-1.5">
+                                      <i className="fas fa-mountain-sun"></i>
+                                      <span>2. Layout (Mẫu - Size)</span>
+                                  </div>
+                                  <div className="font-mono text-zinc-300 font-semibold text-[10.5px] leading-relaxed">
+                                      <div><span className="text-amber-400 font-bold">Mẫu chuẩn:</span> RUN-001-302020, BON-503030</div>
+                                      <div><span className="text-amber-400 font-bold">Cover size:</span> CV-302020, CV-604040</div>
+                                  </div>
                               </div>
-                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.08]">
-                                  <div className="text-emerald-400 font-bold uppercase text-[9.5px] mb-1"><i className="fas fa-boxes-stacked mr-1"></i> Vật Tư Sản Xuất</div>
-                                  <div className="font-mono text-zinc-300 font-semibold">NLSX-BK-A300, VTSX-GANGTAY</div>
+
+                              {/* 3. Phụ Kiện */}
+                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.08] hover:border-purple-500/30 transition-colors">
+                                  <div className="text-purple-400 font-bold uppercase text-[9.5px] mb-1 flex items-center gap-1.5">
+                                      <i className="fas fa-plug"></i>
+                                      <span>3. Hàng Hoá Phụ Kiện</span>
+                                  </div>
+                                  <div className="font-mono text-zinc-300 font-semibold text-[10.5px] leading-relaxed">
+                                      <div><span className="text-purple-400 font-bold">Đèn / Lọc:</span> DEN-RGB-30CM, LOC-THAC-HBL</div>
+                                      <div><span className="text-purple-400 font-bold">VLL / Nền:</span> VLL-MATRIX, CAT-NANG-VANG</div>
+                                  </div>
                               </div>
-                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.08]">
-                                  <div className="text-[#d4af37] font-bold uppercase text-[9.5px] mb-1"><i className="fas fa-calendar-check mr-1"></i> Lịch Chốt Kho</div>
-                                  <div className="text-zinc-300">Ngày <b className="text-white">01</b> (Chốt tháng) & <b className="text-white">15</b> (Giữa kỳ)</div>
+
+                              {/* 4. Nguyên Liệu & Vật Tư */}
+                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.08] hover:border-emerald-500/30 transition-colors">
+                                  <div className="text-emerald-400 font-bold uppercase text-[9.5px] mb-1 flex items-center gap-1.5">
+                                      <i className="fas fa-boxes-stacked"></i>
+                                      <span>4. Nguyên Liệu / Vật Tư</span>
+                                  </div>
+                                  <div className="font-mono text-zinc-300 font-semibold text-[10.5px] leading-relaxed">
+                                      <div><span className="text-emerald-400 font-bold">NLSX:</span> NLSX-KINH-5LI, NLSX-RF, NLSX-502</div>
+                                      <div><span className="text-emerald-400 font-bold">VTSX:</span> VTSX-GANGTAY, VTSX-DAO-ROCTHIEP</div>
+                                  </div>
+                              </div>
+
+                              {/* 5. Lịch Kiểm Kho */}
+                              <div className="p-2.5 rounded-xl bg-[#121215] border border-white/[0.08] hover:border-[#d4af37]/30 transition-colors">
+                                  <div className="text-[#d4af37] font-bold uppercase text-[9.5px] mb-1 flex items-center gap-1.5">
+                                      <i className="fas fa-calendar-check"></i>
+                                      <span>5. Lịch Chốt Kho Xưởng</span>
+                                  </div>
+                                  <div className="text-zinc-300 text-[10.5px] leading-relaxed">
+                                      <div>Định kỳ: Ngày <b className="text-white font-mono">01</b> & <b className="text-white font-mono">15</b></div>
+                                      <div className="text-zinc-400 text-[10px]">Lĩnh đầu ca $\rightarrow$ Quyết toán cuối ca</div>
+                                  </div>
                               </div>
                           </div>
                       </div>
@@ -1238,79 +1324,112 @@ function InventoryListView({ data, pushData, pushDeltas, documents, isAdmin, isB
               </div>
           )}
 
-          {/* 4 THẺ BENTO METRICS GIÁ TRỊ TỒN KHO */}
+          {/* 5 THẺ BENTO METRICS GIÁ TRỊ TỒN KHO THEO GIÁ VỐN XUẤT XƯỞNG */}
           {canViewCost && currentRole !== 'CTV' && (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 w-full">
-                  {/* Card 1: Bể Kính */}
-                  <div 
-                      onClick={() => { setCatFilter('KHO BỂ KÍNH'); setSubCatFilter(null); setSearch(''); }}
-                      className={`p-3 sm:p-3.5 rounded-2xl shadow-sm transition-all relative overflow-hidden group cursor-pointer active:scale-95 select-none ${
-                          catFilter === 'KHO BỂ KÍNH' && !isSearching
-                              ? 'bg-gradient-to-br from-cyan-950/40 via-[#121215] to-[#09090b] border border-cyan-400/60 shadow-[0_0_20px_rgba(6,182,212,0.2)] ring-1 ring-cyan-400/30'
-                              : 'bg-[#121215] border border-white/[0.08] hover:border-cyan-500/40 hover:bg-cyan-500/[0.03]'
-                      }`}
-                  >
-                      <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10.5px] font-bold uppercase tracking-wider text-cyan-400">Giá Trị Bể Kính</span>
-                          <div className="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 text-xs group-hover:scale-110 transition-transform">
-                              <i className="fas fa-fish"></i>
-                          </div>
-                      </div>
-                      <div className="text-[16px] sm:text-[18px] font-mono font-black text-cyan-400 tracking-tight truncate">
-                          {formatMoney(catTotals['BỂ KÍNH'])}<span className="text-xs font-normal text-cyan-500 ml-0.5">đ</span>
-                      </div>
+              <div className="space-y-2 w-full">
+                  <div className="flex items-center justify-between px-1">
+                      <span className="text-[10.5px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                          <i className="fas fa-coins text-[#d4af37]"></i>
+                          <span>Giá Trị Tồn Kho</span>
+                      </span>
+                      <span className="text-[9.5px] font-bold text-zinc-400 bg-white/[0.03] px-2.5 py-0.5 rounded-md border border-white/[0.06] flex items-center gap-1">
+                          <i className="fas fa-info-circle text-[#d4af37] text-[9px]"></i>
+                          <span>Tính theo Giá Vốn xuất xưởng</span>
+                      </span>
                   </div>
 
-                  {/* Card 2: Layout */}
-                  <div 
-                      onClick={() => { setCatFilter('KHO LAYOUT'); setSubCatFilter(null); setSearch(''); }}
-                      className={`p-3 sm:p-3.5 rounded-2xl shadow-sm transition-all relative overflow-hidden group cursor-pointer active:scale-95 select-none ${
-                          catFilter === 'KHO LAYOUT' && !isSearching
-                              ? 'bg-gradient-to-br from-amber-950/40 via-[#121215] to-[#09090b] border border-amber-400/60 shadow-[0_0_20px_rgba(245,158,11,0.2)] ring-1 ring-amber-400/30'
-                              : 'bg-[#121215] border border-white/[0.08] hover:border-amber-500/40 hover:bg-amber-500/[0.03]'
-                      }`}
-                  >
-                      <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10.5px] font-bold uppercase tracking-wider text-amber-400">Giá Trị Layout</span>
-                          <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xs group-hover:scale-110 transition-transform">
-                              <i className="fas fa-mountain-sun"></i>
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3 w-full">
+                      {/* Card 1: Bể Kính */}
+                      <div 
+                          onClick={() => { setCatFilter('KHO BỂ KÍNH'); setSubCatFilter(null); setSearch(''); }}
+                          className={`p-3 sm:p-3.5 rounded-2xl shadow-sm transition-all relative overflow-hidden group cursor-pointer active:scale-95 select-none ${
+                              catFilter === 'KHO BỂ KÍNH' && !isSearching
+                                  ? 'bg-gradient-to-br from-cyan-950/40 via-[#121215] to-[#09090b] border border-cyan-400/60 shadow-[0_0_20px_rgba(6,182,212,0.2)] ring-1 ring-cyan-400/30'
+                                  : 'bg-[#121215] border border-white/[0.08] hover:border-cyan-500/40 hover:bg-cyan-500/[0.03]'
+                          }`}
+                      >
+                          <div className="flex items-center justify-between mb-2">
+                              <span className="text-[10.5px] font-bold uppercase tracking-wider text-cyan-400">Giá Trị Bể Kính</span>
+                              <div className="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 text-xs group-hover:scale-110 transition-transform">
+                                  <i className="fas fa-fish"></i>
+                              </div>
+                          </div>
+                          <div className="text-[15px] sm:text-[17px] font-mono font-black text-cyan-400 tracking-tight truncate">
+                              {formatMoney(catTotals['BỂ KÍNH'])}<span className="text-xs font-normal text-cyan-500 ml-0.5">đ</span>
                           </div>
                       </div>
-                      <div className="text-[16px] sm:text-[18px] font-mono font-black text-amber-400 tracking-tight truncate">
-                          {formatMoney(catTotals['LAYOUT'])}<span className="text-xs font-normal text-amber-500 ml-0.5">đ</span>
-                      </div>
-                  </div>
 
-                  {/* Card 3: Vật Tư */}
-                  <div 
-                      onClick={() => { setCatFilter('KHO NGUYÊN LIỆU'); setSubCatFilter(null); setSearch(''); }}
-                      className={`p-3 sm:p-3.5 rounded-2xl shadow-sm transition-all relative overflow-hidden group cursor-pointer active:scale-95 select-none ${
-                          catFilter === 'KHO NGUYÊN LIỆU' && !isSearching
-                              ? 'bg-gradient-to-br from-emerald-950/40 via-[#121215] to-[#09090b] border border-emerald-400/60 shadow-[0_0_20px_rgba(16,185,129,0.2)] ring-1 ring-emerald-400/30'
-                              : 'bg-[#121215] border border-white/[0.08] hover:border-emerald-500/40 hover:bg-emerald-500/[0.03]'
-                      }`}
-                  >
-                      <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10.5px] font-bold uppercase tracking-wider text-emerald-400">Vật Tư Sản Xuất</span>
-                          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs group-hover:scale-110 transition-transform">
-                              <i className="fas fa-boxes-stacked"></i>
+                      {/* Card 2: Layout */}
+                      <div 
+                          onClick={() => { setCatFilter('KHO LAYOUT'); setSubCatFilter(null); setSearch(''); }}
+                          className={`p-3 sm:p-3.5 rounded-2xl shadow-sm transition-all relative overflow-hidden group cursor-pointer active:scale-95 select-none ${
+                              catFilter === 'KHO LAYOUT' && !isSearching
+                                  ? 'bg-gradient-to-br from-amber-950/40 via-[#121215] to-[#09090b] border border-amber-400/60 shadow-[0_0_20px_rgba(245,158,11,0.2)] ring-1 ring-amber-400/30'
+                                  : 'bg-[#121215] border border-white/[0.08] hover:border-amber-500/40 hover:bg-amber-500/[0.03]'
+                          }`}
+                      >
+                          <div className="flex items-center justify-between mb-2">
+                              <span className="text-[10.5px] font-bold uppercase tracking-wider text-amber-400">Giá Trị Layout</span>
+                              <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xs group-hover:scale-110 transition-transform">
+                                  <i className="fas fa-mountain-sun"></i>
+                              </div>
+                          </div>
+                          <div className="text-[15px] sm:text-[17px] font-mono font-black text-amber-400 tracking-tight truncate">
+                              {formatMoney(catTotals['LAYOUT'])}<span className="text-xs font-normal text-amber-500 ml-0.5">đ</span>
                           </div>
                       </div>
-                      <div className="text-[16px] sm:text-[18px] font-mono font-black text-emerald-400 tracking-tight truncate">
-                          {formatMoney(catTotals['DANH MỤC SẢN XUẤT'])}<span className="text-xs font-normal text-emerald-500 ml-0.5">đ</span>
-                      </div>
-                  </div>
 
-                  {/* Card 4: Tổng Giá Trị Kho */}
-                  <div className="bg-gradient-to-br from-[#18181f] via-[#121215] to-[#09090b] border border-[#d4af37]/40 p-3 sm:p-3.5 rounded-2xl shadow-[0_0_20px_rgba(212,175,55,0.08)] relative overflow-hidden group">
-                      <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10.5px] font-black uppercase tracking-wider text-[#d4af37]">Tổng Giá Trị Kho</span>
-                          <div className="w-7 h-7 rounded-lg bg-[#d4af37]/15 border border-[#d4af37]/30 flex items-center justify-center text-[#d4af37] text-xs shadow-sm group-hover:scale-110 transition-transform">
-                              <i className="fas fa-vault"></i>
+                      {/* Card 3: Phụ Kiện (Hàng Hoá) */}
+                      <div 
+                          onClick={() => { setCatFilter('KHO HÀNG HOÁ'); setSubCatFilter(null); setSearch(''); }}
+                          className={`p-3 sm:p-3.5 rounded-2xl shadow-sm transition-all relative overflow-hidden group cursor-pointer active:scale-95 select-none ${
+                              catFilter === 'KHO HÀNG HOÁ' && !isSearching
+                                  ? 'bg-gradient-to-br from-purple-950/40 via-[#121215] to-[#09090b] border border-purple-400/60 shadow-[0_0_20px_rgba(168,85,247,0.2)] ring-1 ring-purple-400/30'
+                                  : 'bg-[#121215] border border-white/[0.08] hover:border-purple-500/40 hover:bg-purple-500/[0.03]'
+                          }`}
+                      >
+                          <div className="flex items-center justify-between mb-2">
+                              <span className="text-[10.5px] font-bold uppercase tracking-wider text-purple-400">Giá Trị Phụ Kiện</span>
+                              <div className="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 text-xs group-hover:scale-110 transition-transform">
+                                  <i className="fas fa-plug"></i>
+                              </div>
+                          </div>
+                          <div className="text-[15px] sm:text-[17px] font-mono font-black text-purple-400 tracking-tight truncate">
+                              {formatMoney(catTotals['PHỤ KIỆN'])}<span className="text-xs font-normal text-purple-500 ml-0.5">đ</span>
                           </div>
                       </div>
-                      <div className="text-[17px] sm:text-[19px] font-mono font-black text-[#d4af37] drop-shadow-[0_0_10px_rgba(212,175,55,0.3)] tracking-tight truncate">
-                          {formatMoney(totalInventoryValue)}<span className="text-xs font-normal text-[#d4af37]/80 ml-0.5">đ</span>
+
+                      {/* Card 4: Vật Tư Sản Xuất */}
+                      <div 
+                          onClick={() => { setCatFilter('KHO NGUYÊN LIỆU'); setSubCatFilter(null); setSearch(''); }}
+                          className={`p-3 sm:p-3.5 rounded-2xl shadow-sm transition-all relative overflow-hidden group cursor-pointer active:scale-95 select-none ${
+                              catFilter === 'KHO NGUYÊN LIỆU' && !isSearching
+                                  ? 'bg-gradient-to-br from-emerald-950/40 via-[#121215] to-[#09090b] border border-emerald-400/60 shadow-[0_0_20px_rgba(16,185,129,0.2)] ring-1 ring-emerald-400/30'
+                                  : 'bg-[#121215] border border-white/[0.08] hover:border-emerald-500/40 hover:bg-emerald-500/[0.03]'
+                          }`}
+                      >
+                          <div className="flex items-center justify-between mb-2">
+                              <span className="text-[10.5px] font-bold uppercase tracking-wider text-emerald-400">Vật Tư Sản Xuất</span>
+                              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs group-hover:scale-110 transition-transform">
+                                  <i className="fas fa-boxes-stacked"></i>
+                              </div>
+                          </div>
+                          <div className="text-[15px] sm:text-[17px] font-mono font-black text-emerald-400 tracking-tight truncate">
+                              {formatMoney(catTotals['DANH MỤC SẢN XUẤT'])}<span className="text-xs font-normal text-emerald-500 ml-0.5">đ</span>
+                          </div>
+                      </div>
+
+                      {/* Card 5: Tổng Giá Trị Kho */}
+                      <div className="col-span-2 sm:col-span-2 md:col-span-1 lg:col-span-1 bg-gradient-to-br from-[#18181f] via-[#121215] to-[#09090b] border border-[#d4af37]/40 p-3 sm:p-3.5 rounded-2xl shadow-[0_0_20px_rgba(212,175,55,0.08)] relative overflow-hidden group">
+                          <div className="flex items-center justify-between mb-2">
+                              <span className="text-[10.5px] font-black uppercase tracking-wider text-[#d4af37]">Tổng Giá Trị Kho</span>
+                              <div className="w-7 h-7 rounded-lg bg-[#d4af37]/15 border border-[#d4af37]/30 flex items-center justify-center text-[#d4af37] text-xs shadow-sm group-hover:scale-110 transition-transform">
+                                  <i className="fas fa-vault"></i>
+                              </div>
+                          </div>
+                          <div className="text-[16px] sm:text-[18px] font-mono font-black text-[#d4af37] drop-shadow-[0_0_10px_rgba(212,175,55,0.3)] tracking-tight truncate">
+                              {formatMoney(totalInventoryValue)}<span className="text-xs font-normal text-[#d4af37]/80 ml-0.5">đ</span>
+                          </div>
                       </div>
                   </div>
               </div>
@@ -1539,7 +1658,7 @@ function InventoryListView({ data, pushData, pushDeltas, documents, isAdmin, isB
                   </div>
                   <div className="flex items-center gap-3 sm:gap-4 font-mono text-[11px] flex-wrap">
                       <span>Tổng mẫu: <b className="text-zinc-100 font-bold">{warehouseTotalModels}</b></span>
-                      <span>Tổng tồn: <b className="text-sky-400 font-bold">{formatMoney(warehouseTotalQty)}</b></span>
+                      <span>Tổng tồn: <b className="text-sky-400 font-bold">{formatStockQty(warehouseTotalQty)}</b></span>
                       {canViewCost && (
                           <span>Tổng giá trị kho: <b className="text-emerald-400 font-bold">{formatMoney(warehouseTotalVal)}đ</b></span>
                       )}
@@ -1583,15 +1702,23 @@ function InventoryListView({ data, pushData, pushDeltas, documents, isAdmin, isB
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-white/[0.04]">
-                          {productsInCat.map(p => (
+                          {productsInCat.map(p => {
+                              const isMat = String(p.category || '').toUpperCase().trim() === 'DANH MỤC SẢN XUẤT' || String(p.sub_category || '').toUpperCase().includes('NGUYÊN LIỆU') || String(p.sub_category || '').toUpperCase().includes('VẬT TƯ');
+                              return (
                               <tr key={p.id} className="hover:bg-white/[0.02] transition-colors font-medium">
                                   <td className="p-3 font-mono text-[#d4af37] font-bold">{p.sku || 'N/A'}</td>
                                   <td className="p-3 font-bold text-white">{p.name}</td>
                                   <td className="p-3 text-zinc-400">{p.sub_category || 'Mặc định'}</td>
                                   {canViewCost && <td className="p-3 text-right font-mono text-zinc-300">{formatMoney(p.costPrice)}đ</td>}
-                                  <td className="p-3 text-right font-mono text-emerald-400 font-bold">{formatMoney(p.price)}đ</td>
+                                  <td className="p-3 text-right font-mono font-bold">
+                                      {isMat ? (
+                                          <span className="text-amber-400">{formatMoney(p.costPrice)}đ <span className="text-[9px] text-zinc-500 font-normal uppercase">(nhập)</span></span>
+                                      ) : (
+                                          <span className="text-emerald-400">{formatMoney(p.price)}đ</span>
+                                      )}
+                                  </td>
                                   <td className={`p-3 text-center font-mono font-bold ${Number(p.quantity || 0) <= 0 ? 'text-rose-400' : 'text-zinc-100'}`}>
-                                      {p.quantity || 0} {p.unit || ''}
+                                      {formatStockQty(p.quantity)} <span className="text-[10px] text-zinc-400 font-normal">{p.unit || ''}</span>
                                   </td>
                                   <td className="p-3 text-center">
                                       <button onClick={() => setEditProd(p)} className="px-2.5 py-1 bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 rounded-lg text-[10px] font-bold border border-white/[0.08] transition-all cursor-pointer">
@@ -1599,7 +1726,7 @@ function InventoryListView({ data, pushData, pushDeltas, documents, isAdmin, isB
                                       </button>
                                   </td>
                               </tr>
-                          ))}
+                          )})}
                       </tbody>
                   </table>
               </div>

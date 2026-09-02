@@ -4,6 +4,52 @@ Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến tr
 
 ---
 
+## [v2.34.2] - 2026-09-02
+
+### 💎 Tái Cấu Trúc Nhật Ký Chứng Từ: Tách Bạch Xuất - Nhập Từng Kho, Thống Kê Ròng & Ẩn Mã Kỹ Thuật
+- **Tối Ưu Hoá Nút Thao Tác Tạo Phiếu Thành Icon Gọn Gàng (`Tab_ImportExport.html`)**:
+  - Chuyển đổi toàn bộ nút `[Nhập Kho]`, `[Đặt Hàng]`, `[Xuất Kho]`, `[Thanh Lý]`, `[Đồng Bộ BOM]`, `[Sửa BOM]` thành các nút Icon tinh gọn, có Tooltip trực quan và co giãn thông minh trên di động/máy tính bàn.
+- **Tách Biệt Độc Lập Luồng Xuất / Nhập / Đặt Hàng Trong Từng Kho Hàng (`Tab_ImportExport.html`)**:
+  - Bổ sung thanh Sub-filter chips: `[Tất Cả (N) | 📥 Nhập Kho (N) | 📤 Xuất Kho (N) | 📋 Đặt Hàng (N) | 🔄 Kiểm Kho / Khác (N)]` chạy động ngay dưới bộ chọn từng Kho (`Kho Bể Kính`, `Kho Layout`, `Kho Phụ Kiện`, `Kho Vật Tư`).
+- **Nâng Cấp Dải Bento Thống Kê Tài Chính Luân Chuyển 4 Thẻ (`Tab_ImportExport.html`)**:
+  - **Tổng Chứng Từ**: Hiển thị tổng số phiếu kèm tỷ lệ `{N} Nhập • {N} Xuất`.
+  - **Tổng Tiền Nhập**: `+{Số tiền}đ` màu xanh lục (click để lọc ngay danh sách phiếu nhập).
+  - **Tổng Tiền Xuất**: `-{Số tiền}đ` màu đỏ hồng (click để lọc ngay danh sách phiếu xuất).
+  - **Giá Trị Ròng (Nhập - Xuất)**: `±{Số tiền}đ` vàng gold sang trọng, phản ánh chính xác chiều hướng tăng/giảm tồn kho của xưởng.
+- **Ẩn Mã Kỹ Thuật `IE_...`, Đưa Đối Tượng / Mục Đích Giao Dịch Lên Làm Tiêu Đề Chính (`Tab_ImportExport.html`)**:
+  - Tiêu đề thẻ chứng từ hiển thị rõ ràng: `Bàn Giao Khách Hàng (Hàng Loạt)`, `Sản Xuất Layout`, `Tự động nhập kho (Sản xuất xong)`, `Nhà cung cấp...`.
+  - Mã kỹ thuật (`IE_SAFE_OUT_...`, `IE_BOM_...`) được thu gọn thành nhãn monospace tinh tế ở hàng dưới.
+
+---
+
+## [v2.34.1] - 2026-09-02
+
+### 💎 Tối Ưu Hiển Thị Kho Hàng: Làm Tròn Tồn 3 Số Thập Phân, Hiện Giá Nhập Vật Tư & Tinh Gọn Thẻ Kho
+- **Chuẩn Hóa Làm Tròn Số Lượng Tồn Kho Tối Đa 3 Chữ Số Thập Phân (`Tab_Inventory.html`, `Tab_ImportExport.html`, `Code.js`)**:
+  - Triệt tiêu hoàn toàn hiện tượng số thập phân dài vô tận do sai số dấu phẩy động của JavaScript (như `0.11249999999999999` $\rightarrow$ `0.112` hoặc `0.113`).
+  - Áp dụng đồng bộ cho Thẻ sản phẩm, Phân loại variants, Chế độ xem bảng, Tổng tồn danh mục và Modal Thẻ kho chi tiết (`StockHistoryModal`).
+- **Kho Nguyên Liệu / Vật Tư Ưu Tiên Hiển Thị Giá Nhập (Giá Vốn) (`Tab_Inventory.html`)**:
+  - Tự động nhận diện nhóm `DANH MỤC SẢN XUẤT` và các danh mục con nguyên vật liệu (`NGUYÊN LIỆU LAYOUT`, `NGUYÊN LIỆU BỂ KÍNH`, `VẬT TƯ SẢN XUẤT`).
+  - Hiển thị nổi bật **Giá Nhập (Vốn)** `{formatMoney(costPrice)}đ` thay vì giá bán mặc định `0đ` vô nghĩa.
+- **Tinh Gọn & Chuẩn Hóa Ghi Chú Giao Dịch Thẻ Kho (`Tab_ImportExport.html`, `Code.js`)**:
+  - Tự động rút gọn và định dạng đẹp các dòng lịch sử xuất vật tư BOM: `Trừ vật tư lệnh sản xuất (Tên hàng hoá) đơn (Mã đơn hàng)`.
+  - Tự động giải mã các chuỗi JSON kiểm kho `{"status":"BALANCED", ...}` thành văn bản gọn gàng `Đã cân bằng kho / Cân bằng kiểm kho (Người tạo)`.
+
+---
+
+## [v2.34.0] - 2026-09-02
+
+### 💎 Nâng Cấp Vận Hành Lean: Phiếu Nhận Vật Tư Đầu Ca & Quyết Toán Tiêu Hao Cuối Ca Cho Đơn Tùy Chỉnh
+- **Thiết Lập Quy Trình Lĩnh Vật Tư & Quyết Toán Thực Dùng Chuẩn Xưởng (`Tab_Production.html`, `Code.js`)**:
+  - **Phạm vi áp dụng nghiêm ngặt**: Chỉ áp dụng cho `BỂ KÍNH ➔ BỂ LẺ SIZE` và `LAYOUT ➔ COVER` (đơn đặt theo kích thước/ảnh mẫu tùy chỉnh).
+  - **Chạm 1 (Đầu ca - Nhận việc)**: Mở popup **"Phiếu Nhận Nguyên Liệu & Vật Tư"** cho phép thợ chọn trực tiếp đá/lũa/keo/kính từ kho `DANH MỤC SẢN XUẤT ➔ NGUYÊN LIỆU LAYOUT` hoặc `NGUYÊN LIỆU BỂ KÍNH` và nhập số lượng lấy ra bàn làm việc.
+  - **Chạm 2 (Cuối ca - Nộp ảnh hoàn thành)**: Mở popup **"Quyết Toán Tiêu Hao Vật Tư"** với bảng 4 cột (`Tên Vật Tư | Đã Lấy | Trả Lại Kho | Thực Dùng`). Thợ chỉ cần nhập số lượng trả thừa vào ô `Trả Lại Kho` (mặc định 0), hệ thống tự động tính toán `Thực Dùng = Đã Lấy - Trả Lại`.
+- **Tự Động Trừ Tồn Kho Thực Tế & Cập Nhật Giá Vốn Đơn Hàng (`Code.js`)**:
+  - Tự động trừ tồn kho `Products.quantity` theo đúng số lượng `Thực Dùng` qua action backend `deductInventoryBOM` (bọc `LockService` an toàn chống đè dữ liệu).
+  - Tự động tính tổng tiền vật tư thực tế và cộng dồn vào giá vốn `Orders.cogs` của đơn hàng liên quan, đảm bảo báo cáo lợi nhuận chuẩn xác $100\%$.
+
+---
+
 ## [v2.33.9] - 2026-09-01
 
 ### 🛡️ Hotfix: Khắc Phục Triệt Để Sự Cố Đơn Hàng Mới Biến Mất Sau Khi Nhập Trên Toàn Bộ Thiết Bị

@@ -743,6 +743,7 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
 
     // 2. New UI State
     const [filterType, setFilterType] = React.useState('TẤT CẢ');
+    const [logActionFilter, setLogActionFilter] = React.useState('ALL'); // 'ALL' | 'NHAP' | 'XUAT' | 'DAT_HANG' | 'KIEM_KHO'
     const [filterMonth, setFilterMonth] = React.useState(new Date().toISOString().slice(0, 7));
     const [searchTerm, setSearchTerm] = React.useState('');
     const deferredSearchTerm = React.useDeferredValue ? React.useDeferredValue(searchTerm) : searchTerm;
@@ -807,11 +808,10 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
         setExpandedIds(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
-    // 3. Filter Logs
+    // 3. Filter Logs theo Kho & Tháng (để tính chỉ số thống kê trước)
     const logs = data?.ImportExport || [];
-    const filteredLogs = React.useMemo(() => {
-        let list = logs.filter(log => {
-            // Loại bỏ hoàn toàn bản ghi thông báo hệ thống nếu có trong bảng ImportExport cũ
+    const categoryAndMonthFilteredLogs = React.useMemo(() => {
+        return logs.filter(log => {
             if (log.type === 'THONG_BAO_HE_THONG' || (log.id && String(log.id).startsWith('SYS_ANNO_'))) return false;
 
             if (mode === 'KIEM_KHO') {
@@ -820,12 +820,10 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
                 if (log.id && String(log.id).includes('IE_GCHK')) return false;
             }
 
-            const type = String(log.type || '').trim();
-            const target = String(log.target || '').trim().toLowerCase();
-            const note = String(log.note || '').trim().toLowerCase();
-            const id = String(log.id || '').toLowerCase();
-            const items = String(log.itemsData || '').toLowerCase();
-            const user = String(log.user || '').toLowerCase();
+            if (filterMonth) {
+                const logDate = log.date || log.createdAt || '';
+                if (!String(logDate).startsWith(filterMonth)) return false;
+            }
 
             if (filterType !== 'TẤT CẢ') {
                 const parsedItems = safeJSONParse(log.itemsData) || [];
@@ -833,17 +831,12 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
                 parsedItems.forEach(it => {
                     const itNameLower = String(it.name || it.sku || '').toLowerCase();
                     const p = (data?.Products || []).find(x => x.name === it.name || (it.sku && x.sku === it.sku) || String(x.name || '').toLowerCase() === itNameLower);
-                    if (p && p.category) {
-                        logCategories.push(String(p.category || '').toUpperCase().trim());
-                    }
-                    if (p && p.sub_category) {
-                        logCategories.push(String(p.sub_category || '').toUpperCase().trim());
-                    }
+                    if (p && p.category) logCategories.push(String(p.category || '').toUpperCase().trim());
+                    if (p && p.sub_category) logCategories.push(String(p.sub_category || '').toUpperCase().trim());
                 });
 
                 const targetUpper = String(log.target || '').toUpperCase();
                 const noteUpper = String(log.note || '').toUpperCase();
-                const isBomTicket = log.id && String(log.id).startsWith('IE_BOM_');
 
                 if (filterType === 'KHO BỂ KÍNH') {
                     const isTankLog = targetUpper.includes('BỂ KÍNH') || targetUpper.includes('BE KINH') || noteUpper.includes('BỂ KÍNH') ||
@@ -854,25 +847,23 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
                         logCategories.some(c => c === 'LAYOUT' || c === 'THÀNH PHẨM');
                     if (!isLayoutLog) return false;
                 } else if (filterType === 'KHO HÀNG HOÁ') {
-                    // Kho Hàng Hoá (Phụ Kiện Bán Lẻ)
                     const isAccessoryLog = targetUpper.includes('PHỤ KIỆN') || targetUpper.includes('HÀNG HOÁ') || targetUpper.includes('BÁN LẺ') ||
                         logCategories.some(c => c === 'PHỤ KIỆN' || c === 'HÀNG HOÁ' || c === 'PHỤ KIỆN BÁN LẺ');
                     if (!isAccessoryLog) return false;
                 } else if (filterType === 'KHO NGUYÊN LIỆU') {
-                    // Kho Nguyên Liệu (Vật Tư)
                     const isMaterialLog = targetUpper.includes('VẬT TƯ') || targetUpper.includes('NGUYÊN LIỆU') ||
                         logCategories.some(c => c === 'VẬT TƯ SẢN XUẤT' || c === 'DANH MỤC SẢN XUẤT' || c === 'NGUYÊN LIỆU' || c === 'VẬT TƯ' || c.includes('NGUYÊN LIỆU'));
                     if (!isMaterialLog) return false;
                 }
             }
 
-            if (filterMonth) {
-                const logDate = log.date || log.createdAt || '';
-                if (!String(logDate).startsWith(filterMonth)) return false;
-            }
-
             if (deferredSearchTerm) {
                 const term = deferredSearchTerm.toLowerCase();
+                const id = String(log.id || '').toLowerCase();
+                const target = String(log.target || '').toLowerCase();
+                const note = String(log.note || '').toLowerCase();
+                const items = String(log.itemsData || '').toLowerCase();
+                const user = String(log.user || '').toLowerCase();
                 const matchId = id.includes(term);
                 const matchTarget = target.includes(term);
                 const matchNote = note.includes(term);
@@ -882,9 +873,59 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
             }
             return true;
         });
-        
+    }, [logs, filterType, filterMonth, deferredSearchTerm, mode, data?.Products]);
+
+    // Tính toán số liệu thống kê chi tiết cho kho đang chọn
+    const stats = React.useMemo(() => {
+        let importAmt = 0;
+        let importCount = 0;
+        let exportAmt = 0;
+        let exportCount = 0;
+        let poCount = 0;
+        let auditCount = 0;
+
+        categoryAndMonthFilteredLogs.forEach(l => {
+            const lType = String(l.type || '').trim().toUpperCase();
+            const amt = Number(l.totalAmount) || 0;
+            if (lType === 'NHẬP' || lType === 'CÂN TĂNG') {
+                importAmt += amt;
+                importCount++;
+            } else if (lType === 'XUẤT' || lType === 'CÂN GIẢM' || lType === 'THANH LÝ') {
+                exportAmt += amt;
+                exportCount++;
+            } else if (lType === 'ĐẶT HÀNG' || lType === 'ORDERED') {
+                poCount++;
+            } else {
+                auditCount++;
+            }
+        });
+
+        return {
+            importAmt: Math.round(importAmt),
+            importCount,
+            exportAmt: Math.round(exportAmt),
+            exportCount,
+            poCount,
+            auditCount,
+            totalCount: categoryAndMonthFilteredLogs.length,
+            netDiff: Math.round(importAmt - exportAmt)
+        };
+    }, [categoryAndMonthFilteredLogs]);
+
+    // Danh sách sau khi áp dụng lọc theo Loại thao tác (Tất cả / Nhập / Xuất / Đặt hàng / Kiểm kho)
+    const filteredLogs = React.useMemo(() => {
+        let list = categoryAndMonthFilteredLogs.filter(log => {
+            if (logActionFilter === 'ALL') return true;
+            const lType = String(log.type || '').trim().toUpperCase();
+            if (logActionFilter === 'NHAP') return lType === 'NHẬP' || lType === 'CÂN TĂNG';
+            if (logActionFilter === 'XUAT') return lType === 'XUẤT' || lType === 'CÂN GIẢM';
+            if (logActionFilter === 'DAT_HANG') return lType === 'ĐẶT HÀNG' || lType === 'ORDERED';
+            if (logActionFilter === 'THANH_LY') return lType === 'THANH LÝ';
+            if (logActionFilter === 'KIEM_KHO') return lType === 'KIỂM KHO' || lType === 'KIEM_KHO' || lType.includes('CÂN');
+            return true;
+        });
         return list.sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
-    }, [logs, filterType, filterMonth, deferredSearchTerm, mode, data?.Suppliers]);
+    }, [categoryAndMonthFilteredLogs, logActionFilter]);
 
     const totalValue = React.useMemo(() => {
         return filteredLogs.reduce((sum, l) => sum + (Number(l.totalAmount) || 0), 0);
@@ -896,7 +937,6 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
             const rawDate = String(log.date || log.createdAt || '').slice(0, 10) || 'Chưa rõ ngày';
             if (!groups[rawDate]) groups[rawDate] = [];
             groups[rawDate].push(log);
-        });
         return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
     }, [filteredLogs]);
 
@@ -1096,7 +1136,7 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
 
     return (
         <div className="space-y-4 sm:space-y-5 animate-fade-in pb-4 w-full max-w-full overflow-x-hidden">
-            {/* Action Buttons (Kiểm Kho / Nhập / Xuất / Đặt Hàng / Thanh Lý) - 1 GỌN GÀNG ĐỒNG BỘ */}
+            {/* Action Buttons (Kiểm Kho / Nhập / Xuất / Đặt Hàng / Thanh Lý) - ICON GỌN GÀNG ĐỒNG BỘ */}
             <div className="bg-[#121214] p-2.5 sm:p-3 rounded-2xl border border-white/[0.08] shadow-sm flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5 w-full">
                 <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0">
@@ -1117,39 +1157,39 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
                             } else {
                                 alert('Chỉ Quản Lý Kho, Kế Toán hoặc Kiểm Toán mới có quyền tạo phiếu kiểm kho!');
                             }
-                        }} className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md cursor-pointer">
+                        }} className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md cursor-pointer" title="Tạo Phiếu Kiểm Kho">
                             <i className="fas fa-plus-circle text-xs"></i> <span>Tạo Phiếu Kiểm Kho</span>
                         </button>
                     )}
                     {mode === 'NHAT_KY' && (
                         <>
                             {canCreateImport && (
-                                <button onClick={() => { window.pendingType = 'Nhập'; setShowForm(true); }} className="flex-1 sm:flex-none h-9 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm">
-                                    <i className="fas fa-arrow-down text-[10px]"></i> <span>Nhập Kho</span>
+                                <button onClick={() => { window.pendingType = 'Nhập'; setShowForm(true); }} className="h-9 w-9 sm:w-auto sm:px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm" title="Tạo phiếu Nhập Kho">
+                                    <i className="fas fa-arrow-down text-emerald-400 text-xs"></i> <span className="hidden sm:inline">Nhập</span>
                                 </button>
                             )}
                             {canCreatePO && (
-                                <button onClick={() => { window.pendingType = 'Đặt Hàng'; setShowForm(true); }} className="flex-1 sm:flex-none h-9 px-3 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm">
-                                    <i className="fas fa-file-invoice text-[10px]"></i> <span>Đặt Hàng</span>
+                                <button onClick={() => { window.pendingType = 'Đặt Hàng'; setShowForm(true); }} className="h-9 w-9 sm:w-auto sm:px-3 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm" title="Tạo phiếu Đặt Hàng">
+                                    <i className="fas fa-file-invoice text-purple-400 text-xs"></i> <span className="hidden sm:inline">Đặt Hàng</span>
                                 </button>
                             )}
                             {canCreateExport && (
                                 <>
-                                    <button onClick={() => { window.pendingType = 'Xuất'; setShowForm(true); }} className="flex-1 sm:flex-none h-9 px-3 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm">
-                                        <i className="fas fa-arrow-up text-[10px]"></i> <span>Xuất Kho</span>
+                                    <button onClick={() => { window.pendingType = 'Xuất'; setShowForm(true); }} className="h-9 w-9 sm:w-auto sm:px-3 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm" title="Tạo phiếu Xuất Kho">
+                                        <i className="fas fa-arrow-up text-rose-400 text-xs"></i> <span className="hidden sm:inline">Xuất</span>
                                     </button>
-                                    <button onClick={() => { window.pendingType = 'Thanh Lý'; setShowForm(true); }} className="flex-1 sm:flex-none h-9 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm">
-                                        <i className="fas fa-trash-restore text-[10px]"></i> <span>Thanh Lý</span>
+                                    <button onClick={() => { window.pendingType = 'Thanh Lý'; setShowForm(true); }} className="h-9 w-9 sm:w-auto sm:px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm" title="Tạo phiếu Xuất Thanh Lý">
+                                        <i className="fas fa-trash-restore text-amber-400 text-xs"></i> <span className="hidden sm:inline">Thanh Lý</span>
                                     </button>
                                 </>
                             )}
                             {hasPerm('INV_BOM_CONFIG') && (
                                 <>
-                                    <button onClick={handleSyncBomSku} className="flex-1 sm:flex-none h-9 px-3 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 border border-teal-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm" title="Đồng bộ chính xác 100% SKU nguyên liệu từ bảng Products sang bảng BOM_Config">
-                                        <i className="fas fa-sync-alt text-[10px]"></i> <span>Đồng Bộ BOM</span>
+                                    <button onClick={handleSyncBomSku} className="h-9 w-9 sm:w-auto sm:px-3 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 border border-teal-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm" title="Đồng bộ SKU từ Products sang BOM_Config">
+                                        <i className="fas fa-sync-alt text-teal-400 text-xs"></i> <span className="hidden md:inline">Đồng Bộ BOM</span>
                                     </button>
-                                    <button onClick={handleRepairBOM} className="flex-1 sm:flex-none h-9 px-3 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm" title="Tự động chuẩn hóa đối tượng và tính lại nguyên liệu cho các phiếu xuất BOM bị lỗi">
-                                        <i className="fas fa-magic text-[10px]"></i> <span>Sửa BOM</span>
+                                    <button onClick={handleRepairBOM} className="h-9 w-9 sm:w-auto sm:px-3 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm" title="Sửa lỗi phiếu xuất BOM">
+                                        <i className="fas fa-magic text-sky-400 text-xs"></i> <span className="hidden md:inline">Sửa BOM</span>
                                     </button>
                                 </>
                             )}
@@ -1158,16 +1198,85 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
                 </div>
             </div>
 
-            {/* Thống kê tổng quan */}
+            {/* Thống kê tổng quan - Tách bạch rõ ràng Tổng Nhập vs Tổng Xuất */}
             {mode !== 'KIEM_KHO' && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-full">
-                <div className="bg-[#121215] border border-white/[0.08] p-3.5 sm:p-4 rounded-2xl flex flex-col min-w-0 shadow-sm">
-                    <span className="text-[10px] font-black text-zinc-400 uppercase tracking-wider mb-1 truncate">Tổng Số Phiếu</span>
-                    <span className="text-xl font-black text-white truncate">{filteredLogs.length} <span className="text-xs font-normal text-zinc-500">phiếu</span></span>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 w-full max-w-full">
+                {/* Thẻ 1: Tổng Chứng Từ */}
+                <div className="bg-[#121215] border border-white/[0.08] p-3 sm:p-3.5 rounded-2xl flex flex-col min-w-0 shadow-sm">
+                    <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-wider truncate">Tổng Chứng Từ</span>
+                        <div className="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center text-zinc-400 text-xs">
+                            <i className="fas fa-file-lines"></i>
+                        </div>
+                    </div>
+                    <div className="text-[17px] sm:text-[19px] font-black text-white truncate font-mono">
+                        {categoryAndMonthFilteredLogs.length} <span className="text-xs font-normal text-zinc-500">phiếu</span>
+                    </div>
+                    <div className="text-[10px] text-zinc-500 font-bold mt-1 truncate">
+                        <span className="text-emerald-400 font-semibold">{stats.importCount} Nhập</span> • <span className="text-rose-400 font-semibold">{stats.exportCount} Xuất</span>
+                    </div>
                 </div>
-                <div className="bg-[#121215] border border-white/[0.08] p-3.5 sm:p-4 rounded-2xl flex flex-col min-w-0 shadow-sm">
-                    <span className="text-[10px] font-black text-zinc-400 uppercase tracking-wider mb-1 truncate">Tổng Giá Trị</span>
-                    <span className="text-xl font-black text-sky-400 font-mono truncate">{totalValue.toLocaleString('vi-VN')}đ</span>
+
+                {/* Thẻ 2: Tổng Tiền Nhập */}
+                <div 
+                    onClick={() => setLogActionFilter(logActionFilter === 'NHAP' ? 'ALL' : 'NHAP')}
+                    className={`border p-3 sm:p-3.5 rounded-2xl flex flex-col min-w-0 shadow-sm transition-all cursor-pointer active:scale-95 ${
+                        logActionFilter === 'NHAP' 
+                            ? 'bg-emerald-950/40 border-emerald-400/60 shadow-[0_0_15px_rgba(16,185,129,0.2)]' 
+                            : 'bg-[#121215] border-white/[0.08] hover:border-emerald-500/40'
+                    }`}
+                >
+                    <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider truncate">Tổng Tiền Nhập</span>
+                        <div className="w-6 h-6 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs">
+                            <i className="fas fa-arrow-down"></i>
+                        </div>
+                    </div>
+                    <div className="text-[16px] sm:text-[18px] font-black text-emerald-400 font-mono truncate">
+                        +{stats.importAmt.toLocaleString('vi-VN')}đ
+                    </div>
+                    <div className="text-[10px] text-zinc-400 font-bold mt-1">
+                        {stats.importCount} phiếu nhập kho
+                    </div>
+                </div>
+
+                {/* Thẻ 3: Tổng Tiền Xuất */}
+                <div 
+                    onClick={() => setLogActionFilter(logActionFilter === 'XUAT' ? 'ALL' : 'XUAT')}
+                    className={`border p-3 sm:p-3.5 rounded-2xl flex flex-col min-w-0 shadow-sm transition-all cursor-pointer active:scale-95 ${
+                        logActionFilter === 'XUAT' 
+                            ? 'bg-rose-950/40 border-rose-400/60 shadow-[0_0_15px_rgba(244,63,94,0.2)]' 
+                            : 'bg-[#121215] border-white/[0.08] hover:border-rose-500/40'
+                    }`}
+                >
+                    <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-black text-rose-400 uppercase tracking-wider truncate">Tổng Tiền Xuất</span>
+                        <div className="w-6 h-6 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 text-xs">
+                            <i className="fas fa-arrow-up"></i>
+                        </div>
+                    </div>
+                    <div className="text-[16px] sm:text-[18px] font-black text-rose-400 font-mono truncate">
+                        -{stats.exportAmt.toLocaleString('vi-VN')}đ
+                    </div>
+                    <div className="text-[10px] text-zinc-400 font-bold mt-1">
+                        {stats.exportCount} phiếu xuất kho
+                    </div>
+                </div>
+
+                {/* Thẻ 4: Chênh Lệch Luân Chuyển */}
+                <div className="bg-gradient-to-br from-[#18181f] via-[#121215] to-[#09090b] border border-[#d4af37]/40 p-3 sm:p-3.5 rounded-2xl flex flex-col min-w-0 shadow-sm">
+                    <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-black text-[#d4af37] uppercase tracking-wider truncate">Giá Trị Ròng (Nhập - Xuất)</span>
+                        <div className="w-6 h-6 rounded-lg bg-[#d4af37]/15 border border-[#d4af37]/30 flex items-center justify-center text-[#d4af37] text-xs">
+                            <i className="fas fa-scale-balanced"></i>
+                        </div>
+                    </div>
+                    <div className={`text-[16px] sm:text-[18px] font-black font-mono truncate ${stats.netDiff >= 0 ? 'text-[#d4af37]' : 'text-amber-400'}`}>
+                        {stats.netDiff >= 0 ? '+' : ''}{stats.netDiff.toLocaleString('vi-VN')}đ
+                    </div>
+                    <div className="text-[10px] text-zinc-400 font-bold mt-1 truncate">
+                        {stats.netDiff >= 0 ? 'Tăng trưởng tồn kho' : 'Giảm trừ xuất xưởng'}
+                    </div>
                 </div>
             </div>
             )}
@@ -1175,60 +1284,91 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
             {/* Bộ lọc nghiệp vụ & Thanh tìm kiếm */}
             <div className="bg-[#121215] border border-white/[0.08] p-3.5 sm:p-4 rounded-2xl space-y-3 shadow-sm w-full max-w-full overflow-x-hidden">
                 {mode !== 'KIEM_KHO' && (
-                <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-0.5 overscroll-x-contain touch-pan-x max-w-full">
-                    {[
-                        { 
-                            id: 'TẤT CẢ', 
-                            label: 'Tất Cả', 
-                            icon: 'fa-layer-group', 
-                            activeClass: 'bg-white/[0.2] text-white border-white/40 shadow-sm font-black', 
-                            inactiveClass: 'bg-[#18181e] text-zinc-400 border border-white/[0.06] hover:text-white',
-                            iconColor: 'text-zinc-300'
-                        },
-                        { 
-                            id: 'KHO BỂ KÍNH', 
-                            label: 'Kho Bể Kính', 
-                            icon: 'fa-fish', 
-                            activeClass: 'bg-gradient-to-r from-cyan-500/30 via-cyan-500/15 to-transparent text-cyan-300 border-cyan-400/60 shadow-[0_0_16px_rgba(6,182,212,0.35)] ring-1 ring-cyan-400/40 font-black', 
-                            inactiveClass: 'bg-[#18181e] text-zinc-400 border border-white/[0.06] hover:text-cyan-300 hover:border-cyan-500/30',
-                            iconColor: 'text-cyan-400'
-                        },
-                        { 
-                            id: 'KHO LAYOUT', 
-                            label: 'Kho Layout', 
-                            icon: 'fa-mountain-sun', 
-                            activeClass: 'bg-gradient-to-r from-amber-500/30 via-amber-500/15 to-transparent text-amber-300 border-amber-400/60 shadow-[0_0_16px_rgba(245,158,11,0.35)] ring-1 ring-amber-400/40 font-black', 
-                            inactiveClass: 'bg-[#18181e] text-zinc-400 border border-white/[0.06] hover:text-amber-300 hover:border-amber-500/30',
-                            iconColor: 'text-amber-400'
-                        },
-                        { 
-                            id: 'KHO HÀNG HOÁ', 
-                            label: 'Kho Hàng Hoá (Phụ Kiện)', 
-                            icon: 'fa-plug', 
-                            activeClass: 'bg-gradient-to-r from-purple-500/30 via-purple-500/15 to-transparent text-purple-300 border-purple-400/60 shadow-[0_0_16px_rgba(168,85,247,0.35)] ring-1 ring-purple-400/40 font-black', 
-                            inactiveClass: 'bg-[#18181e] text-zinc-400 border border-white/[0.06] hover:text-purple-300 hover:border-purple-500/30',
-                            iconColor: 'text-purple-400'
-                        },
-                        { 
-                            id: 'KHO NGUYÊN LIỆU', 
-                            label: 'Kho Nguyên Liệu (Vật Tư)', 
-                            icon: 'fa-boxes-stacked', 
-                            activeClass: 'bg-gradient-to-r from-emerald-500/30 via-emerald-500/15 to-transparent text-emerald-300 border-emerald-400/60 shadow-[0_0_16px_rgba(16,185,129,0.35)] ring-1 ring-emerald-400/40 font-black', 
-                            inactiveClass: 'bg-[#18181e] text-zinc-400 border border-white/[0.06] hover:text-emerald-300 hover:border-emerald-500/30',
-                            iconColor: 'text-emerald-400'
-                        }
-                    ].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setFilterType(tab.id)}
-                            className={`px-3.5 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer active:scale-95 border ${
-                                filterType === tab.id ? tab.activeClass : tab.inactiveClass
-                            }`}
-                        >
-                            <i className={`fas ${tab.icon} text-[10px] ${tab.iconColor}`}></i>
-                            <span>{tab.label}</span>
-                        </button>
-                    ))}
+                <div className="space-y-2.5">
+                    {/* HÀNG 1: CHỌN KHO (TẤT CẢ / BỂ KÍNH / LAYOUT / PHỤ KIỆN / VẬT TƯ) */}
+                    <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-0.5 overscroll-x-contain touch-pan-x max-w-full">
+                        {[
+                            { 
+                                id: 'TẤT CẢ', 
+                                label: 'Tất Cả Kho', 
+                                icon: 'fa-layer-group', 
+                                activeClass: 'bg-white/[0.2] text-white border-white/40 shadow-sm font-black', 
+                                inactiveClass: 'bg-[#18181e] text-zinc-400 border border-white/[0.06] hover:text-white',
+                                iconColor: 'text-zinc-300'
+                            },
+                            { 
+                                id: 'KHO BỂ KÍNH', 
+                                label: 'Kho Bể Kính', 
+                                icon: 'fa-fish', 
+                                activeClass: 'bg-gradient-to-r from-cyan-500/30 via-cyan-500/15 to-transparent text-cyan-300 border-cyan-400/60 shadow-[0_0_16px_rgba(6,182,212,0.35)] ring-1 ring-cyan-400/40 font-black', 
+                                inactiveClass: 'bg-[#18181e] text-zinc-400 border border-white/[0.06] hover:text-cyan-300 hover:border-cyan-500/30',
+                                iconColor: 'text-cyan-400'
+                            },
+                            { 
+                                id: 'KHO LAYOUT', 
+                                label: 'Kho Layout', 
+                                icon: 'fa-mountain-sun', 
+                                activeClass: 'bg-gradient-to-r from-amber-500/30 via-amber-500/15 to-transparent text-amber-300 border-amber-400/60 shadow-[0_0_16px_rgba(245,158,11,0.35)] ring-1 ring-amber-400/40 font-black', 
+                                inactiveClass: 'bg-[#18181e] text-zinc-400 border border-white/[0.06] hover:text-amber-300 hover:border-amber-500/30',
+                                iconColor: 'text-amber-400'
+                            },
+                            { 
+                                id: 'KHO HÀNG HOÁ', 
+                                label: 'Kho Hàng Hoá (Phụ Kiện)', 
+                                icon: 'fa-plug', 
+                                activeClass: 'bg-gradient-to-r from-purple-500/30 via-purple-500/15 to-transparent text-purple-300 border-purple-400/60 shadow-[0_0_16px_rgba(168,85,247,0.35)] ring-1 ring-purple-400/40 font-black', 
+                                inactiveClass: 'bg-[#18181e] text-zinc-400 border border-white/[0.06] hover:text-purple-300 hover:border-purple-500/30',
+                                iconColor: 'text-purple-400'
+                            },
+                            { 
+                                id: 'KHO NGUYÊN LIỆU', 
+                                label: 'Kho Nguyên Liệu (Vật Tư)', 
+                                icon: 'fa-boxes-stacked', 
+                                activeClass: 'bg-gradient-to-r from-emerald-500/30 via-emerald-500/15 to-transparent text-emerald-300 border-emerald-400/60 shadow-[0_0_16px_rgba(16,185,129,0.35)] ring-1 ring-emerald-400/40 font-black', 
+                                inactiveClass: 'bg-[#18181e] text-zinc-400 border border-white/[0.06] hover:text-emerald-300 hover:border-emerald-500/30',
+                                iconColor: 'text-emerald-400'
+                            }
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setFilterType(tab.id)}
+                                className={`px-3.5 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer active:scale-95 border ${
+                                    filterType === tab.id ? tab.activeClass : tab.inactiveClass
+                                }`}
+                            >
+                                <i className={`fas ${tab.icon} text-[10px] ${tab.iconColor}`}></i>
+                                <span>{tab.label}</span>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* HÀNG 2: TÁCH RIÊNG XUẤT / NHẬP / ĐẶT HÀNG / KIỂM KHO TRONG KHO ĐANG CHỌN */}
+                    <div className="flex gap-1.5 overflow-x-auto hide-scrollbar items-center py-0.5 border-t border-white/[0.06] pt-2">
+                        {[
+                            { id: 'ALL', label: `Tất Cả (${categoryAndMonthFilteredLogs.length})`, icon: 'fa-list' },
+                            { id: 'NHAP', label: `Nhập Kho (${stats.importCount})`, icon: 'fa-arrow-down', activeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/50 font-black' },
+                            { id: 'XUAT', label: `Xuất Kho (${stats.exportCount})`, icon: 'fa-arrow-up', activeClass: 'bg-rose-500/20 text-rose-300 border-rose-400/50 font-black' },
+                            { id: 'DAT_HANG', label: `Đặt Hàng (${stats.poCount})`, icon: 'fa-file-invoice', activeClass: 'bg-purple-500/20 text-purple-300 border-purple-400/50 font-black' },
+                            { id: 'KIEM_KHO', label: `Kiểm Kho / Khác (${stats.auditCount})`, icon: 'fa-clipboard-check', activeClass: 'bg-cyan-500/20 text-cyan-300 border-cyan-400/50 font-black' }
+                        ].map(sub => {
+                            const isSel = logActionFilter === sub.id;
+                            return (
+                                <button
+                                    key={sub.id}
+                                    type="button"
+                                    onClick={() => setLogActionFilter(sub.id)}
+                                    className={`px-3 py-1 rounded-xl text-[10.5px] font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 border whitespace-nowrap ${
+                                        isSel
+                                            ? (sub.activeClass || 'bg-white/[0.2] text-white border-white/40 shadow-sm font-black')
+                                            : 'bg-[#18181e] text-zinc-400 border-white/[0.06] hover:text-zinc-200'
+                                    }`}
+                                >
+                                    <i className={`fas ${sub.icon} text-[9.5px]`}></i>
+                                    <span>{sub.label}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
                 )}
 
@@ -1374,28 +1514,45 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
                                                 <div className="p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-[#1a1a1a]/50 transition-colors" onClick={() => toggleExpand(log.id)}>
                                                     <div className="flex items-center gap-3 min-w-0">
                                                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-black text-xs ${isImport ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
-                                                            <i className={`fas ${isImport ? 'fa-arrow-down' : 'fa-arrow-up'}`}></i>
+                                                            <i className={`fas ${isImport ? 'fa-arrow-down' : (log.type === 'Đặt Hàng' ? 'fa-file-invoice' : 'fa-arrow-up')}`}></i>
                                                         </div>
                                                         <div className="min-w-0">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-black text-xs text-white truncate font-mono">{log.id}</span>
-                                                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide ${isImport ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className="font-bold text-[13px] text-zinc-100 truncate group-hover:text-white">
+                                                                    {log.target || cleanStockLogNote(log.note, log.target) || 'Chứng từ kho'}
+                                                                </span>
+                                                                <span className={`px-2 py-0.5 rounded-md text-[8.5px] font-black uppercase tracking-wide border ${
+                                                                    isImport 
+                                                                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' 
+                                                                        : (log.type === 'Kiểm Kho' || log.type === 'KIEM_KHO' 
+                                                                            ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' 
+                                                                            : (log.type === 'Đặt Hàng' 
+                                                                                ? 'bg-purple-500/15 text-purple-300 border-purple-500/30' 
+                                                                                : 'bg-rose-500/15 text-rose-300 border-rose-500/30'))
+                                                                }`}>
                                                                     {log.type}
                                                                 </span>
                                                             </div>
-                                                            <div className="text-[11px] font-bold text-gray-400 truncate mt-1">
-                                                                Đối tượng: <span className="text-sky-300 font-black">{log.target || 'Nội bộ'}</span> • <span className="text-gray-500 font-mono text-[10px]">{String(log.date).slice(0, 16).replace('T', ' ')}</span>
-                                                            </div>
-                                                            <div className="text-[10px] text-gray-500 font-bold mt-0.5">
-                                                                <i className="fas fa-user-edit mr-1"></i> {log.user || 'Hệ thống'}
+                                                            <div className="flex items-center gap-2 text-[10.5px] text-zinc-400 truncate mt-1 flex-wrap">
+                                                                <span className="font-mono text-[9.5px] text-zinc-400 bg-white/[0.04] px-1.5 py-0.5 rounded border border-white/[0.06]" title="Mã chứng từ">{log.id}</span>
+                                                                <span>•</span>
+                                                                <span className="text-zinc-400 font-mono">{String(log.date || log.createdAt || '').slice(0, 16).replace('T', ' ')}</span>
+                                                                <span>•</span>
+                                                                <span className="text-zinc-400"><i className="fas fa-user-edit text-[9px] text-zinc-500 mr-1"></i>{log.user || 'Hệ thống'}</span>
+                                                                {log.note && log.note !== log.target && (
+                                                                    <>
+                                                                        <span>•</span>
+                                                                        <span className="text-zinc-300 italic truncate max-w-[260px]">{cleanStockLogNote(log.note, log.target)}</span>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
 
                                                     <div className="flex items-center gap-3 shrink-0">
                                                         <div className="text-right hidden sm:block">
-                                                            <div className={`font-black text-sm ${isImport ? 'text-emerald-400' : 'text-rose-400'}`}>{Math.round(displayTotalAmount).toLocaleString('vi-VN')}đ</div>
-                                                            <div className="text-[10px] text-gray-500 font-bold">{items.length} mặt hàng</div>
+                                                            <div className={`font-black text-sm font-mono ${isImport ? 'text-emerald-400' : 'text-rose-400'}`}>{isImport ? '+' : '-'}{Math.round(displayTotalAmount).toLocaleString('vi-VN')}đ</div>
+                                                            <div className="text-[10px] text-zinc-500 font-bold">{items.length} mặt hàng</div>
                                                         </div>
 
                                                         <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>

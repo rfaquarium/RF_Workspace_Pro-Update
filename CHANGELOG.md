@@ -2,6 +2,24 @@
 
 Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến trúc, tối ưu nghiệp vụ và sửa lỗi của hệ điều hành `RF_Workspace_Pro`.
 
+## [v2.35.4] - 2026-09-02
+
+### 💎 Tái Cấu Trúc Nhật Ký Chứng Từ: Nút Icon Gọn Gàng, Tách Bạch Xuất - Nhập Từng Kho & Thống Kê Ròng
+- **Tối Ưu Hoá Nút Thao Tác Tạo Phiếu Thành Icon Gọn Gàng (`Tab_ImportExport.html`)**:
+  - Chuyển đổi toàn bộ nút `[Nhập Kho]`, `[Đặt Hàng]`, `[Xuất Kho]`, `[Thanh Lý]`, `[Đồng Bộ BOM]`, `[Sửa BOM]` thành các nút Icon tinh gọn, có Tooltip trực quan và co giãn thông minh trên di động/máy tính bàn.
+- **Tách Biệt Độc Lập Luồng Xuất / Nhập / Đặt Hàng Trong Từng Kho Hàng (`Tab_ImportExport.html`)**:
+  - Bổ sung thanh Sub-filter chips: `[Tất Cả (N) | 📥 Nhập Kho (N) | 📤 Xuất Kho (N) | 📋 Đặt Hàng (N) | 🔄 Kiểm Kho / Khác (N)]` chạy động ngay dưới bộ chọn từng Kho (`Kho Bể Kính`, `Kho Layout`, `Kho Phụ Kiện`, `Kho Vật Tư`).
+- **Nâng Cấp Dải Bento Thống Kê Tài Chính Luân Chuyển 4 Thẻ (`Tab_ImportExport.html`)**:
+  - **Tổng Chứng Từ**: Hiển thị tổng số phiếu kèm tỷ lệ `{N} Nhập • {N} Xuất`.
+  - **Tổng Tiền Nhập**: `+{Số tiền}đ` màu xanh lục (click để lọc ngay danh sách phiếu nhập).
+  - **Tổng Tiền Xuất**: `-{Số tiền}đ` màu đỏ hồng (click để lọc ngay danh sách phiếu xuất).
+  - **Giá Trị Ròng (Nhập - Xuất)**: `±{Số tiền}đ` vàng gold sang trọng, phản ánh chính xác chiều hướng tăng/giảm tồn kho của xưởng.
+- **Ẩn Mã Kỹ Thuật `IE_...`, Đưa Đối Tượng / Mục Đích Giao Dịch Lên Làm Tiêu Đề Chính (`Tab_ImportExport.html`)**:
+  - Tiêu đề thẻ chứng từ hiển thị rõ ràng: `Bàn Giao Khách Hàng (Hàng Loạt)`, `Sản Xuất Layout`, `Tự động nhập kho (Sản xuất xong)`, `Nhà cung cấp...`.
+  - Mã kỹ thuật (`IE_SAFE_OUT_...`, `IE_BOM_...`) được thu gọn thành nhãn monospace tinh tế ở hàng dưới.
+
+---
+
 ## [v2.35.3] - 2026-09-01
 
 ### 🛡️ Minh Bạch Cước Vận Chuyển / Chi Phí Khác Trong Phiếu Nhập & Chi Tiết Chứng Từ

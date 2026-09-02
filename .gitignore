@@ -19,3 +19,6 @@ scratch/
 fix_temp.js
 temp_babel.js
 clasp_output.log
+
+# Submodules & Agent Skills Cache
+.agents/skills/gstack/

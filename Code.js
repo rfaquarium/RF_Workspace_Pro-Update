@@ -22,7 +22,7 @@ function AAA_RUN_STANDARDIZE_SKU() {
 var SCHEMA = {
   Orders: ['id', 'orderCode', 'channel', 'customer', 'createdAt', 'deadline', 'date', 'status', 'accessories', 'hasProduction', 'isCarriedToWH', 'updatedBy', 'revenue', 'phone', 'address', 'note', 'prePaid', 'cod', 'costTotal', 'responsibleUser', 'discount', 'shippingMethod', 'sizeCoefficient', 'cogs', 'feeFixed', 'feeService', 'feePayment', 'feeAffiliate', 'shopVoucher', 'tax', 'reconciledAt', 'isReconciled'],
   Orders_Archive: ['id', 'orderCode', 'channel', 'customer', 'createdAt', 'deadline', 'date', 'status', 'accessories', 'hasProduction', 'isCarriedToWH', 'updatedBy', 'revenue', 'phone', 'address', 'note', 'prePaid', 'cod', 'costTotal', 'responsibleUser', 'discount', 'shippingMethod', 'sizeCoefficient', 'cogs', 'feeFixed', 'feeService', 'feePayment', 'feeAffiliate', 'shopVoucher', 'tax', 'reconciledAt', 'isReconciled'],
-  Production: ['id', 'orderId', 'type', 'name', 'note', 'status', 'deadline', 'fulfilledFromStock', 'p1_name', 'p1_status', 'p1_user', 'p1_start', 'p1_endTime', 'p1_photo', 'p1_reward_vnd', 'p2_name', 'p2_status', 'p2_user', 'p2_start', 'p2_endTime', 'p2_photo', 'p2_reward_vnd', 'qc_front_photo', 'qc_side_photo', 'qc_status', 'qc_note'],
+  Production: ['id', 'orderId', 'type', 'name', 'note', 'status', 'deadline', 'fulfilledFromStock', 'p1_name', 'p1_status', 'p1_user', 'p1_start', 'p1_endTime', 'p1_photo', 'p1_reward_vnd', 'p2_name', 'p2_status', 'p2_user', 'p2_start', 'p2_endTime', 'p2_photo', 'p2_reward_vnd', 'qc_front_photo', 'qc_side_photo', 'qc_status', 'qc_note', 'serialCode', 'usedByOrderCode', 'usedAt'],
   Packings: ['id', 'orderId', 'user', 'start', 'end', 'endTime', 'status', 'photo', 'reward_vnd', 'photoBefore'],
   Attendance: ['id', 'user', 'date', 'morningIn', 'morningOut', 'afternoonIn', 'afternoonOut', 'leaveType', 'leaveReportAt', 'shift', 'timeIn', 'timeOut', 'totalHours', 'status', 'penalty', 'isEdited', 'leaveStart', 'leaveEnd', 'note'],
   Documents: ['id', 'category', 'title', 'description', 'link', 'createdAt', 'createdBy', 'attachments', 'testLink', 'readBy'],
@@ -350,6 +350,24 @@ function handleApiRequest(payload) {
       var auth = validatePin(pin);
       if (auth && auth.valid) {
         response = processAutoAllocation(payload.orderId);
+      } else {
+        response.message = 'Xác thực thất bại!';
+      }
+    }
+    else if (action === 'getAvailableStockItems') {
+      var pin = payload.pin;
+      var auth = validatePin(pin);
+      if (auth && auth.valid) {
+        response = api_getAvailableStockItems(payload.sku, payload.type);
+      } else {
+        response.message = 'Xác thực thất bại!';
+      }
+    }
+    else if (action === 'assignStockItemToOrder') {
+      var pin = payload.pin;
+      var auth = validatePin(pin);
+      if (auth && auth.valid) {
+        response = api_assignStockItemToOrder(payload.prodId, payload.orderCode, payload.serialCode);
       } else {
         response.message = 'Xác thực thất bại!';
       }
@@ -1527,7 +1545,7 @@ function getAppData(pin) {
         if (String(dStr) >= cutoffStr) return true;
       }
       return false;
-    }, ss).map(function (p) { return { id: p.id, orderId: p.orderId, type: p.type, name: p.name, note: p.note, status: p.status, deadline: p.deadline, fulfilledFromStock: (String(p.fulfilledFromStock).toUpperCase() === 'TRUE'), qc_front_photo: p.qc_front_photo || '', qc_side_photo: p.qc_side_photo || '', qc_status: p.qc_status || '', qc_note: p.qc_note || '', phases: { phase1: { name: p.p1_name || '', status: p.p1_status || '', user: p.p1_user || '', start: p.p1_start || '', endTime: p.p1_endTime || '', photo: p.p1_photo || '', reward_vnd: p.p1_reward_vnd || 0 }, phase2: { name: p.p2_name || '', status: p.p2_status || '', user: p.p2_user || '', start: p.p2_start || '', endTime: p.p2_endTime || '', photo: p.p2_photo || '', reward_vnd: p.p2_reward_vnd || 0 } } }; });
+    }, ss).map(function (p) { return { id: p.id, orderId: p.orderId, type: p.type, name: p.name, note: p.note, status: p.status, deadline: p.deadline, fulfilledFromStock: (String(p.fulfilledFromStock).toUpperCase() === 'TRUE'), qc_front_photo: p.qc_front_photo || '', qc_side_photo: p.qc_side_photo || '', qc_status: p.qc_status || '', qc_note: p.qc_note || '', serialCode: p.serialCode || '', usedByOrderCode: p.usedByOrderCode || '', usedAt: p.usedAt || '', phases: { phase1: { name: p.p1_name || '', status: p.p1_status || '', user: p.p1_user || '', start: p.p1_start || '', endTime: p.p1_endTime || '', photo: p.p1_photo || '', reward_vnd: p.p1_reward_vnd || 0 }, phase2: { name: p.p2_name || '', status: p.p2_status || '', user: p.p2_user || '', start: p.p2_start || '', endTime: p.p2_endTime || '', photo: p.p2_photo || '', reward_vnd: p.p2_reward_vnd || 0 } } }; });
 
     // 4. LỌC ĐÓNG GÓI: GIỮ LẠI ĐÓNG GÓI CỦA ĐƠN ĐANG VẬN HÀNH VÀ HOÀN THÀNH TRONG 45 NGÀY
     var packings = readSheet('Packings', function (p) {
@@ -1635,7 +1653,7 @@ function getArchivedData(pin) {
       var s = String(p.status).toUpperCase().trim();
       var isTerminal = (normalizeStatus(s) === 'Done' || normalizeStatus(s) === 'Đơn Huỷ' || p.fulfilledFromStock);
       return isTerminal;
-    }, ss).map(function (p) { return { id: p.id, orderId: p.orderId, type: p.type, name: p.name, note: p.note, status: p.status, deadline: p.deadline, fulfilledFromStock: (String(p.fulfilledFromStock).toUpperCase() === 'TRUE'), qc_front_photo: p.qc_front_photo || '', qc_side_photo: p.qc_side_photo || '', qc_status: p.qc_status || '', qc_note: p.qc_note || '', phases: { phase1: { name: p.p1_name || '', status: p.p1_status || '', user: p.p1_user || '', start: p.p1_start || '', endTime: p.p1_endTime || '', photo: p.p1_photo || '', reward_vnd: p.p1_reward_vnd || 0 }, phase2: { name: p.p2_name || '', status: p.p2_status || '', user: p.p2_user || '', start: p.p2_start || '', endTime: p.p2_endTime || '', photo: p.p2_photo || '', reward_vnd: p.p2_reward_vnd || 0 } } }; });
+    }, ss).map(function (p) { return { id: p.id, orderId: p.orderId, type: p.type, name: p.name, note: p.note, status: p.status, deadline: p.deadline, fulfilledFromStock: (String(p.fulfilledFromStock).toUpperCase() === 'TRUE'), qc_front_photo: p.qc_front_photo || '', qc_side_photo: p.qc_side_photo || '', qc_status: p.qc_status || '', qc_note: p.qc_note || '', serialCode: p.serialCode || '', usedByOrderCode: p.usedByOrderCode || '', usedAt: p.usedAt || '', phases: { phase1: { name: p.p1_name || '', status: p.p1_status || '', user: p.p1_user || '', start: p.p1_start || '', endTime: p.p1_endTime || '', photo: p.p1_photo || '', reward_vnd: p.p1_reward_vnd || 0 }, phase2: { name: p.p2_name || '', status: p.p2_status || '', user: p.p2_user || '', start: p.p2_start || '', endTime: p.p2_endTime || '', photo: p.p2_photo || '', reward_vnd: p.p2_reward_vnd || 0 } } }; });
 
     // 3. TẢI CÁC LỆNH ĐÓNG GÓI ĐÃ ĐÓNG (ARCHIVED)
     var archivedPackings = readSheet('Packings', function (p) {
@@ -2323,7 +2341,10 @@ function formatProd(p) {
     "qc_front_photo": p.qc_front_photo || '', 
     "qc_side_photo": p.qc_side_photo || '', 
     "qc_status": qcSt, 
-    "qc_note": p.qc_note || '' 
+    "qc_note": p.qc_note || '',
+    "serialCode": p.serialCode || '',
+    "usedByOrderCode": p.usedByOrderCode || '',
+    "usedAt": p.usedAt || ''
   }; 
 }
 function formatPacking(p) { return { "id": p.id, "orderId": p.orderId, "user": p.user || '', "start": p.start || '', "end": p.end || '', "endTime": p.endTime || '', "status": p.status || '', "photo": p.photo || '', "photoBefore": p.photoBefore || '', "reward_vnd": p.reward_vnd || 0 }; }
@@ -8823,8 +8844,26 @@ function processMaterialDeduction(prodId, materialUsageData) {
 
     var bomMap = {};
 
-    // 2. ƯU TIÊN SỐ 1: Đọc trực tiếp từ Sheet BomLayout chuẩn
-    if (isLayout) {
+    // 0. ƯU TIÊN SỐ 0: Sử dụng dữ liệu quyết toán thực tế (materialUsageData) từ thợ (Quy trình 2 Chạm cho BỂ LẺ SIZE & LAYOUT COVER)
+    if (materialUsageData && Array.isArray(materialUsageData) && materialUsageData.length > 0) {
+      for (var mu = 0; mu < materialUsageData.length; mu++) {
+        var mItem = materialUsageData[mu];
+        if (!mItem) continue;
+        var actQty = Number(mItem.actualQty != null ? mItem.actualQty : (mItem.qty != null ? mItem.qty : (Number(mItem.requestedQty || 0) - Number(mItem.returnedQty || 0))));
+        if (actQty > 0) {
+          var mSku = String(mItem.sku || mItem.name || '').trim();
+          bomMap[mSku] = {
+            qty: actQty,
+            unit: mItem.unit || 'kg',
+            name: mItem.name || mSku,
+            defaultPrice: Number(mItem.costPrice || mItem.price || 0)
+          };
+        }
+      }
+    }
+
+    // 2. ƯU TIÊN SỐ 1: Đọc trực tiếp từ Sheet BomLayout chuẩn nếu chưa có materialUsageData
+    if (Object.keys(bomMap).length === 0 && isLayout) {
       var layoutBomRes = getBomFromBomLayoutSheet(ss, prodName, targetSku);
       if (layoutBomRes && layoutBomRes.found && layoutBomRes.bomMap) {
         bomMap = layoutBomRes.bomMap;
@@ -9014,8 +9053,8 @@ function processMaterialDeduction(prodId, materialUsageData) {
           unitPrice = Number((rawCost / convRate).toFixed(2));
         }
 
-        var roundedDeductQty = Math.round(convertedDeductQty * 10000) / 10000;
-        var newQty = Math.round(Math.max(0, curQty - roundedDeductQty) * 10000) / 10000;
+        var roundedDeductQty = Math.round(convertedDeductQty * 1000) / 1000;
+        var newQty = Math.round(Math.max(0, curQty - roundedDeductQty) * 1000) / 1000;
 
         pData[p][prQtyIdx] = newQty;
         isProductChanged = true;
@@ -9046,7 +9085,7 @@ function processMaterialDeduction(prodId, materialUsageData) {
       var itemObj = bomMap[remainKey];
       if (!itemObj) continue;
       
-      var sQty = Number(itemObj.qty) || 0;
+      var sQty = Math.round((Number(itemObj.qty) || 0) * 1000) / 1000;
       var sPrice = Number(itemObj.defaultPrice || itemObj.price || 0);
       if (remainKey === 'DICHVU-MAI-CNC' || itemObj.isService) {
         sPrice = sPrice || 25000;
@@ -9091,7 +9130,7 @@ function processMaterialDeduction(prodId, materialUsageData) {
     if (itemsDeducted.length > 0) {
       var safeDate = Utilities.formatDate(new Date(), 'GMT+7', 'yyyy-MM-dd HH:mm:ss');
       var logId = 'IE_BOM_' + targetProdIdStr;
-      var note = 'Trừ vật tư BOM đơn ' + (targetProd.orderId || 'Không xác định') + ' (Lệnh: ' + targetProdIdStr + ' - ' + prodName + ')';
+      var note = 'Trừ vật tư lệnh sản xuất ' + prodName + (targetProd.orderId ? ' đơn ' + targetProd.orderId : '');
 
       // 6.1. Phiếu Xuất Nguyên Liệu BOM
       ieSheet.appendRow([
@@ -9148,6 +9187,33 @@ function processMaterialDeduction(prodId, materialUsageData) {
           }
         } catch (stockErr) {
           Logger.log('Lỗi cộng tồn kho thành phẩm: ' + stockErr.toString());
+        }
+      } else {
+        // 6.4. Cập nhật Giá Vốn Thực Tế vào Orders.cogs
+        try {
+          var orderSheet = ss.getSheetByName('Orders');
+          if (orderSheet) {
+            var oData = orderSheet.getDataRange().getValues();
+            var oHeaders = oData[0];
+            var oIdCol = oHeaders.indexOf('id');
+            var oCodeCol = oHeaders.indexOf('orderCode');
+            var oCogsCol = oHeaders.indexOf('cogs');
+            if (oCogsCol >= 0) {
+              var targetOrderIdStr = String(targetProd.orderId).trim();
+              for (var oRow = 1; oRow < oData.length; oRow++) {
+                var rowOId = String(oData[oRow][oIdCol] || '').trim();
+                var rowOCode = String(oData[oRow][oCodeCol] || '').trim();
+                if (rowOId === targetOrderIdStr || rowOCode === targetOrderIdStr) {
+                  var curCogs = Number(oData[oRow][oCogsCol]) || 0;
+                  var newCogs = Math.round(curCogs + totalCost);
+                  orderSheet.getRange(oRow + 1, oCogsCol + 1).setValue(newCogs);
+                  break;
+                }
+              }
+            }
+          }
+        } catch (cogsErr) {
+          Logger.log('Lỗi cập nhật Orders.cogs: ' + cogsErr.toString());
         }
       }
     }
@@ -12730,8 +12796,251 @@ function emergencyCleanAllJuneData() {
     lock.releaseLock();
   }
 }
+/**
+ * 📦 TRUY VẾT HIỆN VẬT TỒN KHO: Lấy danh sách sản phẩm tồn khả dụng của SKU / Tên SP
+ * Hỗ trợ Bể Kính (kèm serialCode 4 số) và Layout (kèm ảnh KCS + thợ Dựng Khung/Gia Cố).
+ * Chỉ lấy các lệnh chưa bị gán đơn hàng khác (!usedByOrderCode).
+ */
+function api_getAvailableStockItems(skuOrName, type) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Production');
+    if (!sheet) return { success: false, message: 'Không tìm thấy bảng Production', items: [] };
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return { success: true, items: [] };
+
+    var headers = data[0];
+    var idCol = headers.indexOf('id');
+    var orderIdCol = headers.indexOf('orderId');
+    var typeCol = headers.indexOf('type');
+    var nameCol = headers.indexOf('name');
+    var statusCol = headers.indexOf('status');
+    var p1NameCol = headers.indexOf('p1_name');
+    var p1UserCol = headers.indexOf('p1_user');
+    var p1PhotoCol = headers.indexOf('p1_photo');
+    var p1EndTimeCol = headers.indexOf('p1_endTime');
+    var p2NameCol = headers.indexOf('p2_name');
+    var p2UserCol = headers.indexOf('p2_user');
+    var p2PhotoCol = headers.indexOf('p2_photo');
+    var p2EndTimeCol = headers.indexOf('p2_endTime');
+    var qcPhotoCol = headers.indexOf('qc_front_photo');
+    var qcSideCol = headers.indexOf('qc_side_photo');
+    var serialCol = headers.indexOf('serialCode');
+    var usedByCol = headers.indexOf('usedByOrderCode');
+    var deadlineCol = headers.indexOf('deadline');
+
+    var searchKey = String(skuOrName || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    var cleanSearchKey = searchKey.replace(/[\u2010-\u2015\u2212-]/g, '-');
+
+    var items = [];
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var rowUsedBy = usedByCol !== -1 ? String(row[usedByCol] || '').trim() : '';
+      if (rowUsedBy) continue; // Đã bị đơn khác xuất
+
+      var rowStatus = statusCol !== -1 ? String(row[statusCol] || '').trim() : '';
+      var normStatus = normalizeStatus(rowStatus);
+      // Chỉ lấy các lệnh đã hoàn thành (Done, Hoàn Kho Đạt)
+      if (normStatus !== 'Done' && rowStatus !== 'HOÀN KHO ĐẠT' && rowStatus !== 'ĐÃ XONG') continue;
+
+      var rowName = nameCol !== -1 ? String(row[nameCol] || '').trim().toLowerCase().replace(/[\u2010-\u2015\u2212-]/g, '-').replace(/\s+/g, ' ') : '';
+      var rowType = typeCol !== -1 ? String(row[typeCol] || '').trim() : '';
+
+      // Kiểm tra so khớp tên sản phẩm hoặc SKU
+      var match = false;
+      if (!cleanSearchKey) {
+        match = true;
+      } else if (rowName === cleanSearchKey || rowName.indexOf(cleanSearchKey) !== -1 || cleanSearchKey.indexOf(rowName) !== -1) {
+        match = true;
+      }
+
+      if (type) {
+        var tLower = String(type).toLowerCase();
+        var rowTLower = rowType.toLowerCase();
+        if (tLower.includes('bể') || tLower.includes('kính')) {
+          if (!rowTLower.includes('bể') && !rowTLower.includes('kính') && !rowName.includes('bể') && !rowName.includes('kính')) match = false;
+        } else if (tLower.includes('layout')) {
+          if (!rowTLower.includes('layout') && !rowName.includes('layout')) match = false;
+        }
+      }
+
+      if (!match) continue;
+
+      var rowId = idCol !== -1 ? String(row[idCol] || '') : '';
+      var rowSerial = serialCol !== -1 ? String(row[serialCol] || '').trim() : '';
+      if (!rowSerial && (rowType.includes('Bể') || rowName.includes('bể'))) {
+        var numOnly = rowId.replace(/\D/g, '');
+        var sCode = numOnly.length >= 4 ? numOnly.slice(-4) : (rowId.slice(-4) || '0000');
+        rowSerial = '#' + sCode;
+      }
+
+      var p1U = p1UserCol !== -1 ? String(row[p1UserCol] || '') : '';
+      var p2U = p2UserCol !== -1 ? String(row[p2UserCol] || '') : '';
+      var p1Photo = p1PhotoCol !== -1 ? String(row[p1PhotoCol] || '') : '';
+      var p2Photo = p2PhotoCol !== -1 ? String(row[p2PhotoCol] || '') : '';
+      var qcPhoto = qcPhotoCol !== -1 ? String(row[qcPhotoCol] || '') : '';
+      var pDate = p2EndTimeCol !== -1 && row[p2EndTimeCol] ? String(row[p2EndTimeCol]) : (p1EndTimeCol !== -1 && row[p1EndTimeCol] ? String(row[p1EndTimeCol]) : (deadlineCol !== -1 ? String(row[deadlineCol] || '') : ''));
+
+      items.push({
+        id: rowId,
+        rowIndex: i + 1,
+        name: nameCol !== -1 ? String(row[nameCol] || '') : '',
+        type: rowType,
+        serialCode: rowSerial,
+        p1_name: p1NameCol !== -1 ? String(row[p1NameCol] || '') : 'Khâu 1',
+        p1_user: p1U,
+        p1_photo: p1Photo,
+        p2_name: p2NameCol !== -1 ? String(row[p2NameCol] || '') : 'Khâu 2',
+        p2_user: p2U,
+        p2_photo: p2Photo,
+        qc_front_photo: qcPhoto || p2Photo || p1Photo,
+        date: pDate ? pDate.slice(0, 16).replace('T', ' ') : ''
+      });
+    }
+
+    return { success: true, items: items };
+  } catch (e) {
+    return { success: false, message: e.toString(), items: [] };
+  }
+}
+
+/**
+ * 🔒 KHÓA & GÁN SẢN PHẨM TỒN VÀO ĐƠN HÀNG (CONCURRENCY SAFE)
+ * Đảm bảo 1 sản phẩm chỉ gán cho đúng 1 đơn duy nhất.
+ * Cập nhật usedByOrderCode vào Production tồn, đồng thời chuyển thông tin thợ thật vào đơn.
+ */
+function api_assignStockItemToOrder(prodId, orderCode, serialCode) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch (e) {
+    return { success: false, message: 'Hệ thống đang bận, vui lòng thử lại sau vài giây!' };
+  }
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var prodSheet = ss.getSheetByName('Production');
+    if (!prodSheet) return { success: false, message: 'Không tìm thấy bảng Production' };
+
+    var data = prodSheet.getDataRange().getValues();
+    var headers = data[0];
+    var idCol = headers.indexOf('id');
+    var orderIdCol = headers.indexOf('orderId');
+    var nameCol = headers.indexOf('name');
+    var p1UserCol = headers.indexOf('p1_user');
+    var p1PhotoCol = headers.indexOf('p1_photo');
+    var p2UserCol = headers.indexOf('p2_user');
+    var p2PhotoCol = headers.indexOf('p2_photo');
+    var qcPhotoCol = headers.indexOf('qc_front_photo');
+    var serialCol = headers.indexOf('serialCode');
+    var usedByCol = headers.indexOf('usedByOrderCode');
+    var usedAtCol = headers.indexOf('usedAt');
+    var noteCol = headers.indexOf('note');
+
+    // Bổ sung cột nếu chưa có trong trang tính
+    var missingCols = [];
+    if (serialCol === -1) missingCols.push('serialCode');
+    if (usedByCol === -1) missingCols.push('usedByOrderCode');
+    if (usedAtCol === -1) missingCols.push('usedAt');
+    if (missingCols.length > 0) {
+      var lastCol = prodSheet.getLastColumn();
+      prodSheet.getRange(1, lastCol + 1, 1, missingCols.length).setValues([missingCols]).setFontWeight("bold");
+      data = prodSheet.getDataRange().getValues();
+      headers = data[0];
+      serialCol = headers.indexOf('serialCode');
+      usedByCol = headers.indexOf('usedByOrderCode');
+      usedAtCol = headers.indexOf('usedAt');
+    }
+
+    // 1. Tìm bản ghi sản phẩm tồn
+    var targetRowIndex = -1;
+    var targetStockItem = null;
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var rId = String(row[idCol] || '').trim();
+      var rSerial = serialCol !== -1 ? String(row[serialCol] || '').trim().toUpperCase() : '';
+
+      var isMatch = false;
+      if (prodId && rId === String(prodId).trim()) {
+        isMatch = true;
+      } else if (serialCode && rSerial) {
+        var cleanTargetSerial = String(serialCode).trim().toUpperCase().replace(/^#/, '');
+        var cleanRowSerial = rSerial.replace(/^#/, '');
+        if (cleanRowSerial === cleanTargetSerial) isMatch = true;
+      }
+
+      if (isMatch) {
+        targetRowIndex = i + 1; // 1-indexed sheet row
+        targetStockItem = {
+          id: rId,
+          name: nameCol !== -1 ? String(row[nameCol] || '') : '',
+          p1_user: p1UserCol !== -1 ? String(row[p1UserCol] || '') : '',
+          p1_photo: p1PhotoCol !== -1 ? String(row[p1PhotoCol] || '') : '',
+          p2_user: p2UserCol !== -1 ? String(row[p2UserCol] || '') : '',
+          p2_photo: p2PhotoCol !== -1 ? String(row[p2PhotoCol] || '') : '',
+          qc_front_photo: qcPhotoCol !== -1 ? String(row[qcPhotoCol] || '') : '',
+          serialCode: rSerial || serialCode || '',
+          usedByOrderCode: usedByCol !== -1 ? String(row[usedByCol] || '').trim() : ''
+        };
+        break;
+      }
+    }
+
+    if (!targetStockItem || targetRowIndex === -1) {
+      return { success: false, message: 'Không tìm thấy sản phẩm tồn có mã định danh này trong kho!' };
+    }
+
+    if (targetStockItem.usedByOrderCode && targetStockItem.usedByOrderCode !== orderCode) {
+      return { success: false, message: 'Hiện vật này đã được xuất cho đơn ' + targetStockItem.usedByOrderCode + '! Vui lòng chọn hiện vật khác.' };
+    }
+
+    // 2. Cập nhật khóa hiện vật tồn
+    var nowIso = new Date().toISOString();
+    prodSheet.getRange(targetRowIndex, usedByCol + 1).setValue(orderCode);
+    prodSheet.getRange(targetRowIndex, usedAtCol + 1).setValue(nowIso);
+    if (serialCode && serialCol !== -1 && !targetStockItem.serialCode) {
+      prodSheet.getRange(targetRowIndex, serialCol + 1).setValue(serialCode);
+      targetStockItem.serialCode = serialCode;
+    }
+
+    // 3. Tìm và cập nhật lệnh sản xuất đại diện của đơn hàng trong Production (nếu có)
+    for (var j = 1; j < data.length; j++) {
+      var oRow = data[j];
+      var rOrdId = String(oRow[orderIdCol] || '').trim();
+      var rOrdCode = String(oRow[idCol] || '').trim();
+
+      if (rOrdId === orderCode || rOrdCode.indexOf(orderCode) !== -1 || rOrdId === String(orderCode).replace('ORD_', '')) {
+        if (p1UserCol !== -1 && targetStockItem.p1_user) prodSheet.getRange(j + 1, p1UserCol + 1).setValue(targetStockItem.p1_user);
+        if (p2UserCol !== -1 && targetStockItem.p2_user) prodSheet.getRange(j + 1, p2UserCol + 1).setValue(targetStockItem.p2_user);
+        if (p1PhotoCol !== -1 && targetStockItem.p1_photo) prodSheet.getRange(j + 1, p1PhotoCol + 1).setValue(targetStockItem.p1_photo);
+        if (p2PhotoCol !== -1 && targetStockItem.p2_photo) prodSheet.getRange(j + 1, p2PhotoCol + 1).setValue(targetStockItem.p2_photo);
+        if (qcPhotoCol !== -1 && targetStockItem.qc_front_photo) prodSheet.getRange(j + 1, qcPhotoCol + 1).setValue(targetStockItem.qc_front_photo);
+        if (serialCol !== -1 && targetStockItem.serialCode) prodSheet.getRange(j + 1, serialCol + 1).setValue(targetStockItem.serialCode);
+        if (noteCol !== -1) {
+          var oldNote = String(oRow[noteCol] || '');
+          var newNote = (oldNote ? oldNote + ' | ' : '') + 'Xuất từ tồn kho (' + (targetStockItem.serialCode || targetStockItem.id) + ')';
+          prodSheet.getRange(j + 1, noteCol + 1).setValue(newNote);
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Gán hiện vật xuất kho thành công!',
+      stockItem: targetStockItem
+    };
+  } catch (err) {
+    return { success: false, message: 'Lỗi gán sản phẩm tồn: ' + err.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // Cache buster: 1787591552301
 // Cache buster: 1787591802145
 // Cache buster: 1787592134673
 // Cache buster: 1787592152071
 // Cache buster: 1788254800000
+// Cache buster: 1788365000000

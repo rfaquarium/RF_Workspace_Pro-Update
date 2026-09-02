@@ -160,6 +160,380 @@
     };
 
     // -------------------------------------------------------------------------
+    // 📋 MODAL 1: PHIẾU NHẬN NGUYÊN LIỆU & VẬT TƯ (ĐẦU CA - NHẬN VIỆC)
+    // CHUYÊN BIỆT CHO: BỂ KÍNH ➔ BỂ LẺ SIZE & LAYOUT ➔ COVER
+    // -------------------------------------------------------------------------
+    const MaterialRequisitionModal = React.memo(function MaterialRequisitionModal({ isOpen, onClose, item, order, erpProducts = [], onConfirm, triggerToast }) {
+        if (!isOpen || !item) return null;
+
+        const isGlass = item.type === 'Bể Kính' || String(item.name || '').toLowerCase().includes('bể');
+        const targetSubCat = isGlass ? 'NGUYÊN LIỆU BỂ KÍNH' : 'NGUYÊN LIỆU LAYOUT';
+        
+        // Lọc danh sách nguyên liệu từ kho Products
+        const availableMaterials = React.useMemo(() => {
+            if (!erpProducts || !Array.isArray(erpProducts)) return [];
+            return erpProducts.filter(p => {
+                const cat = String(p.category || '').toUpperCase().trim();
+                const subCat = String(p.sub_category || '').toUpperCase().trim();
+                if (cat === 'DANH MỤC SẢN XUẤT' && subCat === targetSubCat) return true;
+                if (isGlass && (subCat.includes('KÍNH') || p.name?.toLowerCase().includes('kính') || p.name?.toLowerCase().includes('wacker'))) return true;
+                if (!isGlass && (subCat.includes('LAYOUT') || p.name?.toLowerCase().includes('lũa') || p.name?.toLowerCase().includes('đá') || p.name?.toLowerCase().includes('502'))) return true;
+                return false;
+            });
+        }, [erpProducts, isGlass, targetSubCat]);
+
+        const [selectedRows, setSelectedRows] = React.useState([]);
+        const [searchQuery, setSearchQuery] = React.useState('');
+
+        const handleAddMaterial = (mat) => {
+            if (!mat) return;
+            const exists = selectedRows.find(r => r.sku === mat.sku || r.name === mat.name);
+            if (exists) {
+                if (triggerToast) triggerToast('Vật tư đã có trong danh sách!', 'fa-info-circle', 'warning');
+                return;
+            }
+            setSelectedRows(prev => [
+                ...prev,
+                {
+                    sku: mat.sku || mat.id,
+                    name: mat.name,
+                    unit: mat.unit || (isGlass ? 'm²' : 'kg'),
+                    requestedQty: '',
+                    costPrice: Number(mat.costPrice || 0)
+                }
+            ]);
+        };
+
+        const handleUpdateQty = (index, val) => {
+            setSelectedRows(prev => {
+                const next = [...prev];
+                next[index].requestedQty = val;
+                return next;
+            });
+        };
+
+        const handleRemoveRow = (index) => {
+            setSelectedRows(prev => prev.filter((_, i) => i !== index));
+        };
+
+        const handleConfirm = () => {
+            const validItems = selectedRows.filter(r => Number(r.requestedQty) > 0).map(r => ({
+                ...r,
+                requestedQty: Number(r.requestedQty),
+                returnedQty: 0,
+                actualQty: Number(r.requestedQty)
+            }));
+
+            if (validItems.length === 0) {
+                if (!window.confirm('Bạn chưa nhập số lượng vật tư nào. Vẫn muốn tiếp tục nhận việc?')) {
+                    return;
+                }
+            }
+            onConfirm(validItems);
+        };
+
+        const filteredStockList = availableMaterials.filter(m => 
+            String(m.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+            String(m.sku || '').toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+        return (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 animate-fade-in" onClick={onClose}>
+                <div className="bg-[#121215] border border-indigo-500/30 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                    {/* Header */}
+                    <div className="p-4 bg-gradient-to-r from-[#181820] to-[#141418] border-b border-white/[0.08] flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-base">
+                                <i className="fas fa-clipboard-list"></i>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-black uppercase text-white tracking-wider flex items-center gap-2">
+                                    <span>PHIẾU NHẬN NGUYÊN LIỆU & VẬT TƯ</span>
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">
+                                        {isGlass ? 'BỂ LẺ SIZE' : 'LAYOUT COVER'}
+                                    </span>
+                                </h3>
+                                <p className="text-[11px] text-zinc-400 font-medium truncate max-w-md mt-0.5">
+                                    Lệnh: <strong className="text-zinc-200">{item.name}</strong> ({order?.orderCode || item.orderId || 'Sản xuất lẻ'})
+                                </p>
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="w-8 h-8 rounded-lg bg-zinc-800/80 hover:bg-rose-600 text-zinc-400 hover:text-white flex items-center justify-center transition-colors">
+                            <i className="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    {/* Body */}
+                    <div className="p-4 overflow-y-auto custom-scrollbar flex-1 space-y-4">
+                        {/* Box Chọn Nhanh Vật Tư Từ Kho */}
+                        <div className="bg-[#0c0c0e] p-3 rounded-xl border border-white/[0.06] space-y-2.5">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-black uppercase text-zinc-300 flex items-center gap-1.5">
+                                    <i className="fas fa-boxes-stacked text-amber-400"></i>
+                                    <span>Chọn vật tư từ kho ({targetSubCat})</span>
+                                </span>
+                                <span className="text-[10px] text-zinc-500 font-mono">{availableMaterials.length} loại có sẵn</span>
+                            </div>
+                            <div className="relative">
+                                <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs"></i>
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    placeholder="Tìm theo tên vật tư hoặc mã SKU..."
+                                    className="w-full pl-8 pr-3 py-1.5 bg-[#141417] border border-zinc-800 rounded-lg text-xs text-zinc-200 outline-none focus:border-indigo-500 transition-colors placeholder:text-zinc-600"
+                                />
+                            </div>
+
+                            {/* Tags vật tư nhanh */}
+                            <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto custom-scrollbar pt-1">
+                                {filteredStockList.length === 0 ? (
+                                    <div className="text-[11px] text-zinc-500 italic py-2">Không tìm thấy vật tư nào phù hợp trong danh mục {targetSubCat}</div>
+                                ) : (
+                                    filteredStockList.map(mat => {
+                                        const isSelected = selectedRows.some(r => r.sku === mat.sku || r.name === mat.name);
+                                        return (
+                                            <button
+                                                key={mat.id || mat.sku}
+                                                onClick={() => handleAddMaterial(mat)}
+                                                disabled={isSelected}
+                                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${isSelected
+                                                    ? 'bg-zinc-800/50 text-zinc-600 border border-zinc-800 cursor-not-allowed'
+                                                    : 'bg-[#18181f] hover:bg-indigo-600/30 text-zinc-300 hover:text-white border border-white/[0.08] hover:border-indigo-500/50 active:scale-95'
+                                                }`}
+                                            >
+                                                <i className={`fas ${isSelected ? 'fa-check' : 'fa-plus'} text-[9px]`}></i>
+                                                <span>{mat.name}</span>
+                                                <span className="text-[9px] text-zinc-500 font-mono">({mat.unit || 'đv'})</span>
+                                            </button>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Bảng Danh Sách Đã Chọn Để Lĩnh */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-black uppercase text-indigo-400 flex items-center gap-1.5">
+                                    <i className="fas fa-hand-holding-box"></i>
+                                    <span>Danh sách vật tư thực tế ra kệ lấy ({selectedRows.length})</span>
+                                </span>
+                            </div>
+
+                            {selectedRows.length === 0 ? (
+                                <div className="p-6 text-center bg-[#0e0e11] border border-dashed border-zinc-800 rounded-xl text-zinc-500 text-xs">
+                                    <i className="fas fa-box-open text-2xl mb-2 text-zinc-600 block"></i>
+                                    Chưa chọn vật tư nào. Hãy bấm vào các nút vật tư ở trên để thêm vào phiếu!
+                                </div>
+                            ) : (
+                                <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl overflow-hidden divide-y divide-white/[0.04]">
+                                    <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-[#141417] text-[10px] font-black uppercase text-zinc-400">
+                                        <div className="col-span-6">Tên Vật Tư</div>
+                                        <div className="col-span-4 text-center">Số Lượng Lấy (Bê về bàn)</div>
+                                        <div className="col-span-2 text-right">Xoá</div>
+                                    </div>
+                                    {selectedRows.map((row, idx) => (
+                                        <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-2 items-center hover:bg-white/[0.02] transition-colors">
+                                            <div className="col-span-6 min-w-0">
+                                                <div className="text-xs font-bold text-zinc-200 truncate">{row.name}</div>
+                                                <div className="text-[10px] text-zinc-500 font-mono">{row.sku}</div>
+                                            </div>
+                                            <div className="col-span-4 flex items-center justify-center gap-1.5">
+                                                <input
+                                                    type="number"
+                                                    step="any"
+                                                    min="0"
+                                                    value={row.requestedQty}
+                                                    onChange={e => handleUpdateQty(idx, e.target.value)}
+                                                    placeholder="0"
+                                                    className="w-20 px-2 py-1 text-center bg-[#18181f] border border-indigo-500/40 rounded-lg text-xs font-black text-amber-300 outline-none focus:border-indigo-400 transition-colors"
+                                                />
+                                                <span className="text-[11px] font-bold text-zinc-400 w-8">{row.unit}</span>
+                                            </div>
+                                            <div className="col-span-2 text-right">
+                                                <button
+                                                    onClick={() => handleRemoveRow(idx)}
+                                                    className="w-7 h-7 rounded-lg bg-zinc-800 hover:bg-rose-600 text-zinc-400 hover:text-white inline-flex items-center justify-center transition-colors"
+                                                    title="Bỏ dòng này"
+                                                >
+                                                    <i className="fas fa-trash text-xs"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="p-3 bg-[#141418] border-t border-white/[0.08] flex items-center justify-between gap-3">
+                        <button
+                            onClick={onClose}
+                            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs font-bold uppercase transition-colors"
+                        >
+                            Đóng
+                        </button>
+                        <button
+                            onClick={handleConfirm}
+                            className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-indigo-500/30 flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
+                        >
+                            <i className="fas fa-check-circle text-sm"></i>
+                            <span>✅ XÁC NHẬN LĨNH VẬT TƯ</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    });
+
+    // -------------------------------------------------------------------------
+    // ⚖️ MODAL 2: QUYẾT TOÁN TIÊU HAO & TRẢ THỪA (CUỐI CA - NỘP ẢNH HOÀN THÀNH)
+    // -------------------------------------------------------------------------
+    const MaterialSettlementModal = React.memo(function MaterialSettlementModal({ isOpen, onClose, item, order, onConfirm, triggerToast }) {
+        if (!isOpen || !item) return null;
+
+        const initialList = React.useMemo(() => {
+            const raw = item.materialUsageData || [];
+            if (Array.isArray(raw) && raw.length > 0) {
+                return raw.map(m => ({
+                    sku: m.sku,
+                    name: m.name,
+                    unit: m.unit || 'kg',
+                    costPrice: Number(m.costPrice || 0),
+                    requestedQty: Number(m.requestedQty || m.qty || 0),
+                    returnedQty: Number(m.returnedQty || 0),
+                    actualQty: Math.max(0, Number(m.requestedQty || m.qty || 0) - Number(m.returnedQty || 0))
+                }));
+            }
+            return [];
+        }, [item]);
+
+        const [rows, setRows] = React.useState(initialList);
+
+        React.useEffect(() => {
+            setRows(initialList);
+        }, [initialList]);
+
+        const handleReturnedChange = (idx, val) => {
+            setRows(prev => {
+                const next = [...prev];
+                const retVal = Number(val) || 0;
+                next[idx].returnedQty = val;
+                next[idx].actualQty = Math.max(0, Number(next[idx].requestedQty || 0) - retVal);
+                return next;
+            });
+        };
+
+        const handleConfirm = () => {
+            const finalData = rows.map(r => ({
+                ...r,
+                requestedQty: Number(r.requestedQty || 0),
+                returnedQty: Number(r.returnedQty || 0),
+                actualQty: Math.max(0, Number(r.requestedQty || 0) - Number(r.returnedQty || 0))
+            }));
+            onConfirm(finalData);
+        };
+
+        return (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 animate-fade-in" onClick={onClose}>
+                <div className="bg-[#121215] border border-emerald-500/30 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                    {/* Header */}
+                    <div className="p-4 bg-gradient-to-r from-[#181820] to-[#141418] border-b border-white/[0.08] flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-base">
+                                <i className="fas fa-scale-balanced"></i>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-black uppercase text-white tracking-wider flex items-center gap-2">
+                                    <span>QUYẾT TOÁN TIÊU HAO VẬT TƯ</span>
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
+                                        TRẢ THỪA CUỐI CA
+                                    </span>
+                                </h3>
+                                <p className="text-[11px] text-zinc-400 font-medium truncate max-w-md mt-0.5">
+                                    Sản phẩm: <strong className="text-zinc-200">{item.name}</strong> ({order?.orderCode || item.orderId || 'Sản xuất lẻ'})
+                                </p>
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="w-8 h-8 rounded-lg bg-zinc-800/80 hover:bg-rose-600 text-zinc-400 hover:text-white flex items-center justify-center transition-colors">
+                            <i className="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    {/* Body */}
+                    <div className="p-4 overflow-y-auto custom-scrollbar flex-1 space-y-3">
+                        <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-[11px] text-indigo-300 flex items-center gap-2">
+                            <i className="fas fa-info-circle text-indigo-400 text-xs shrink-0"></i>
+                            <span>Chỉ cần gõ số lượng vào ô <strong>Trả Lại Kho</strong>. Cột <strong>Thực Dùng</strong> sẽ tự động tính toán để trừ kho chính xác!</span>
+                        </div>
+
+                        {rows.length === 0 ? (
+                            <div className="p-6 text-center bg-[#0e0e11] border border-dashed border-zinc-800 rounded-xl text-zinc-500 text-xs">
+                                Chưa có dữ liệu lĩnh vật tư ban đầu cho lệnh này.
+                            </div>
+                        ) : (
+                            <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl overflow-hidden divide-y divide-white/[0.04]">
+                                <div className="grid grid-cols-12 gap-2 px-3 py-2.5 bg-[#141417] text-[10px] font-black uppercase text-zinc-400">
+                                    <div className="col-span-4">Tên Vật Tư</div>
+                                    <div className="col-span-2 text-center">Đã Lấy</div>
+                                    <div className="col-span-3 text-center">Trả Lại Kho</div>
+                                    <div className="col-span-3 text-center text-emerald-400">Thực Dùng (Trừ Kho)</div>
+                                </div>
+                                {rows.map((row, idx) => (
+                                    <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-2.5 items-center hover:bg-white/[0.02] transition-colors">
+                                        <div className="col-span-4 min-w-0">
+                                            <div className="text-xs font-bold text-zinc-200 truncate">{row.name}</div>
+                                            <div className="text-[10px] text-zinc-500 font-mono">{row.sku}</div>
+                                        </div>
+                                        <div className="col-span-2 text-center font-mono font-bold text-zinc-300 text-xs">
+                                            {row.requestedQty} <span className="text-[10px] text-zinc-500">{row.unit}</span>
+                                        </div>
+                                        <div className="col-span-3 flex items-center justify-center gap-1">
+                                            <input
+                                                type="number"
+                                                step="any"
+                                                min="0"
+                                                max={row.requestedQty}
+                                                value={row.returnedQty}
+                                                onChange={e => handleReturnedChange(idx, e.target.value)}
+                                                placeholder="0"
+                                                className="w-16 px-2 py-1 text-center bg-[#18181f] border border-amber-500/40 rounded-lg text-xs font-black text-amber-300 outline-none focus:border-amber-400 transition-colors"
+                                            />
+                                            <span className="text-[10px] font-bold text-zinc-500">{row.unit}</span>
+                                        </div>
+                                        <div className="col-span-3 text-center font-mono font-black text-emerald-400 text-sm">
+                                            {row.actualQty} <span className="text-[10px] font-bold text-zinc-400">{row.unit}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="p-3 bg-[#141418] border-t border-white/[0.08] flex items-center justify-between gap-3">
+                        <button
+                            onClick={onClose}
+                            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs font-bold uppercase transition-colors"
+                        >
+                            Huỷ
+                        </button>
+                        <button
+                            onClick={handleConfirm}
+                            className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-black font-black rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/30 flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
+                        >
+                            <i className="fas fa-rocket text-sm"></i>
+                            <span>🚀 HOÀN THÀNH & CHỐT VẬT TƯ</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    });
+
+    // -------------------------------------------------------------------------
     // MODAL HỘP ĐEN ĐỐI SOÁT THAO TÁC TOÀN XƯỞNG (CHỈ DÀNH RIÊNG CHO BOSS PHÂN QUYỀN TỐI CAO)
     // -------------------------------------------------------------------------
     const WorkerActionAuditModal = React.memo(function WorkerActionAuditModal({ isOpen, onClose, prodItems, orders, packings, erpData, userConfigs, triggerToast }) {
@@ -1347,8 +1721,26 @@
         const [processing, setProcessing] = React.useState(false);
         const [isEditingUser, setIsEditingUser] = React.useState(false);
         const [showPokaYokeConfirm, setShowPokaYokeConfirm] = React.useState(false);
+        const [showRequisitionModal, setShowRequisitionModal] = React.useState(false);
+        const [showSettlementModal, setShowSettlementModal] = React.useState(false);
+        const [pendingPhotoFile, setPendingPhotoFile] = React.useState(null);
         const [qcFront, setQcFront] = React.useState(null);
         const [qcSide, setQcSide] = React.useState(null);
+        const [completedSerialModal, setCompletedSerialModal] = React.useState(null);
+
+        // KIỂM TRA ĐƠN TÙY CHỈNH (CHỈ ÁP DỤNG: BỂ KÍNH ➔ BỂ LẺ SIZE & LAYOUT ➔ COVER)
+        const isCustomItem = React.useMemo(() => {
+            const nameLower = String(item.name || '').toLowerCase().trim();
+            const typeUpper = String(item.type || item.category || '').toUpperCase().trim();
+            let subCat = '';
+            if (erpProducts && Array.isArray(erpProducts)) {
+                const p = erpProducts.find(x => x.name === item.name || x.sku === item.name);
+                if (p) subCat = String(p.sub_category || '').toUpperCase().trim();
+            }
+            const isGlassLeSize = subCat === 'BỂ LẺ SIZE' || subCat === 'BE LE SIZE' || nameLower.includes('bể lẻ size') || nameLower.includes('lẻ size') || (isGlassProduct && /(\d+)\s*[xX*×]\s*(\d+)/.test(nameLower));
+            const isLayoutCover = subCat === 'COVER' || nameLower.includes('cover') || nameLower.includes('làm theo ảnh') || nameLower.includes('theo mẫu');
+            return isGlassLeSize || isLayoutCover;
+        }, [item, erpProducts, isGlassProduct]);
 
         const parseDateSafe = (val) => {
             if (!val) return NaN;
@@ -1463,7 +1855,7 @@
 
         if (isLocked) return null;
 
-        const act = async (s, confirmed = false) => {
+        const act = async (s, confirmed = false, customMaterialData = null) => {
             if (item.assignee && String(item.assignee).trim() !== '' && !isStaffMatch(item.assignee, currentUser) && !isAdmin) {
                 triggerToast(`Lệnh này đã được chỉ định cho ${item.assignee}. Bạn không thể nhận!`, 'fa-lock', 'danger');
                 return;
@@ -1479,8 +1871,14 @@
                     return;
                 }
 
+                // CHỐT CHẶN PHIẾU NHẬN NGUYÊN LIỆU ĐỐI VỚI BỂ LẺ SIZE & LAYOUT COVER
+                if (c.k === 'phase1' && isCustomItem && !customMaterialData && (!item.materialUsageData || item.materialUsageData.length === 0)) {
+                    setShowRequisitionModal(true);
+                    return;
+                }
+
                 // CHỐT CHẶN POKA-YOKE XÁC NHẬN ĐÚNG LỆNH (CHỐNG BẤM NHẦM / ĐỔ LỖI MẠNG)
-                if (!confirmed && !isAdmin) {
+                if (!confirmed && !isAdmin && !customMaterialData) {
                     setShowPokaYokeConfirm(true);
                     return;
                 }
@@ -1492,6 +1890,9 @@
             const currentDateTime = safeDateFull.slice(0, 16).replace('T', ' ');
 
             const upd = JSON.parse(JSON.stringify(item));
+            if (customMaterialData) {
+                upd.materialUsageData = customMaterialData;
+            }
             const isTwoPhaseProduct = configs.length >= 2;
 
             if (c.k === 'phase1' && isTwoPhaseProduct && s === 'Done') {
@@ -1614,9 +2015,23 @@
             setProcessing(false);
         };
 
-        const handlePhotoUpload = async (e) => {
-            const file = e.target.files[0];
+        const handlePhotoUpload = async (e, customMaterialData = null) => {
+            let file = null;
+            if (e && e.target && e.target.files) {
+                file = e.target.files[0];
+            } else if (e instanceof File || e instanceof Blob) {
+                file = e;
+            }
             if (!file) return;
+
+            // KIỂM TRA CHỐT CHẶN QUYẾT TOÁN TIÊU HAO CHO BỂ LẺ SIZE & LAYOUT COVER
+            const isFinalPhase = (c.k === 'phase2' || configs.length === 1);
+            if (isFinalPhase && isCustomItem && !customMaterialData) {
+                setPendingPhotoFile(file);
+                setShowSettlementModal(true);
+                return;
+            }
+
             setProcessing(true);
             try {
                 const b64 = typeof resizeImage === 'function' ? await resizeImage(file) : await new Promise((res, rej) => { const rd = new FileReader(); rd.onload = () => res(rd.result.split(',')[1]); rd.readAsDataURL(file); });
@@ -1629,6 +2044,9 @@
                 const currentDateTime = safeDateFull.slice(0, 16).replace('T', ' ');
 
                 const upd = JSON.parse(JSON.stringify(item));
+                if (customMaterialData) {
+                    upd.materialUsageData = customMaterialData;
+                }
                 const isTwoPhaseProduct = configs.length >= 2;
 
                 if (c.k === 'phase1' && isTwoPhaseProduct) {
@@ -1654,6 +2072,18 @@
                         endTime: currentDateTime,
                         photo: url
                     };
+
+                    // BỂ KÍNH: TỰ ĐỘNG SINH MÃ SERIAL 4 SỐ GÓC ĐÁY BỂ KHI THỢ GỌT KEO (KHÂU 2) HOÀN THÀNH
+                    if (isGlassProduct && (c.k === 'phase2' || configs.length === 1)) {
+                        let serial = item.serialCode || upd.serialCode;
+                        if (!serial) {
+                            const rawId = String(item.id || '');
+                            const numOnly = rawId.replace(/\D/g, '');
+                            const shortDigits = numOnly.length >= 4 ? numOnly.slice(-4) : String(Math.floor(1000 + Math.random() * 9000));
+                            serial = '#' + shortDigits;
+                        }
+                        upd.serialCode = serial;
+                    }
                 }
 
                 let penaltyPayload = null;
@@ -1714,6 +2144,19 @@
                     upd.status = 'Kiểm Định';
                 }
 
+                // TỰ ĐỘNG GỌI TRỪ VẬT TƯ BOM KÈM DỮ LIỆU QUYẾT TOÁN THỰC TẾ
+                if (c.k === 'phase2' || configs.length === 1) {
+                    const finalMatList = customMaterialData || upd.materialUsageData || null;
+                    if (typeof window.safeFetchJSON === 'function') {
+                        window.safeFetchJSON(window.SCRIPT_URL || '', {
+                            method: 'POST',
+                            body: JSON.stringify({ action: 'deductInventoryBOM', pin: localStorage.getItem('rf_pin'), prodId: upd.id, materialUsageData: finalMatList })
+                        }).catch(console.error);
+                    } else if (typeof window.runGAS === 'function') {
+                        window.runGAS('deductInventoryBOM', { prodId: upd.id, pin: localStorage.getItem('rf_pin'), materialUsageData: finalMatList }).catch(console.error);
+                    }
+                }
+
                 // GHI NHẬN HỘP ĐEN CỤC BỘ (BLACKBOX LOG) TRÊN MÁY THỢ
                 recordWorkerActionLog({
                     user: currentUser,
@@ -1746,36 +2189,9 @@
                     triggerToast(c.k === 'phase1' && isTwoPhaseProduct ? `Đã nộp ảnh Khung thành công! Chờ Quản lý duyệt.` : `Tải ảnh & hoàn thành ${c.n} thành công!`, 'fa-check', 'success');
                 }
 
-                // GHI NHẬN HỘP ĐEN CỤC BỘ (BLACKBOX LOG) TRÊN MÁY THỢ
-                recordWorkerActionLog({
-                    user: currentUser,
-                    action: 'Chụp ảnh & hoàn thành ' + c.n,
-                    phaseKey: c.k,
-                    phaseName: c.n,
-                    itemId: item.id,
-                    itemName: item.name,
-                    orderId: item.orderId,
-                    reward: baseReward,
-                    status: 'Done'
-                });
-
-                // PHÁT ÂM THANH & RUNG ĐIỆN THOẠI XÁC NHẬN HOÀN THÀNH
-                playWorkerHapticAndAudio('done');
-
-                // GHI VÀO BẢNG TRACKING_LOG CỦA SERVER
-                payloadDeltas.Tracking_Log = [{
-                    'Thời gian': currentDateTime,
-                    'Tên nhân sự': currentUser,
-                    'Hoàn thành': `Hoàn thành ${c.n} - ${item.name} (${item.orderId || 'Sản xuất lẻ'})`,
-                    'Hỏi AI': navigator.onLine ? 'Online' : 'Offline Mode',
-                    'Ghi chú thêm': `Thưởng nhận: +${baseReward.toLocaleString('vi-VN')}đ | Thiết bị: ${/Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'Điện thoại' : 'Máy tính'}`
-                }];
-
-                await pushDeltas(payloadDeltas, `Tải ảnh & hoàn thành ${c.n}`, 'fa-check-double');
-                if (isLate || durationMins < 2) {
-                    triggerToast(`Có lỗi vi phạm thao tác/trễ hạn. Đã ghi nhận phạt!`, 'fa-times-circle', 'danger');
-                } else {
-                    triggerToast(`Tải ảnh & hoàn thành ${c.n} thành công!`, 'fa-check', 'success');
+                // BẬT MODAL NHẮC VIẾT MÃ ĐÁY BỂ NỔI BẬT NẾU LÀ BỂ KÍNH HOÀN THÀNH KHÂU 2
+                if (upd.serialCode && isGlassProduct && (c.k === 'phase2' || configs.length === 1)) {
+                    setCompletedSerialModal(upd.serialCode);
                 }
 
                 // CẢNH BÁO TỒN KHO THÔNG MINH
@@ -1800,7 +2216,7 @@
                 console.error(err);
                 triggerToast(`Lỗi tải ảnh!`, 'fa-times', 'danger');
             } finally {
-                e.target.value = '';
+                if (e && e.target) e.target.value = '';
                 setProcessing(false);
             }
         };
@@ -2305,6 +2721,75 @@
                                     {processing ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-play text-[10px]"></i> BẮT ĐẦU LÀM</>}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 📋 MODAL 1: PHIẾU NHẬN NGUYÊN LIỆU & VẬT TƯ (BỂ LẺ SIZE & LAYOUT COVER) */}
+                {showRequisitionModal && (
+                    <MaterialRequisitionModal
+                        isOpen={showRequisitionModal}
+                        onClose={() => setShowRequisitionModal(false)}
+                        item={item}
+                        order={order}
+                        erpProducts={erpProducts}
+                        triggerToast={triggerToast}
+                        onConfirm={(selectedMaterials) => {
+                            setShowRequisitionModal(false);
+                            act('In Progress', true, selectedMaterials);
+                        }}
+                    />
+                )}
+
+                {/* ⚖️ MODAL 2: QUYẾT TOÁN TIÊU HAO & TRẢ THỪA (BỂ LẺ SIZE & LAYOUT COVER) */}
+                {showSettlementModal && (
+                    <MaterialSettlementModal
+                        isOpen={showSettlementModal}
+                        onClose={() => {
+                            setShowSettlementModal(false);
+                            setPendingPhotoFile(null);
+                        }}
+                        item={item}
+                        order={order}
+                        triggerToast={triggerToast}
+                        onConfirm={(finalMaterials) => {
+                            setShowSettlementModal(false);
+                            if (pendingPhotoFile) {
+                                handlePhotoUpload(pendingPhotoFile, finalMaterials);
+                                setPendingPhotoFile(null);
+                            }
+                        }}
+                    />
+                )}
+                {/* ✍️ MODAL NHẮC VIẾT MÃ ĐÁY BỂ NỔI BẬT DÀNH CHO BỂ KÍNH HOÀN THÀNH */}
+                {completedSerialModal && (
+                    <div className="fixed inset-0 z-[999999] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in select-none" onClick={() => setCompletedSerialModal(null)}>
+                        <div className="bg-[#121214] border-2 border-amber-400 rounded-3xl p-6 max-w-sm w-full text-center shadow-[0_0_50px_rgba(251,191,36,0.35)] space-y-4 relative" onClick={e => e.stopPropagation()}>
+                            <div className="w-16 h-16 rounded-full bg-amber-400/20 border-2 border-amber-400 flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(251,191,36,0.4)]">
+                                <span className="text-3xl">✍️</span>
+                            </div>
+                            
+                            <div className="space-y-1">
+                                <div className="text-[11px] font-black uppercase text-amber-400 tracking-widest">
+                                    MÃ ĐỊNH DANH ĐÁY BỂ
+                                </div>
+                                <div className="text-4xl font-black font-mono text-white tracking-wider py-2 px-5 bg-amber-500/10 rounded-2xl border border-amber-400/40 inline-block shadow-inner mt-1">
+                                    {completedSerialModal}
+                                </div>
+                            </div>
+
+                            <div className="p-3 bg-amber-400/10 border border-amber-400/30 rounded-xl text-amber-200 text-xs font-semibold leading-relaxed text-left">
+                                <i className="fas fa-pen-nib mr-1 text-amber-400"></i> Thợ vui lòng dùng <b>bút lông</b> viết mã số này vào <b>góc đáy bể</b> trước khi xếp lên kệ kho!
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setCompletedSerialModal(null)}
+                                className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-zinc-950 font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                            >
+                                <i className="fas fa-check-circle text-sm"></i>
+                                <span>ĐÃ GHI XONG & XẾP LÊN KỆ</span>
+                            </button>
                         </div>
                     </div>
                 )}
@@ -3449,9 +3934,14 @@
                                 return (
                                     <div className="p-3 bg-[#0c0c0e] rounded-xl border border-emerald-500/30 space-y-2.5 shadow-sm">
                                         <div className="flex items-center justify-between border-b border-white/[0.08] pb-1.5">
-                                            <div className="flex items-center gap-1.5 text-emerald-400 font-black text-[11px] uppercase tracking-wider">
+                                            <div className="flex items-center gap-1.5 text-emerald-400 font-black text-[11px] uppercase tracking-wider flex-wrap">
                                                 <i className="fas fa-box-check text-emerald-400"></i>
                                                 <span>XUẤT TỪ KHO CÓ SẴN (ĐÃ NGHIỆM THU)</span>
+                                                {_item.serialCode && (
+                                                    <span className="px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[9px] font-mono font-black tracking-normal">
+                                                        <i className="fas fa-barcode mr-0.5"></i> {_item.serialCode}
+                                                    </span>
+                                                )}
                                             </div>
                                             <span className="text-[8.5px] bg-emerald-500/15 text-emerald-300 font-bold px-2 py-0.5 rounded border border-emerald-500/30">
                                                 ĐẠT KCS

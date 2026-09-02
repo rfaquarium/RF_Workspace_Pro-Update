@@ -2,6 +2,44 @@
 
 Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến trúc, tối ưu nghiệp vụ và sửa lỗi của hệ điều hành `RF_Workspace_Pro`.
 
+## [v2.35.6] - 2026-09-02
+
+### 💎 Tối Ưu Giao Diện Modal Đối Soát File Đơn Hàng (Order.all / Income)
+- **Chuẩn Hóa Màu Sắc Status Badge Đồng Bộ 100% (`Modals_Orders.html`)**:
+  - Viết hàm `normalizeStatus(status)` chuẩn hóa `.trim()`, `.toLowerCase()`, `.normalize("NFC")`.
+  - Phân loại màu sắc chính xác theo quy chuẩn:
+    - **Nhóm Hoàn Thành / Đã Giao**: Badge xanh lục (`bg-emerald-500/15 text-emerald-400 border-emerald-500/30`).
+    - **Nhóm Đã Hủy**: Badge đỏ hồng (`bg-rose-500/15 text-rose-400 border-rose-500/30`).
+    - **Nhóm Hoàn Hàng / Khiếu Nại**: Badge vàng cam (`bg-amber-500/15 text-amber-400 border-amber-500/30`).
+  - Triệt tiêu 100% lỗi lệch màu hoặc badge bị rơi vào màu xám xịt do khác biệt Unicode tổ hợp.
+- **Rút Gọn Chuỗi Trạng Thái Shopee Siêu Dài & Khóa Chiều Rộng Cột (`Modals_Orders.html`)**:
+  - Chuỗi câu dài *"Người mua xác nhận đã nhận được hàng, tuy nhiên Người mua vẫn có thể gửi yêu cầu Trả hàng/Hoàn tiền tới ngày YYYY-MM-DD"* được tự động bóc tách thành: `Đã nhận (Hạn khiếu nại: DD/MM)` hoặc `Đã nhận hàng`.
+  - Cột trạng thái được khóa cứng: `max-w-[220px] truncate whitespace-nowrap overflow-hidden` kèm `title={fullStatusText}` hiển thị tooltip câu gốc khi rê chuột, ngăn chặn triệt để hiện tượng vỡ layout kéo dãn mất cột tiền.
+- **Cố Định Cột Mã Đơn & Luôn Hiển Thị Thanh Cuộn Ngang (`Modals_Orders.html`)**:
+  - Cột đầu tiên (Cột Mã Đơn) được cố định với `sticky left-0 bg-[#121216] z-10 shadow-[2px_0_5px_rgba(0,0,0,0.5)]`, đứng yên khi cuộn ngang sang phải xem các cột tiền (`PHÍ SÀN`, `NET THỰC NHẬN`).
+  - Bọc toàn bộ bảng trong `w-full max-h-[60vh] overflow-y-auto overflow-x-auto relative rounded-xl border border-zinc-800 custom-scrollbar`: Thanh cuộn ngang luôn hiển thị ngay trước mắt ở đáy khung nhìn, không cần cuộn chuột qua 500+ dòng.
+
+---
+
+## [v2.35.5] - 2026-09-02
+
+### 🎯 Triển Khai Hệ Thống Truy Vết Nguồn Gốc Sản Phẩm Xuất Kho (Serial Bể Kính & KCS Layout)
+- **Bể Kính: Cơ Chế Mã Serial 4 Số Góc Đáy Bể (`Production.serialCode`)**:
+  - Khi thợ Khâu 2 (Gọt Keo) bấm hoàn thành, hệ thống tự động sinh mã định danh 4 số duy nhất dạng `#XXXX` (lấy 4 số cuối của ID lệnh hoặc số tuần tự) và lưu vào `Production.serialCode`.
+  - **Modal Cảnh Báo Neon-Yellow**: Xuất hiện hộp thoại vàng neon nổi bật với icon cây bút `✍️ MÃ ĐỊNH DANH ĐÁY BỂ: #XXXX`, nhắc nhở thợ dùng bút lông ghi mã số vào góc đáy bể trước khi xếp lên kệ.
+  - **Xác Thực Serial Khi Đóng Gói (`OrderCardV2`)**: Thợ đóng gói kiểm tra mã 4 số dưới đáy bể và gõ trực tiếp hoặc chạm chọn từ danh sách chip serial khả dụng trong kho để xác nhận xuất.
+- **Layout: Cơ Chế Chọn Theo Ảnh KCS Trên Tay (Visual Matching)**:
+  - Hiển thị lưới hình ảnh KCS thực tế (`qc_front_photo` / `p2_photo`) của từng cây layout tồn kho kèm tên thợ Dựng Khung & Gia Cố. Thợ đóng gói đối chiếu cây layout trên tay với ảnh KCS và chạm chọn để gán xuất chính xác.
+- **Nút Cứu Nguy Thất Lạc/Hỏng: `[Không Tìm Thấy Hiện Vật Trên Kệ]`**:
+  - Bổ sung nút cứu nguy màu đỏ trên cả 2 modal. Nếu hiện vật bị vỡ hoặc thất lạc trong kho, thợ đóng gói bấm nút này để hệ thống tự động hủy xuất tồn và chuyển đơn hàng sang trạng thái `Chờ Sản Xuất Mới` (kèm ghi chú thời gian cảnh báo).
+- **Loại Bỏ Hoàn Toàn Nhãn Ảo "Kho Hàng | Kho Hàng"**:
+  - Sau khi gán hiện vật tồn, đơn hàng hiển thị 100% tên thợ sản xuất thực tế trên thẻ đơn hàng và nhật ký đơn.
+- **Backend Concurrency Safe (`Code.js`)**:
+  - Mở rộng bảng `Production` thêm 3 cột: `serialCode`, `usedByOrderCode`, `usedAt`.
+  - Bổ sung 2 hàm RPC: `api_getAvailableStockItems(sku, type)` và `api_assignStockItemToOrder(prodId, orderCode, serialCode)` được bảo vệ bằng `LockService.getScriptLock().waitLock(15000)` chống xung đột xuất kho đồng thời.
+
+---
+
 ## [v2.35.4] - 2026-09-02
 
 ### 💎 Tái Cấu Trúc Nhật Ký Chứng Từ: Nút Icon Gọn Gàng, Tách Bạch Xuất - Nhập Từng Kho & Thống Kê Ròng

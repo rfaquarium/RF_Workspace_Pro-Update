@@ -57,6 +57,28 @@
         const [scannedOrders, setScannedOrders] = React.useState([]);
         const [unmatchedCodes, setUnmatchedCodes] = React.useState([]);
 
+        // Quản lý lý do hoàn hàng (Hallmark UI)
+        const [returnReason, setReturnReason] = React.useState('');
+        const [selectedReasonChip, setSelectedReasonChip] = React.useState('');
+
+        const PRESET_RETURN_REASONS = [
+            { label: 'Bom hàng / Khách không nhận', icon: 'fa-box-archive', color: 'text-amber-300 border-amber-500/30' },
+            { label: 'Bể vỡ khi vận chuyển', icon: 'fa-heart-crack', color: 'text-rose-300 border-rose-500/30' },
+            { label: 'Giao sai mẫu / Thiếu hàng', icon: 'fa-triangle-exclamation', color: 'text-yellow-300 border-yellow-500/30' },
+            { label: 'Khách đổi ý / Trả qua sàn', icon: 'fa-rotate-left', color: 'text-sky-300 border-sky-500/30' },
+            { label: 'Giao chậm / Quá hạn nhận', icon: 'fa-clock', color: 'text-indigo-300 border-indigo-500/30' }
+        ];
+
+        const handleSelectPreset = (presetLabel) => {
+            if (selectedReasonChip === presetLabel && returnReason === presetLabel) {
+                setSelectedReasonChip('');
+                setReturnReason('');
+            } else {
+                setSelectedReasonChip(presetLabel);
+                setReturnReason(presetLabel);
+            }
+        };
+
         const inputRef = React.useRef(null);
         const fileInputRef = React.useRef(null);
         const lastScanRef = React.useRef({ code: '', time: 0 });
@@ -116,8 +138,24 @@
                     try {
                         const safeDateFull = typeof getLocalISODate === 'function' ? getLocalISODate() : new Date().toISOString();
                         const returnedAt = safeDateFull.replace('T', ' ').slice(0, 19);
-                        const newOrder = { ...order, status: 'Hàng Hoàn', returnedAt: returnedAt, reconciledAt: order.reconciledAt || returnedAt };
-                        await pushDeltas({ orders: [newOrder] }, `Đã nhận hoàn đơn: ${order.orderCode}!`, 'fa-undo');
+                        const effectiveReason = String(returnReason || '').trim();
+                        let updatedNote = String(order.note || '').trim();
+                        if (effectiveReason) {
+                            if (updatedNote.includes('[Hoàn:')) {
+                                updatedNote = updatedNote.replace(/\[Hoàn:[^\]]*\]/g, `[Hoàn: ${effectiveReason}]`).trim();
+                            } else {
+                                updatedNote = updatedNote ? `${updatedNote} | [Hoàn: ${effectiveReason}]` : `[Hoàn: ${effectiveReason}]`;
+                            }
+                        }
+                        const newOrder = { 
+                            ...order, 
+                            status: 'Hàng Hoàn', 
+                            returnReason: effectiveReason || order.returnReason || '',
+                            note: updatedNote,
+                            returnedAt: returnedAt, 
+                            reconciledAt: order.reconciledAt || returnedAt 
+                        };
+                        await pushDeltas({ orders: [newOrder] }, `Đã nhận hoàn đơn: ${order.orderCode}${effectiveReason ? ` (${effectiveReason})` : ''}!`, 'fa-undo');
                         triggerToast(`Thành công! Đơn [${order.orderCode}] đã chuyển về Kho Hoàn.`, 'fa-check', 'success');
                     } catch (err) { triggerToast('Lỗi kết nối đồng bộ kho hoàn!', 'fa-times', 'danger'); }
                 }
@@ -237,6 +275,7 @@
                         const iOrderStatus = headers.findIndex(h => h === 'trạng thái đơn hàng' || h === 'trạng thái' || h === 'order status' || h === 'status' || h.includes('trạng thái đơn hàng') || h.includes('สถานะ'));
                         const iReturnStatus = headers.findIndex(h => h.includes('trạng thái trả hàng') || h.includes('trả hàng/hoàn tiền') || h.includes('trả hàng / hoàn tiền') || h.includes('return / refund status') || h.includes('return status'));
                         const iCancelReason = headers.findIndex(h => h.includes('lý do hủy') || h.includes('lý do huỷ') || h.includes('cancellation reason') || h.includes('cancel reason'));
+                        const iReturnReason = headers.findIndex(h => h.includes('lý do trả hàng') || h.includes('lý do hoàn') || h.includes('lý do khiếu nại') || h.includes('return reason') || h.includes('refund reason') || h.includes('lý do yêu cầu'));
 
                         const isActualReturnOrder = (cols) => {
                             const orderStatus = String((iOrderStatus >= 0 ? cols[iOrderStatus] : '') || '').trim();
@@ -313,7 +352,14 @@
                                 if (matchOrder) {
                                     const currentStatus = String(matchOrder.status || '').toUpperCase().trim();
                                     if (currentStatus !== 'HÀNG HOÀN' && !currentStatus.includes('HOÀN CHỜ XỬ') && !currentStatus.includes('HOÀN KHO')) {
-                                        if (!foundOrders.find(fo => fo.id === matchOrder.id)) foundOrders.push(matchOrder);
+                                        const detectedFileReason = (iReturnReason >= 0 && cols[iReturnReason]) ? String(cols[iReturnReason]).trim() : 
+                                                                   ((iCancelReason >= 0 && cols[iCancelReason]) ? String(cols[iCancelReason]).trim() : '');
+                                        if (!foundOrders.find(fo => fo.id === matchOrder.id)) {
+                                            foundOrders.push({
+                                                ...matchOrder,
+                                                fileReturnReason: detectedFileReason
+                                            });
+                                        }
                                     }
                                 } else {
                                     if (!notFound.includes(cleanCode)) notFound.push(cleanCode);
@@ -325,6 +371,10 @@
                         setUnmatchedCodes(notFound);
                         setPreview('file_loaded');
                         if (foundOrders.length > 0) {
+                            const firstFileReason = foundOrders.find(fo => fo.fileReturnReason)?.fileReturnReason;
+                            if (firstFileReason && !returnReason) {
+                                setReturnReason(firstFileReason);
+                            }
                             triggerToast(`Phân tích xong! Khớp ${foundOrders.length} đơn hoàn hợp lệ.`, "fa-check", "success");
                         } else {
                             triggerToast(`Không tìm thấy đơn hoàn mới nào cần cập nhật trong file!`, "fa-info", "warning");
@@ -385,8 +435,31 @@
             if (scannedOrders.length === 0) return;
             setIsProcessing(true);
             try {
-                const updatedOrders = scannedOrders.map(o => ({ ...o, status: 'Hàng Hoàn' }));
-                await pushDeltas({ orders: updatedOrders }, `Đã chuyển ${updatedOrders.length} đơn về Hàng Hoàn!`, 'fa-undo');
+                const safeDateFull = typeof getLocalISODate === 'function' ? getLocalISODate() : new Date().toISOString();
+                const returnedAt = safeDateFull.replace('T', ' ').slice(0, 19);
+
+                const updatedOrders = scannedOrders.map(o => {
+                    const effectiveReason = String(returnReason || o.fileReturnReason || '').trim();
+                    let updatedNote = String(o.note || '').trim();
+                    if (effectiveReason) {
+                        if (updatedNote.includes('[Hoàn:')) {
+                            updatedNote = updatedNote.replace(/\[Hoàn:[^\]]*\]/g, `[Hoàn: ${effectiveReason}]`).trim();
+                        } else {
+                            updatedNote = updatedNote ? `${updatedNote} | [Hoàn: ${effectiveReason}]` : `[Hoàn: ${effectiveReason}]`;
+                        }
+                    }
+                    return {
+                        ...o,
+                        status: 'Hàng Hoàn',
+                        returnReason: effectiveReason || o.returnReason || '',
+                        note: updatedNote,
+                        returnedAt: o.returnedAt || returnedAt,
+                        reconciledAt: o.reconciledAt || returnedAt
+                    };
+                });
+
+                const logMsg = returnReason ? `Đã chuyển ${updatedOrders.length} đơn về Hàng Hoàn (${returnReason})!` : `Đã chuyển ${updatedOrders.length} đơn về Hàng Hoàn!`;
+                await pushDeltas({ orders: updatedOrders }, logMsg, 'fa-undo');
                 triggerToast(`Thành công! Đã chuyển ${updatedOrders.length} đơn sang Hàng Hoàn.`, 'fa-check', 'success');
                 onClose();
             } catch (err) { triggerToast('Lỗi đồng bộ!', 'fa-times', 'danger'); }
@@ -397,11 +470,13 @@
             setPreview('');
             setScannedOrders([]);
             setUnmatchedCodes([]);
+            setReturnReason('');
+            setSelectedReasonChip('');
         };
 
         return (
             <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[9999] p-4 backdrop-blur-md animate-fade-in" onClick={() => onClose()}>
-                <div className="bg-[#141414] border border-purple-500/50 w-full max-w-md rounded-3xl p-6 shadow-[0_0_50px_rgba(168,85,247,0.2)] text-center relative animate-slide-up flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="bg-[#141414] border border-purple-500/50 w-full max-w-lg rounded-3xl p-6 shadow-[0_0_50px_rgba(168,85,247,0.2)] text-center relative animate-slide-up flex flex-col" onClick={e => e.stopPropagation()}>
                     <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-[#222] text-gray-400 hover:text-white hover:bg-rose-500 flex items-center justify-center transition-all z-20 cursor-pointer"><i className="fas fa-times text-sm"></i></button>
 
                     <h3 className="font-black text-white text-[15px] uppercase tracking-widest mb-1 flex items-center justify-center gap-2 mt-2">
@@ -409,31 +484,103 @@
                     </h3>
 
                     {preview ? (
-                        <div className="mt-4 flex flex-col space-y-4 animate-fade-in text-left">
-                            <div className="relative w-full h-24 bg-black rounded-xl border border-[#333] overflow-hidden flex items-center justify-center shadow-inner">
+                        <div className="mt-4 flex flex-col space-y-3.5 animate-fade-in text-left">
+                            <div className="relative w-full h-20 bg-black rounded-xl border border-[#333] overflow-hidden flex items-center justify-center shadow-inner">
                                 <div className="flex flex-col items-center justify-center text-purple-400">
-                                    <i className="fas fa-file-excel text-3xl mb-1"></i>
+                                    <i className="fas fa-file-excel text-2xl mb-0.5"></i>
                                     <span className="text-[11px] font-black uppercase tracking-widest text-white">Đã Tải & Đọc File Báo Cáo</span>
                                 </div>
-                                <button onClick={resetScan} disabled={isProcessing} className="absolute top-3 right-3 w-8 h-8 bg-black/80 rounded-full text-white border border-white/20 flex items-center justify-center hover:bg-rose-500 transition-colors shadow-md"><i className="fas fa-redo text-xs"></i></button>
+                                <button onClick={resetScan} disabled={isProcessing} className="absolute top-2.5 right-2.5 w-7 h-7 bg-black/80 rounded-full text-white border border-white/20 flex items-center justify-center hover:bg-rose-500 transition-colors shadow-md cursor-pointer"><i className="fas fa-redo text-xs"></i></button>
                             </div>
 
+                            {/* Danh sách đơn khớp */}
                             <div className="bg-[#0a0a0a] border border-[#222] rounded-xl p-3">
-                                <div className="text-[10px] font-black text-purple-400 uppercase tracking-widest border-b border-[#333] pb-2 mb-2 flex justify-between">
+                                <div className="text-[10px] font-black text-purple-400 uppercase tracking-widest border-b border-[#333] pb-2 mb-2 flex justify-between items-center">
                                     <span><i className="fas fa-check-circle mr-1"></i> Khớp {scannedOrders.length} Đơn Hoàn</span>
+                                    <span className="text-[9px] text-zinc-400 font-normal">Sẵn sàng chuyển kho hoàn</span>
                                 </div>
                                 {scannedOrders.length > 0 ? (
-                                    <div className="max-h-[140px] overflow-y-auto custom-scrollbar space-y-1.5 pr-1">
+                                    <div className="max-h-[130px] overflow-y-auto custom-scrollbar space-y-1.5 pr-1">
                                         {scannedOrders.map((o, idx) => (
                                             <div key={idx} className="bg-[#141414] border border-[#333] p-2 rounded-lg flex justify-between items-center hover:border-purple-500/50 transition-colors">
-                                                <span className="text-[10px] text-white font-mono font-black truncate">{o.orderCode.split(' | ')[0]}</span>
-                                                <span className="text-[9px] bg-[#222] px-1.5 py-0.5 rounded text-gray-400 truncate max-w-[120px]">{o.customer}</span>
+                                                <div className="flex flex-col min-w-0 pr-2">
+                                                    <span className="text-[10px] text-white font-mono font-black truncate">{o.orderCode.split(' | ')[0]}</span>
+                                                    {o.fileReturnReason && (
+                                                        <span className="text-[8.5px] text-purple-300 font-semibold truncate flex items-center gap-1 mt-0.5">
+                                                            <i className="fas fa-tag text-[7.5px] text-purple-400"></i> {o.fileReturnReason}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <span className="text-[9px] bg-[#222] px-1.5 py-0.5 rounded text-gray-400 truncate max-w-[120px] shrink-0">{o.customer}</span>
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
                                     <div className="text-gray-500 text-[10px] font-bold py-2 text-center">Không có đơn hoàn mới nào khớp!</div>
                                 )}
+                            </div>
+
+                            {/* KHU VỰC NHẬP LÝ DO HOÀN (HALLMARK DESIGN) */}
+                            <div className="bg-[#0b0b10] border border-purple-500/30 rounded-2xl p-3.5 shadow-[0_0_20px_rgba(168,85,247,0.08)]">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] font-black text-purple-300 uppercase tracking-widest flex items-center gap-1.5">
+                                        <i className="fas fa-clipboard-question text-purple-400"></i> Lý Do Hoàn Hàng
+                                    </span>
+                                    {returnReason ? (
+                                        <span className="text-[9px] bg-purple-500/20 text-purple-300 font-bold px-2 py-0.5 rounded-full border border-purple-500/40 truncate max-w-[180px] flex items-center gap-1">
+                                            <i className="fas fa-check text-[8px] text-emerald-400"></i> {returnReason}
+                                        </span>
+                                    ) : (
+                                        <span className="text-[9px] text-zinc-500 italic">Chọn nhanh hoặc tự nhập</span>
+                                    )}
+                                </div>
+
+                                {/* Preset Chips */}
+                                <div className="flex flex-wrap gap-1.5 mb-2.5">
+                                    {PRESET_RETURN_REASONS.map((p, idx) => {
+                                        const isSelected = selectedReasonChip === p.label || returnReason === p.label;
+                                        return (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => handleSelectPreset(p.label)}
+                                                className={`text-[9.5px] font-bold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                                                    isSelected
+                                                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.5)] scale-[1.02]'
+                                                        : `bg-[#161620] text-zinc-300 ${p.color} hover:bg-[#1e1e2c]`
+                                                }`}
+                                            >
+                                                <i className={`fas ${p.icon} text-[9px]`}></i>
+                                                <span>{p.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Custom Text Input */}
+                                <div className="relative">
+                                    <i className="fas fa-pen-to-square absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs"></i>
+                                    <input
+                                        type="text"
+                                        value={returnReason}
+                                        onChange={e => {
+                                            setReturnReason(e.target.value);
+                                            setSelectedReasonChip('');
+                                        }}
+                                        placeholder="Nhập lý do hoàn chi tiết (áp dụng cho toàn bộ đơn khớp)..."
+                                        className="w-full bg-[#060608] border border-[#262630] focus:border-purple-500 rounded-xl pl-8 pr-8 py-2 text-[11px] text-zinc-100 placeholder:text-zinc-500 outline-none focus:shadow-[0_0_15px_rgba(168,85,247,0.25)] transition-all font-medium"
+                                    />
+                                    {returnReason && (
+                                        <button
+                                            type="button"
+                                            onClick={() => { setReturnReason(''); setSelectedReasonChip(''); }}
+                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-rose-400 text-xs cursor-pointer p-0.5 transition-colors"
+                                            title="Xóa lý do"
+                                        >
+                                            <i className="fas fa-times-circle"></i>
+                                        </button>
+                                    )}
+                                </div>
                             </div>
 
                             {unmatchedCodes.length > 0 && (
@@ -449,13 +596,51 @@
                                 </div>
                             )}
 
-                            <button onClick={confirmBulkReturn} disabled={isProcessing || scannedOrders.length === 0} className={`w-full py-3.5 rounded-xl font-black text-[12px] tracking-wide shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 mt-1 ${isProcessing || scannedOrders.length === 0 ? 'bg-[#333] text-gray-500' : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90 shadow-purple-900/30'}`}>
+                            <button onClick={confirmBulkReturn} disabled={isProcessing || scannedOrders.length === 0} className={`w-full py-3.5 rounded-xl font-black text-[12px] tracking-wide shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 mt-1 cursor-pointer ${isProcessing || scannedOrders.length === 0 ? 'bg-[#333] text-gray-500' : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90 shadow-purple-900/30'}`}>
                                 {isProcessing ? <><i className="fas fa-spinner fa-spin"></i> ĐANG CẬP NHẬT TRẠNG THÁI...</> : `XÁC NHẬN ĐƯA ${scannedOrders.length} ĐƠN VỀ HÀNG HOÀN`}
                             </button>
                         </div>
                     ) : (
                         <>
-                            <p className="text-gray-400 text-[11px] mb-3 leading-relaxed mt-1">Dùng súng bắn mã vạch hoặc ném file Excel Order.all / PDF vào đây.</p>
+                            <p className="text-gray-400 text-[11px] mb-2.5 leading-relaxed mt-1">Dùng súng bắn mã vạch hoặc ném file Excel Order.all / PDF vào đây.</p>
+
+                            {/* Preset Lý Do Khi Tít Súng Mã Vạch */}
+                            <div className="w-full mb-3 bg-[#0d0d12] border border-purple-500/20 rounded-xl p-2.5 text-left">
+                                <div className="flex items-center justify-between mb-1.5 px-0.5">
+                                    <span className="text-[9px] font-black text-purple-300 uppercase tracking-widest flex items-center gap-1">
+                                        <i className="fas fa-tag text-purple-400"></i> Lý do hoàn mặc định khi tít:
+                                    </span>
+                                    {returnReason && (
+                                        <button
+                                            type="button"
+                                            onClick={() => { setReturnReason(''); setSelectedReasonChip(''); }}
+                                            className="text-[8.5px] text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
+                                        >
+                                            Bỏ chọn
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                    {PRESET_RETURN_REASONS.map((p, idx) => {
+                                        const isSelected = selectedReasonChip === p.label || returnReason === p.label;
+                                        return (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => handleSelectPreset(p.label)}
+                                                className={`text-[8.5px] font-bold px-2 py-0.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
+                                                    isSelected
+                                                        ? 'bg-purple-600 text-white border-purple-400 shadow-sm'
+                                                        : `bg-[#161620] text-zinc-400 border-zinc-700/60 hover:text-zinc-200`
+                                                }`}
+                                            >
+                                                <i className={`fas ${p.icon} text-[8px]`}></i>
+                                                <span>{p.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
 
                             <div className="w-full flex flex-col items-center">
                                 <div className="relative w-full mb-2">
@@ -1447,9 +1632,13 @@
             );
 
             const related = getMatchedProds(o);
+            const hasProdFlag = o.hasProduction === true || String(o.hasProduction).toUpperCase() === 'TRUE';
             let allProdDone = true;
             if (related.length > 0) {
                 allProdDone = related.every(p => checkItemReady(p));
+            } else if (hasProdFlag) {
+                // Đơn hàng yêu cầu sản xuất nhưng không có lệnh sản xuất nào (hoặc đã bị xoá) -> Chưa hoàn thành sản xuất!
+                allProdDone = false;
             }
 
             const isGHNShipping = String(o.shippingMethod || '').trim() === 'Gửi GHN' || String(o.shippingMethod || '').toLowerCase().includes('ghn');
@@ -1580,6 +1769,9 @@
                 
                 if (meta.allProdDone && (eff === 'CHỜ SẢN XUẤT' || eff === 'QUÉT TỰ ĐỘNG' || eff === 'ĐANG SẢN XUẤT' || eff === 'CHỜ PHỤ KIỆN')) {
                     eff = 'SẴN SÀNG ĐÓNG GÓI';
+                } else if (!meta.allProdDone && eff === 'SẴN SÀNG ĐÓNG GÓI' && !meta.hasDonePack) {
+                    // Nếu đơn cần sản xuất nhưng phôi/bể chưa xong hoặc lệnh đã bị xoá, bắt buộc giữ ở Chờ Sản Xuất
+                    eff = 'CHỜ SẢN XUẤT';
                 }
 
                 const normalized = { 
@@ -1991,7 +2183,8 @@
             try {
                 const updatedOrders = eligibleHandoverOrders.map(order => ({
                     ...order,
-                    status: 'Đã Bàn Giao'
+                    status: 'Đã Bàn Giao',
+                    isCarriedToWH: true
                 }));
 
                 // Payload siêu nhẹ (Fast Payload): Chỉ cần gửi danh sách đơn với status 'Đã Bàn Giao'

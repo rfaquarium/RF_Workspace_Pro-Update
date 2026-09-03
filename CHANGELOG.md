@@ -2,6 +2,145 @@
 
 Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến trúc, tối ưu nghiệp vụ và sửa lỗi của hệ điều hành `RF_Workspace_Pro`.
 
+## [v2.37.7] - 2026-09-04
+
+### 📦 Xử Lý Đơn Thiếu Hàng (Hoàn Tiền Ngay): Bảo Toàn 100% Tồn Kho & Chuyển Đối Soát Thành Công
+- **Khắc phục lỗi cộng khống kho khi khách khiếu nại thiếu hàng (`Modals_Orders.html`)**:
+  - **Bản chất nghiệp vụ**: Khi khách khiếu nại thiếu hàng (ví dụ: đặt 2 túi sạn thiếu 1 túi), Shopee xử lý *"Hoàn tiền ngay / Refund Only"*, trừ trực tiếp số tiền món thiếu (18.418đ) vào doanh thu người bán và thanh toán phần còn lại (324.475đ). Khách giữ toàn bộ hàng đã nhận, **không có kiện hàng nào quay về kho**.
+  - **Bảo vệ tồn kho (Zero Muda & Chống cộng khống)**:
+    - Nếu duyệt theo luồng hoàn thông thường, hệ thống sẽ ngỡ hàng về và cộng bù toàn bộ phụ kiện vào kho gây lệch tồn kho nghiêm trọng.
+    - Bổ sung biến chặn `isMissingItems`: Khi lý do chứa từ *"thiếu"* hoặc *"không trả hàng"*, hệ thống **tuyệt đối KHÔNG cộng bù kho (`productUpdates = []`)**, không tạo phiếu nhập kho hay xuất hủy.
+  - **Nút bấm 1-chạm tại Bước 1 (Trạm Xử Lý Hàng Hoàn)**:
+    - Thêm nút: `📦 HOÀN TIỀN THIẾU HÀNG (GIỮ NGUYÊN KHO → ĐỐI SOÁT THÀNH CÔNG)`.
+    - Thao tác 1 click: Bật popup xác nhận rõ ràng ➔ Chuyển đơn sang `Đối Soát Thành Công` ➔ Ghi chú `[THIẾU HÀNG - HOÀN TIỀN NGAY - GIỮ NGUYÊN KHO]`.
+  - **Preset & Nút CTA trực quan tại Bước 2 (Duyệt Kho)**:
+    - Bổ sung chip preset: `📦 Thiếu hàng (Giữ nguyên kho)`.
+    - Nút CTA duyệt tự động chuyển sang màu cam hổ phách: `DUYỆT HOÀN TIỀN (GIỮ NGUYÊN KHO) → ĐỐI SOÁT THÀNH CÔNG`.
+  - **Đồng bộ doanh thu**: Doanh thu quyết toán tự động khớp đúng số tiền Shopee chi trả thực tế (đã trừ món thiếu).
+
+---
+
+## [v2.37.6] - 2026-09-04
+
+### 🔄 Quét Đơn Hoàn Tự Động: Tích Hợp Nhập Lý Do Hoàn Hàng & Trích Xuất Thông Minh
+- **Nâng cấp toàn diện Modal Quét Đơn Hoàn Tự Động theo chuẩn Hallmark UI (`Tab_Orders.html`)**:
+  - **Bộ Preset Chips Chọn Nhanh 1 Chạm**: Cung cấp các tag lý do hoàn thường gặp trong thực tế vận hành thương mại điện tử:
+    - 📦 *Bom hàng / Khách không nhận*
+    - 💔 *Bể vỡ khi vận chuyển*
+    - ⚠️ *Giao sai mẫu / Thiếu hàng*
+    - 🔄 *Khách đổi ý / Trả qua sàn*
+    - ⏳ *Giao chậm / Quá hạn nhận*
+  - **Ô nhập văn bản chi tiết & nút xóa nhanh**: Cho phép nhân sự tự do nhập lý do cụ thể (hoặc bấm chọn nhanh rồi gõ bổ sung chi tiết), có nút `✕` xóa nhanh để đổi lý do.
+  - **Tự động bóc tách cột lý do từ file báo cáo Shopee/TikTok**:
+    - Dò tìm các header `lý do trả hàng`, `lý do hoàn`, `lý do khiếu nại`, `return reason`, `refund reason`.
+    - Gắn nhãn badge lý do thực tế dưới từng mã đơn trong danh sách khớp.
+    - Tự động điền lý do này làm gợi ý chung cho đợt quét nếu nhân sự chưa chọn lý do nào khác.
+  - **Hỗ trợ súng bắn mã vạch (Barcode Gun)**: Bổ sung thanh chọn lý do hoàn mặc định ngay tại màn hình chờ để nhân viên kho tít đơn hàng loạt tự động gắn luôn lý do.
+  - **Lưu trữ chuẩn xác vào Schema `Orders`**:
+    - Ghi nhận `returnReason: effectiveReason`.
+    - Cập nhật thông minh vào cột `note`: Ghép chuỗi `[Hoàn: <lý do>]`, tự động thay thế nếu đơn đã từng có ghi chú hoàn cũ để tránh phình to chuỗi dữ liệu.
+    - Đồng bộ nguyên khối qua `pushDeltas` hiển thị toast thông báo chi tiết.
+
+---
+
+## [v2.37.5] - 2026-09-04
+
+### 💰 Khắc Phục Lệch Doanh Thu Thực Nhận Về Ví & Tự Động Bồi Hoàn Cước Hoàn PiShip
+- **Khắc phục lỗi trừ nhầm phí vận chuyển thực tế vào tiền hàng người bán (`Modals_Orders.html`)**:
+  - **Nguyên nhân gốc rễ**: Cột `Phí vận chuyển thực tế` trong file Shopee (e.g. 140.400đ hay 63.800đ) là cước thu của đơn vị vận chuyển (SPX, GHTK), do người mua trả hoặc Shopee tài trợ 100% qua mã freeship. Người bán không phải chịu khoản này. Tuy nhiên, hàm quét file đối soát `processExcel` lại lấy khoản cước này gán vào `shippingFee` và trừ thẳng vào doanh thu người bán (`grossRevenue - totalFees - shopVoucher - shippingFee`). Hậu quả: Đơn hàng thực nhận về ví hơn 200.000đ sau khi bị trừ oan 140.400đ chỉ còn hiển thị vẻn vẹn **23.167đ**.
+  - **Khắc phục**:
+    - Phân định rõ ràng giữa cước vận chuyển thực tế và cước người bán chịu: Chỉ trừ cước vận chuyển khi có cột riêng `Phí vận chuyển do người bán trả` hoặc khi cước thực tế vượt quá phần người mua trả cộng phần Shopee trợ giá (`Math.max(0, actualShip - buyerShip - shopeeShip)`).
+    - Với các đơn hàng xuất xưởng thông thường, phí vận chuyển người bán chịu được bảo toàn chuẩn xác là 0đ. Doanh thu thực nhận về ví hiển thị chính xác hơn 200k (+219.105đ) đúng từng đồng với Kênh Người Bán Shopee.
+- **Tự động bồi hoàn cước hoàn từ gói PiShip & bóc tách chuẩn phí dịch vụ 2.700đ (`Modals_Orders.html`)**:
+  - **Nguyên nhân gốc rễ**: Khi khách hàng hoàn trả hàng, Shopee ghi nhận 3 khoản: `Phí vận chuyển trả hàng: -40.000đ`, `Phí vận chuyển được hoàn bởi PiShip: +40.000đ`, và `Phí dịch vụ PiShip: -2.700đ`. Hệ thống cũ chỉ đọc cột trừ 40.000đ mà không đọc cột hoàn lại 40.000đ của PiShip, dẫn đến việc shop vừa mất 40.000đ tiền ship oan, vừa tính nhầm Net thực nhận thành số dương (+42.800đ) trong khi thực tế chỉ mất -2.700đ phí dịch vụ.
+  - **Khắc phục**:
+    - Bổ sung nhận diện cột `iPiShipRefund` (`Phí vận chuyển được hoàn bởi PiShip`). Tính cước hoàn thực tế shop phải chịu `returnShippingFee = Math.max(0, rawReturnShip - rawPiShipRefund) = 0đ`.
+    - Hiển thị trực quan trên bảng đối soát: Cột phí vận chuyển hiện `0đ` kèm nhãn xanh `[PiShip Hoàn Cước (40.000đ)]`.
+    - Net thực nhận ghi nhận chuẩn xác `-2.700đ` (kèm nhãn đỏ `Phí PiShip (Hoàn khách: 144.900đ)`), tự động tạo giao dịch chi phí hàng hoàn 2.700đ vào quỹ.
+- **Nhận diện chuẩn xác cột `Doanh thu đơn hàng` & Chống bắt nhầm phí NTTD (`Modals_Orders.html`)**:
+  - Viết hàm `findRevenueCol` với quy tắc so khớp chính xác (Exact Match) các cột `Doanh thu đơn hàng`, `Số tiền được ghi nhận`. Loại trừ 100% các cột phí quảng cáo NTTD (như `Phí dịch vụ hiển thị NTTD (từ doanh thu đơn hàng)`) vô tình chứa chữ "doanh thu".
+  - Thêm hàm `getOrderLevelVal` chống nhân đôi doanh thu khi đơn hàng có nhiều dòng sản phẩm trong file Excel.
+
+---
+
+## [v2.37.4] - 2026-09-04
+
+### 🛠️ Sửa Lỗi Lệnh Sản Xuất Chưa Làm Bị Ép Sang Tab 'Đã Xong' & Bảo Vệ Tiến Độ Thợ
+- **Khắc phục lỗi thẻ xưởng chưa làm xong (khâu 2 Chờ nhận việc, hoặc KCS Yêu cầu làm lại) bị hiển thị ở tab "Đã Xong" (`Tab_Production.html`)**:
+  - **Nguyên nhân gốc rễ**: Khi liên kết trạng thái đơn hàng mẹ, điều kiện `isParentDelivered` đã vô tình ép trạng thái lệnh xưởng `curSt = 'ĐÃ XONG'` mà không kiểm tra điều kiện hoàn thành thực tế (`isBothDone`). Do đó, các đơn hàng Shopee đã đối soát hoặc bàn giao nhưng xưởng đang sản xuất dở dang (như thẻ *Đảo Bay ver.3* mới xong khâu 1, khâu 2 đang chờ nhận việc; hay thẻ *Hẻm Núi ver.3* đang bị KCS yêu cầu làm lại) bị cưỡng ép chuyển sang tab `ĐÃ XONG` với nút `[ ▶ NHẬN LÀM ]` bất hợp lý.
+  - **Khắc phục**: Phân định ranh giới nghiêm ngặt giữa tiến độ vật lý của thợ và trạng thái đơn hàng:
+    - `ĐÃ XONG`: Bắt buộc sản phẩm phải hoàn thành cả 2 khâu (`isBothDone && (isFinalQcPassed || isParentDelivered)`) hoặc xuất kho hàng có sẵn (`isStockValid`).
+    - `CHỜ SẢN XUẤT`: Giữ chặt toàn bộ các lệnh đang làm dở khâu 1, chờ khâu 2 (`hasAnyWorkerStarted`) hoặc đang bị KCS báo lỗi yêu cầu làm lại để thợ tiếp tục nhận việc và thi công.
+    - `ĐÃ HUỶ`: Nếu đơn mẹ đã giao nhưng thợ xưởng chưa từng đụng tay vào khâu nào (`!hasAnyWorkerStarted`), lệnh tự động chuyển sang `ĐÃ HUỶ` để tránh làm trùng, hoàn toàn không đẩy sang `ĐÃ XONG`.
+- **Sửa lỗi tiền tố mã đơn `ORD` trong `getParentOrder` (`Tab_Production.html`)**:
+  - Bổ sung bộ lọc loại trừ các tiền tố hệ thống tự sinh (`ORD`, `PROD`) khi tách chuỗi `_`, ngăn ngừa so khớp nhầm với bản ghi rác.
+
+---
+
+## [v2.37.3] - 2026-09-03
+
+### 🛡️ Bảo Vệ Trạng Thái Đơn Hàng & Đồng Bộ Hai Chiều Khi Xoá Lệnh Sản Xuất
+- **Khắc phục lỗi đơn tự nhảy hoặc kẹt ở "Sẵn Sàng Đóng Gói" khi xoá lệnh sản xuất (`Tab_Orders.html` & `Modals_Orders.html`)**:
+  - **Nguyên nhân gốc rễ**: Hàm `computeOrderMetadata` và `effectiveStatus` trước đây mặc định `allProdDone = true` khi số lượng lệnh sản xuất liên kết bằng 0 (`related.length === 0`). Khi người dùng xoá lệnh sản xuất, hệ thống ngộ nhận là "không có lệnh nào đang nợ ➔ sản xuất đã xong 100%" và tự động ép đơn sang trạng thái `Sẵn Sàng Đóng Gói`.
+  - **Khắc phục**: Ràng buộc cờ `hasProduction` nghiêm ngặt: Nếu đơn hàng có `hasProduction === true` mà danh sách lệnh liên kết rỗng (`related.length === 0`), `allProdDone` bắt buộc nhận giá trị `false`. Bổ sung chốt chặn `else if (!meta.allProdDone && eff === 'SẴN SÀNG ĐÓNG GÓI' && !meta.hasDonePack)` tự động kéo đơn về đúng `Chờ Sản Xuất`, ngăn chặn triệt để nguy cơ thợ đóng gói đóng nhầm thùng rỗng.
+- **Hộp thoại điều hướng thông minh 2 chiều khi bấm Xoá Lệnh Sản Xuất (`Tab_Production.html`)**:
+  - Khi quản lý/chủ shop bấm thùng rác xoá lệnh xưởng, hệ thống phân tích đơn hàng mẹ liên kết và cung cấp lựa chọn chuẩn:
+    - Bấm **OK**: Huỷ luôn đơn hàng tương ứng (`Đơn Huỷ`) nếu khách đổi ý không mua nữa.
+    - Bấm **CANCEL**: Giữ đơn hàng và chuyển trạng thái về `Chờ Sản Xuất` (kèm `hasProduction: true`) để chuẩn bị tạo lại lệnh xưởng mới.
+  - Đồng bộ cả lệnh xoá `deletes: { prodItems: [...] }` và cập nhật `orders: [...]` trong cùng 1 payload an toàn nguyên khối.
+
+---
+
+## [v2.37.2] - 2026-09-03
+
+### 🏭 Liên Kết Trạng Thái Đơn - Xưởng (Parent-Child Cascade), Quét Ghi Chú Đơn Hàng Shopee & Triệt Tiêu Nhãn Ảo Tồn Kho
+- **Liên kết trạng thái Đơn Hàng Mẹ & Lệnh Sản Xuất Con (`Tab_Production.html`)**:
+  - **Nguyên nhân gốc rễ**: Lệnh xưởng chỉ tính trạng thái qua 2 khâu thợ mà không xét trạng thái đơn hàng mẹ. Khi đơn hàng đã đóng gói và xuất kho (`Đã Bàn Giao`, `Hoàn Thành`, `Đối Soát Thành Công`), lệnh sản xuất con chưa bấm hoàn thành vẫn treo ở tab `CHỜ SẢN XUẤT`, gây mâu thuẫn và cãi vã trong xưởng.
+  - **Khắc phục**: Thiết lập cơ chế Parent-Child Cascade: Nếu đơn mẹ đã dứt điểm (`Đã Bàn Giao`, `Hoàn Thành`, `Đối Soát Thành Công`), lệnh sản xuất tự động mang trạng thái `_computedStatus = 'ĐÃ XONG'` và tuyệt đối không hiển thị ở tab `CHỜ SẢN XUẤT`. Nếu đơn mẹ huỷ, lệnh chuyển thành `ĐÃ HUỶ`.
+- **Quét chính xác Ghi Chú Đơn Hàng từ File Shopee (`Modals_Orders.html`)**:
+  - **Nguyên nhân**: Hàm nhập file Excel Shopee thiếu cột quét ghi chú khách (`iNote`), khiến lời dặn của khách (`Ghi chú của người mua`, `Buyer Note`, `Lưu ý`) bị bỏ rơi hoàn toàn, không lưu vào `Orders.note`.
+  - **Khắc phục**: Bổ sung bộ nhận diện đa ngôn ngữ cho cột ghi chú khách, lưu chuẩn xác vào `Orders.note`, truyền trực tiếp vào lệnh sản xuất và hiển thị nổi bật ở khối `LƯU Ý ĐƠN HÀNG` màu tím indigo trên thẻ thợ.
+- **Triệt tiêu nhãn ma "Lấy từ tồn kho có sẵn" & dọn sạch rác ghi chú tự sinh (`Tab_Production.html` & `Code.js`)**:
+  - Khi lệnh xưởng đang ở trạng thái Chờ Sản Xuất (`Pending`), tự động dọn sạch các nhãn tồn kho mâu thuẫn (`Lấy từ tồn kho có sẵn`, `Có sẵn ở kho...`) và các chuỗi text rác tự sinh (`Sản xuất mới cho đơn...`). Chỉ hiển thị đúng thông số kỹ thuật và lời dặn thực tế của khách hàng.
+
+---
+
+## [v2.37.1] - 2026-09-03
+
+### 🚚 Khắc Phục Lỗi Đồng Bộ Bàn Giao Đơn Hàng & Tích Hợp Nút Bàn Giao Trực Tiếp 1-Click
+- **Khắc phục lỗi hoàn trạng thái "Chờ Bàn Giao" khi tải lại trang (`Code.js` & `Tab_Orders.html`)**:
+  - **Nguyên nhân gốc rễ**: Trong hàm `applyDeltasToSheet('Orders')` và `syncDeltas`, hệ thống chỉ so khớp duy nhất `String(data[i][0]) === String(item.id)` mà không tìm theo chỉ số cột `idColIdx` và không có cơ chế dự phòng khớp theo `orderCode`. Khi đơn Shopee/TikTok được gửi lên với mã đơn (`2609033FPUAX50`) hoặc khác biệt khoảng trắng, Google Apps Script không tìm thấy dòng cũ nên ghi chèn thêm dòng mới xuống cuối sheet thay vì cập nhật dòng hiện tại, khiến thao tác tải lại trang nạp dòng cũ vẫn ở trạng thái "Chờ Bàn Giao".
+  - **Khắc phục**: Nâng cấp thuật toán so khớp đa tầng: tìm chính xác cột `id` qua `headers.indexOf('id')` kèm `.trim()`; tự động kích hoạt đối soát dự phòng theo mã đơn `orderCode` (chuẩn hóa cắt chuỗi `| MVĐ: `).
+- **Tích hợp nút "BÀN GIAO" trực tiếp 1-click trên thẻ đơn hàng (`Modals_Orders.html`)**:
+  - **Vấn đề**: Các đơn đóng gói hoàn tất (Shopee, TikTok, GHN, Bán Lẻ) trước đây hiển thị nút "CHỜ KHO" (`handleAct('START_CARRY')`). Khi nhân sự bấm vào, hệ thống chỉ gán cờ `isCarriedToWH` mà không cập nhật trạng thái đơn sang `Đã Bàn Giao`.
+  - **Giải pháp**: Phân luồng thông minh: các đơn giao khách/sàn vận chuyển hiển thị ngay nút **`[ 🚚 BÀN GIAO ]`** màu gradient xanh nổi bật, kích hoạt thẳng luồng `handleAct('SHIP')` để xuất kho và chuyển sang `Đã Bàn Giao` tức thì; chỉ các đơn nội bộ chuyển kho (`Sản Xuất Bù Kho`, `Sản Xuất Tồn`) mới sử dụng luồng "CHỜ KHO".
+- **Đồng bộ cờ `isCarriedToWH: true` trong Bàn Giao Hàng Loạt (`Tab_Orders.html`)**:
+  - Đảm bảo khi bấm "BÀN GIAO (N)" ở thanh công cụ hàng loạt, toàn bộ cờ trạng thái `status: 'Đã Bàn Giao'` và `isCarriedToWH: true` được ghi nhận đồng bộ 100%.
+
+---
+
+## [v2.37.0] - 2026-09-03
+
+### 🛡️ Đại Tu Kiến Trúc Toàn Diện: Triệt Tiêu Mất Dữ Liệu, Deadlock & Chống Lệch Kho
+- **Loại Bỏ Hàm Trùng Lặp & Khôi Phục Logic Khấu Trừ Tồn Kho Chuẩn Xác (`Code.js`)**:
+  - **Nguyên nhân gốc rễ**: Tồn tại 2 hàm cốt lõi `normalizeProdName()` và `getProductInfoByName()` bị khai báo lặp ở cuối file với logic đơn giản hoá và `isEligible = true` cho mọi sản phẩm. Trong Google Apps Script, khai báo sau ghi đè khai báo trước, khiến toàn bộ phụ kiện/vật tư không đủ điều kiện sản xuất đều bị quét nhầm thành sản phẩm sản xuất và trừ kho sai lệch.
+  - **Khắc phục**: Xoá bỏ hoàn toàn các bản khai báo trùng lặp; khôi phục bản chuẩn với thuật toán bóc tách kích thước đa chiều (vd: `25x12x14`), bỏ dấu tiếng Việt chuẩn hóa và kiểm tra phân loại `category` nghiêm ngặt.
+- **Khắc Phục Deadlock & Nhả Khóa Sớm Trong Quá Trình Trừ BOM Tự Động (`Code.js`)**:
+  - **Nguyên nhân**: Khi `syncDeltas` đang giữ `LockService.getScriptLock(30000)`, việc gọi trực tiếp `processMaterialDeduction` (có `try/finally { lock.releaseLock(); }`) đã vô tình giải phóng Lock sớm, khiến toàn bộ thao tác ghi sau đó (Packings, Attendance, Products, Accounts, Suppliers, Transactions...) chạy không có khóa bảo vệ.
+  - **Khắc phục**: Tách biệt hàm nội bộ `_processMaterialDeduction_Core(prodId, materialUsageData, ss)` không can thiệp khóa, giữ vững ScriptLock của `syncDeltas` liên tục xuyên suốt toàn bộ giao dịch.
+- **Batch Hóa Biến Động Số Dư Tài Khoản (`Code.js`)**:
+  - **Nguyên nhân**: Thao tác xóa hoặc cập nhật nhiều giao dịch gọi `adjustAccountBalanceServer` lặp từng dòng đơn lẻ, gây đọc dữ liệu cũ (stale read) và race condition số dư.
+  - **Khắc phục**: Xây dựng cơ chế `applyBatchAccountBalanceChanges(ss, balanceChanges)` gom toàn bộ biến động tài khoản thành 1 map duy nhất và cập nhật nguyên khối trên bảng `Accounts`.
+- **Nâng Cấp Xóa Dữ Liệu Nguyên Khối O(1) Cho `deleteDeltas` (`Code.js`)**:
+  - **Nguyên nhân**: Vòng lặp `deleteRow(i + 1)` gọi API Google Sheets đơn lẻ gây nguy cơ timeout khi xóa hàng chục bản ghi cùng lúc.
+  - **Khắc phục**: Chuyển sang thuật toán lọc mảng trong bộ nhớ và ghi đè nguyên khối `clearContents() + setValues()`, triệt tiêu hoàn toàn nguy cơ timeout và mất dữ liệu dở dang.
+- **Siết Chặt An Ninh Phân Quyền Backend RBAC (`Code.js`)**:
+  - Loại bỏ logic so khớp hardcode theo tên người dùng trong `checkServerPermission` và `validateTableWritePermission`.
+  - Bổ sung xác thực PIN và phân quyền `CALC_TANK` cho endpoint tính toán định mức bể kính `autoCalculateGlassTankBOM`.
+  - Chuẩn hóa lưu trữ tài chính cộng tác viên `CTV_Finance` qua `applyDeltasToSheet` chống trùng lặp ID.
+
+---
+
 ## [v2.36.6] - 2026-09-03
 
 ### 🛠️ Hỗ Trợ Nhập Thủ Công Tên Công Cụ, Trang Thiết Bị Ngoài Kho Trên Bảng Báo Nhập Hàng

@@ -3602,6 +3602,19 @@
             n = n.replace(/\|\s*Cover:\s*https?:\/\/[^\s|]+/gi, '');
             // Bỏ chuỗi dạng "Tên SP | MVĐ: SPX... (Cái 1/1)"
             n = n.replace(/[^|]*\|\s*MVĐ:\s*[A-Za-z0-9]+(?:\s*\(Cái\s*\d+\/\d+\))?/gi, '');
+
+            // Nếu lệnh chưa xong (đang chờ làm / kiểm định), triệt tiêu các nhãn tồn kho tự sinh gây hiểu lầm
+            if (!isItemDone) {
+                n = n.replace(/\|?\s*Lấy từ tồn kho có sẵn/gi, '');
+                n = n.replace(/Lấy từ tồn kho có sẵn\s*\|?/gi, '');
+                n = n.replace(/\|?\s*Có sẵn ở kho[^|]*/gi, '');
+                n = n.replace(/Có sẵn ở kho[^|]*\|?/gi, '');
+                n = n.replace(/\|?\s*Sản xuất BỂ LẺ SIZE cho đơn [^|]*/gi, '');
+                n = n.replace(/Sản xuất BỂ LẺ SIZE cho đơn [^|]*\|?/gi, '');
+                n = n.replace(/\|?\s*Sản xuất ĐƠN XUẤT KHẨU [^|]*/gi, '');
+                n = n.replace(/Sản xuất ĐƠN XUẤT KHẨU [^|]*\|?/gi, '');
+            }
+
             n = n.replace(/^\|\s*/, '');
             n = n.replace(/\s*\|$/, '');
             return n.trim();
@@ -3792,7 +3805,22 @@
                                                     const upd = { ..._item, status: 'Đã Huỷ' };
                                                     wrappedPushDeltas({ prodItems: [upd] }, 'Huỷ lệnh kho dư thừa', 'fa-trash');
                                                 } else {
-                                                    wrappedPushDeltas({ deletes: { prodItems: [_item.id] } }, 'Đã xoá lệnh sản xuất', 'fa-trash');
+                                                    const parentOrder = (order && order.id) ? order : (typeof getParentOrder === 'function' ? getParentOrder(_item.orderId) : null);
+                                                    const payload = { deletes: { prodItems: [_item.id] } };
+
+                                                    if (parentOrder && parentOrder.id) {
+                                                        const shouldCancelOrder = window.confirm(
+                                                            "Lệnh này thuộc đơn hàng [" + (parentOrder.orderCode || parentOrder.id) + "].\n\n" +
+                                                            "- Bấm OK: HUỶ LUÔN ĐƠN HÀNG này.\n" +
+                                                            "- Bấm CANCEL: Giữ đơn và chuyển về CHỜ SẢN XUẤT (để tạo lại lệnh mới)."
+                                                        );
+                                                        if (shouldCancelOrder) {
+                                                            payload.orders = [{ ...parentOrder, status: 'Đơn Huỷ' }];
+                                                        } else {
+                                                            payload.orders = [{ ...parentOrder, status: 'Chờ Sản Xuất', hasProduction: true }];
+                                                        }
+                                                    }
+                                                    wrappedPushDeltas(payload, 'Đã xoá lệnh sản xuất & đồng bộ đơn hàng', 'fa-trash');
                                                 }
                                             }
                                         }}
@@ -3855,10 +3883,12 @@
                                     let redBoxNote = realItemNote;
                                     let blueBoxNote = '';
 
-                                    if (isShopeeTiktok && !realItemNote && cleanOrderN) {
-                                        redBoxNote = cleanOrderN;
-                                    } else if (cleanOrderN && cleanOrderN !== realItemNote) {
-                                        blueBoxNote = cleanOrderN;
+                                    if (cleanOrderN) {
+                                        if (!realItemNote) {
+                                            blueBoxNote = cleanOrderN;
+                                        } else if (cleanOrderN !== realItemNote) {
+                                            blueBoxNote = cleanOrderN;
+                                        }
                                     }
 
                                     return (
@@ -4437,14 +4467,40 @@
 
         const orderMap = React.useMemo(() => {
             const map = {};
-            (orders || []).forEach(o => { if (o && o.id) map[o.id] = o; });
+            (orders || []).forEach(o => {
+                if (!o) return;
+                if (o.id) map[o.id] = o;
+                if (o.orderCode) {
+                    map[o.orderCode] = o;
+                    const cleanCode = String(o.orderCode).split(' | ')[0].split('|')[0].trim();
+                    if (cleanCode) map[cleanCode] = o;
+                }
+            });
             return map;
         }, [orders]);
+
+        const getParentOrder = React.useCallback((orderId) => {
+            if (!orderId) return {};
+            if (orderMap[orderId]) return orderMap[orderId];
+            const clean = String(orderId).split('_')[0].trim();
+            if (clean && clean !== 'ORD' && clean !== 'PROD' && clean.length > 3 && orderMap[clean]) {
+                return orderMap[clean];
+            }
+            const codeParts = String(orderId).split('|').map(x => x.trim());
+            for (let part of codeParts) {
+                if (orderMap[part]) return orderMap[part];
+                const sub = part.split('_')[0].trim();
+                if (sub && sub !== 'ORD' && sub !== 'PROD' && sub.length > 3 && orderMap[sub]) {
+                    return orderMap[sub];
+                }
+            }
+            return {};
+        }, [orderMap]);
 
         const baseFiltered = React.useMemo(() => {
             return (prodItems || []).filter(i => {
                 if (!i || i.orderId === 'SHARED_TASK' || i.orderId === 'REMINDER' || i.orderId === 'MATERIAL_REQ' || i.type === 'Báo Nhập Hàng' || String(i.id || '').startsWith('MAT_REQ_') || String(i.name || '').includes('[DANH MỤC SẢN XUẤT]')) return false;
-                const o = orderMap[i.orderId] || {};
+                const o = getParentOrder(i.orderId);
                 const isCtvOrder = String(o.channel || '').toUpperCase().includes('CỘNG TÁC VIÊN') || String(o.channel || '').toUpperCase() === 'CTV';
                 if (isCTV && o.createdBy !== currentUser && o.sale !== currentUser && o.responsibleUser !== currentUser && !isCtvOrder) return false;
 
@@ -4469,7 +4525,7 @@
                 if (!isTimeMatch) return false;
                 return true;
             });
-        }, [prodItems, orderMap, filterTime, customMonth, deferredSearchQuery]);
+        }, [prodItems, getParentOrder, filterTime, customMonth, deferredSearchQuery]);
 
         const countBeKinh = baseFiltered.filter(i => {
             const searchStr = String(i.type || '') + ' ' + String(i.name || '');
@@ -4507,17 +4563,38 @@
             const isFinalQcPassed = qcUpper === 'ĐẠT' || qcUpper.includes('TỰ ĐỘNG KCS') || qcUpper.includes('ĐÃ DUYỆT KCS') || isStatusDone;
             const isStockValid = (statusUpper === 'HOÀN KHO ĐẠT' || isStock) && !isKhoAm;
 
-            if (statusUpper === 'ĐÃ HUỶ' || statusUpper === 'HUỶ' || statusUpper === 'CANCEL' || statusUpper === 'HỦY') {
+            // LIÊN KẾT TRẠNG THÁI ĐƠN HÀNG MẸ (PARENT-CHILD CASCADE)
+            const parentOrder = getParentOrder(i.orderId);
+            const parentStatusUpper = String(parentOrder.status || '').toUpperCase().trim();
+            const isParentDelivered = parentStatusUpper === 'ĐÃ BÀN GIAO' || parentStatusUpper === 'HOÀN THÀNH' || 
+                                      parentStatusUpper === 'ĐỐI SOÁT THÀNH CÔNG' || parentStatusUpper === 'ĐÃ GIAO' || 
+                                      parentStatusUpper === 'DELIVERED' || parentStatusUpper === 'COMPLETED';
+            const isParentCancelled = parentStatusUpper === 'ĐƠN HUỶ' || parentStatusUpper === 'ĐƠN HỦY' || 
+                                      parentStatusUpper.includes('HUỶ') || parentStatusUpper.includes('HỦY') || 
+                                      parentStatusUpper.includes('CANCEL');
+
+            // Kiểm tra xem thợ đã từng làm khâu nào chưa
+            const hasAnyWorkerStarted = (p1 === 'Done') || (p2 === 'Done') || 
+                                        Boolean(i.p1_user || i.phases?.phase1?.user) || 
+                                        Boolean(i.p2_user || i.phases?.phase2?.user);
+
+            if (statusUpper === 'ĐÃ HUỶ' || statusUpper === 'HUỶ' || statusUpper === 'CANCEL' || statusUpper === 'HỦY' || isParentCancelled) {
                 curSt = 'ĐÃ HUỶ';
-            } else if (isStockValid || (isBothDone && isFinalQcPassed)) {
+            } else if (isStockValid || (isBothDone && (isFinalQcPassed || isParentDelivered))) {
+                // ĐÃ XONG: Chỉ khi sản phẩm thực sự hoàn thành cả 2 khâu (hoặc xuất kho hàng có sẵn)
                 curSt = 'ĐÃ XONG';
             } else if (isBothDone) {
                 curSt = 'KIỂM ĐỊNH';
+            } else if (isParentDelivered && !hasAnyWorkerStarted) {
+                // Đơn đã giao/bàn giao nhưng thợ CHƯA TỪNG ĐỤNG TAY VÀO (kho đã lấy hàng có sẵn xuất đi)
+                // -> Huỷ lệnh để thợ không bấm nhầm và không làm trùng
+                curSt = 'ĐÃ HUỶ';
             } else {
+                // Còn lại (đang làm dở khâu 1, chờ khâu 2, hoặc yêu cầu làm lại) -> Bắt buộc ở CHỜ SẢN XUẤT
                 curSt = 'CHỜ SẢN XUẤT';
             }
 
-            return { ...i, _computedStatus: curSt };
+            return { ...i, _computedStatus: curSt, _parentOrder: parentOrder };
         });
 
         const workerTodayKPI = React.useMemo(() => {
@@ -5425,7 +5502,7 @@
 
                             const channelGroups = [];
                             sortedList.forEach(item => {
-                                const order = (orders || []).find(o => o.id === item.orderId || o.orderCode === item.orderId) || {};
+                                const order = item._parentOrder && item._parentOrder.id ? item._parentOrder : getParentOrder(item.orderId);
                                 const isItemUrgent = item.isUrgent === true || String(item.isUrgent).toUpperCase() === 'TRUE' || order.isUrgent === true || String(order.isUrgent).toUpperCase() === 'TRUE';
                                 const groupKey = normalizeProductionChannel(order.channel || (item.orderId === 'SẢN XUẤT TỒN' ? 'SẢN XUẤT TỒN' : ''));
 
@@ -5491,16 +5568,7 @@
 
                                 // Render items inside this channel
                                 let content = items.map((item, idx) => {
-                                    const order = (orders || []).find(o => {
-                                        const pOrd = String(item.orderId || '').trim();
-                                        const oOrd = String(o.id).trim();
-                                        if (pOrd === oOrd) return true;
-                                        if (pOrd.startsWith(oOrd + '_')) return true;
-                                        const parts = pOrd.split('|').map(x => x.trim());
-                                        if (parts.includes(oOrd)) return true;
-                                        if (parts.some(part => part.startsWith(oOrd + '_'))) return true;
-                                        return false;
-                                    }) || {};
+                                    const order = item._parentOrder && item._parentOrder.id ? item._parentOrder : getParentOrder(item.orderId);
                                     return (
                                         <WorkerCardV2
                                             key={item.id}

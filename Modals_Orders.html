@@ -711,6 +711,11 @@
             let iFeeAffiliate = findCol(['phí hoa hồng tiếp thị', 'phí tiếp thị liên kết', 'ค่าคอมมิชชั่นพันธมิตร', 'affiliate fee', 'ams commission fee']);
             let iShopVoucher = findCol(['voucher của shop', 'khuyến mãi của shop', 'โค้ดส่วนลดจากร้านค้า', 'seller voucher', 'shop voucher']);
             let iStatus = findCol(['trạng thái đơn hàng', 'order status', 'status', 'สถานะการสั่งซื้อ', 'order_status']); // Lấy duy nhất cột trạng thái chính để tránh rác chuỗi
+            let iNote = findCol([
+                'ghi chú của người mua', 'ghi chú từ người mua', 'lời nhắn của người mua', 
+                'buyer note', 'buyer message', 'customer note', 'ghi chú đơn hàng', 'lưu ý', 
+                'ghi chú của shop', 'ghi chú người bán', 'seller note', 'ghi chú', 'note', 'ข้อความจากผู้ซื้อ'
+            ]);
             const existingOrdersMap = new Map();
             (existingOrders || []).forEach(o => {
                 const baseCode = (o.orderCode || '').split(' | MVĐ: ')[0].trim().toLowerCase();
@@ -841,11 +846,14 @@
                         rowShopVoucher = Math.round(rowShopVoucher);
                     }
 
+                    let customerNote = (iNote >= 0 && cols[iNote]) ? String(cols[iNote]).trim() : '';
+
                     if (!orderMap[oCode]) {
                         orderMap[oCode] = {
                             orderCode: finalOrderCode,
                             channel: rowChannel,
                             customer: customerName,
+                            note: customerNote,
                             isDuplicate: false,
                             isUpdate: false,
                             existingId: null,
@@ -898,6 +906,9 @@
                             items: []
                         };
                     } else {
+                        if (customerNote && !orderMap[oCode].note) {
+                            orderMap[oCode].note = customerNote;
+                        }
                         if (orderMap[oCode].customer === 'Khách' && customerName !== 'Khách') {
                             orderMap[oCode].customer = customerName;
                         }
@@ -979,9 +990,10 @@
                             const mappedStatus = mapOrderStatusExact(o.rawStatus);
                             // Cập nhật trạng thái nếu file import có trạng thái dứt điểm khác với trạng thái cũ
                             const hasNewStatus = mappedStatus !== null && existing.status !== mappedStatus;
+                            const hasNewNote = Boolean(o.note && String(o.note).trim() !== String(existing.note || '').trim());
                             o.mappedStatus = mappedStatus; // Truyền xuống function submit
 
-                            if (hasNewTrack || hasNewCustomer || hasNewRevenue || hasNewStatus || hasNewFees) {
+                            if (hasNewTrack || hasNewCustomer || hasNewRevenue || hasNewStatus || hasNewFees || hasNewNote) {
                                 return {
                                     ...o,
                                     isDuplicate: false,
@@ -1153,6 +1165,8 @@
                                         { phase1: { name: 'Cắt Dán', status: 'Done', user: 'Kho Hàng' }, phase2: { name: 'Gọt Keo', status: 'Done', user: 'Kho Hàng' } } :
                                         { phase1: { name: 'Dựng Khung', status: 'Done', user: 'Kho Hàng' }, phase2: { name: 'Gia Cố', status: 'Done', user: 'Kho Hàng' } };
 
+                                    const orderCustomerNote = String(o.note || (o.existingRecord ? o.existingRecord.note : '') || '').trim();
+
                                     // Nếu là BỂ LẺ SIZE: Chỉ tạo DUY NHẤT 1 lệnh sản xuất gom chung số lượng cho đơn
                                     if (prodInfo.isBeLeSize) {
                                         const prodId = 'PROD_' + Date.now() + Math.random().toString(36).substr(2, 5) + '_' + oIdx + '_' + itemIdx + '_0';
@@ -1161,7 +1175,7 @@
                                                 id: prodId, orderId: targetOrderId,
                                                 type: 'Bể Kính',
                                                 name: item.name,
-                                                note: 'Lấy từ tồn kho có sẵn',
+                                                note: orderCustomerNote ? (orderCustomerNote + ' | Lấy từ tồn kho có sẵn') : 'Lấy từ tồn kho có sẵn',
                                                 status: 'Hoàn Kho Đạt', fulfilledFromStock: true,
                                                 phases: stockPhases,
                                                 qc_status: 'Đã Duyệt',
@@ -1174,7 +1188,7 @@
                                                 id: prodId, orderId: targetOrderId,
                                                 type: 'Bể Kính',
                                                 name: item.name,
-                                                note: isExportChan ? `Sản xuất ĐƠN XUẤT KHẨU ${o.orderCode || ''} (Bể lẻ size x${orderQty})` : `Sản xuất BỂ LẺ SIZE cho đơn ${o.orderCode || ''} (SL: ${orderQty})`,
+                                                note: orderCustomerNote,
                                                 status: 'Pending', fulfilledFromStock: false,
                                                 phases: workerPhases,
                                                 deadline: typeof getAutoDeadline === 'function' ? getAutoDeadline(o.channel) : defaultDeadline
@@ -1190,7 +1204,7 @@
                                                     id: prodId, orderId: targetOrderId,
                                                     type: isGlass ? 'Bể Kính' : 'Layout',
                                                     name: item.name,
-                                                    note: 'Lấy từ tồn kho có sẵn',
+                                                    note: orderCustomerNote ? (orderCustomerNote + ' | Lấy từ tồn kho có sẵn') : 'Lấy từ tồn kho có sẵn',
                                                     status: 'Hoàn Kho Đạt', fulfilledFromStock: true,
                                                     phases: stockPhases,
                                                     qc_status: 'Đã Duyệt',
@@ -1203,7 +1217,7 @@
                                                     id: prodId, orderId: targetOrderId,
                                                     type: isGlass ? 'Bể Kính' : 'Layout',
                                                     name: item.name,
-                                                    note: isExportChan ? `Sản xuất ĐƠN XUẤT KHẨU ${o.orderCode || ''} (Cái ${q + 1}/${orderQty})` : `Sản xuất mới cho đơn ${o.orderCode || ''} (Cái ${q + 1}/${orderQty})`,
+                                                    note: orderCustomerNote,
                                                     status: 'Pending', fulfilledFromStock: false,
                                                     phases: workerPhases,
                                                     deadline: typeof getAutoDeadline === 'function' ? getAutoDeadline(o.channel) : defaultDeadline
@@ -1220,6 +1234,8 @@
                             orderStatus = 'Chờ Sản Xuất';
                         }
                     }
+
+                    const finalOrderCustomerNote = String(o.note || (o.existingRecord ? o.existingRecord.note : '') || '').trim();
 
                     if (o.isUpdate && o.existingRecord) {
                         let mergedAccessories = accessories;
@@ -1255,6 +1271,7 @@
                             orderCode: o.orderCode,
                             channel: o.channel,
                             customer: (o.customer && o.customer !== 'Khách') ? o.customer : (o.existingRecord.customer || 'Khách'),
+                            note: finalOrderCustomerNote,
                             createdAt: o.existingRecord.createdAt || safeDateFull,
                             deadline: o.existingRecord.deadline || defaultDeadline,
                             date: o.existingRecord.date || safeDateFull.split(' ')[0],
@@ -1288,6 +1305,7 @@
 
                         newOrders.push({
                             id: targetOrderId, orderCode: o.orderCode, channel: o.channel, customer: o.customer,
+                            note: finalOrderCustomerNote,
                             createdAt: orderDateFormatted, deadline: defaultDeadline, date: dateOnly,
                             status: finalStatus, accessories: JSON.stringify(accessories),
                             hasProduction: hasProdItems, updatedBy: activeUser, responsibleUser: activeUser,
@@ -4596,14 +4614,19 @@
             return (ps === 'DONE' || ps === 'ĐÃ ĐÓNG GÓI' || ps === 'HOÀN THÀNH' || ps === 'ĐÃ XONG') && (!p.note || !p.note.includes('kho'));
         });
 
+        const orderRequiresProd = _order.hasProduction === true || String(_order.hasProduction).toUpperCase() === 'TRUE';
+        const hasProdItems = Array.isArray(prods) && prods.length > 0;
+        const prodsReady = orderRequiresProd ? (hasProdItems && allProdsDone) : (!hasProdItems || allProdsDone);
+
         if (upperStatus === 'CHỜ SẢN XUẤT' || upperStatus === 'QUÉT TỰ ĐỘNG' || upperStatus === 'ĐANG SẢN XUẤT' || upperStatus === 'SẴN SÀNG ĐÓNG GÓI' || upperStatus === 'CHỜ BÀN GIAO' || upperStatus === 'CHỜ MÃ VẬN ĐƠN' || upperStatus === 'CHỜ PHỤ KIỆN') {
             if (hasDonePack || upperStatus === 'CHỜ BÀN GIAO') {
                 effectiveStatus = 'Chờ Bàn Giao';
+            } else if (orderRequiresProd && !prodsReady) {
+                // Đơn cần sản xuất nhưng chưa xong sản xuất hoặc thiếu lệnh -> Giữ ở Chờ Sản Xuất
+                effectiveStatus = 'Chờ Sản Xuất';
             } else if (_order._computedStatus === 'SẴN SÀNG ĐÓNG GÓI' || _order._computedStatus === 'Sẵn Sàng Đóng Gói' || filterStatus === 'Sẵn Sàng Đóng Gói') {
                 effectiveStatus = 'Sẵn sàng đóng gói';
             } else {
-                const hasProdItems = Array.isArray(prods) && prods.length > 0;
-                const prodsReady = !hasProdItems || allProdsDone;
                 if (prodsReady && stockValid) {
                     effectiveStatus = 'Sẵn sàng đóng gói';
                 }
@@ -4810,6 +4833,33 @@
         };
 
         const handleAppealResult = async (type) => {
+            if (type === 'THIEU_HANG') {
+                if (!window.confirm(`📦 Xác nhận Shopee HOÀN TIỀN THIẾU HÀNG (Không có hàng hoàn về)?\n\nHệ thống sẽ:\n1. GIỮ NGUYÊN 100% TỒN KHO (Tuyệt đối KHÔNG cộng bù hay xuất hủy kho)\n2. Chuyển đơn sang [ĐỐI SOÁT THÀNH CÔNG]\n3. Doanh thu đơn tự động khớp đúng số tiền Shopee quyết toán sau khi trừ món thiếu.`)) return;
+                setProcessing(true);
+                try {
+                    const safeDateFull = typeof getLocalISODate === 'function' ? getLocalISODate() : new Date().toISOString();
+                    const currentFullTime = safeDateFull.replace('T', ' ').slice(0, 19);
+                    const cleanOldNote = String(_order.note || '').replace(/\[KN-THANG\]/g, '').replace(/\[KN-THUA\]/g, '').replace(/\[THIẾU HÀNG[^\]]*\]/g, '').trim();
+                    const newNote = `[THIẾU HÀNG - HOÀN TIỀN NGAY - GIỮ NGUYÊN KHO] ${cleanOldNote}`.trim();
+                    const updatedOrder = {
+                        ..._order,
+                        status: 'Đối Soát Thành Công',
+                        isReconciled: true,
+                        reconciledAt: currentFullTime,
+                        note: newNote,
+                        returnReason: 'Thiếu hàng (Hoàn tiền không trả hàng)'
+                    };
+                    setOptimisticOrder(updatedOrder);
+                    await pushDeltas({ orders: [updatedOrder] }, `Hoàn tiền thiếu hàng đơn ${_order.orderCode || _order.id} (Giữ nguyên kho) → Đối Soát Thành Công!`, 'fa-box-open');
+                    if (triggerToast) triggerToast(`Đã duyệt Hoàn Tiền Thiếu Hàng (Giữ nguyên kho) cho đơn ${_order.orderCode || _order.id}!`, 'fa-check-circle', 'success');
+                } catch (err) {
+                    if (triggerToast) triggerToast('Lỗi: ' + err.message, 'fa-times', 'danger');
+                } finally {
+                    setProcessing(false);
+                }
+                return;
+            }
+
             if (type === 'THANG') {
                 if (!window.confirm(`🏆 Xác nhận THẮNG KHIẾU NẠI sàn cho đơn ${_order.orderCode || _order.id}?\n\nĐơn sẽ được chuyển thẳng sang [ĐỐI SOÁT THÀNH CÔNG / HOÀN THÀNH] để ghi nhận doanh thu và tiền sàn đền bù.`)) return;
                 setProcessing(true);
@@ -4860,7 +4910,8 @@
                 return;
             }
 
-            const isBrokenOrDefect = finalReason.includes('bể vỡ') || finalReason.includes('Vận chuyển') || finalReason.includes('Chất lượng') || finalReason.includes('hỏng') || finalReason.includes('Huỷ') || finalReason.includes('Lỗi');
+            const isMissingItems = finalReason.toLowerCase().includes('thiếu') || finalReason.toLowerCase().includes('không trả hàng');
+            const isBrokenOrDefect = !isMissingItems && (finalReason.includes('bể vỡ') || finalReason.includes('Vận chuyển') || finalReason.includes('Chất lượng') || finalReason.includes('hỏng') || finalReason.includes('Huỷ') || finalReason.includes('Lỗi'));
             
             // 🛡️ CHỐNG CỘNG KHỐNG KHO KHI HỦY/HOÀN ĐƠN CHƯA XUẤT:
             const orderCodeStr = String(_order.orderCode || _order.id || '').trim();
@@ -4875,7 +4926,9 @@
             const wasShipped = _order.status === 'Đã Bàn Giao' || _order.status === 'Chờ Bàn Giao' || Boolean(_order.reconciledAt);
             const hasExported = hasExportTicket || wasShipped;
             
-            const promptMsg = isBrokenOrDefect
+            const promptMsg = isMissingItems
+                ? `Xác nhận duyệt hoàn đơn ${_order.orderCode || _order.id} với lý do: "${finalReason}"?\n\n(Shopee hoàn tiền không trả hàng: Hệ thống GIỮ NGUYÊN 100% TỒN KHO - Tuyệt đối KHÔNG cộng bù hay xuất hủy kho)`
+                : isBrokenOrDefect
                 ? `Xác nhận duyệt hoàn đơn ${_order.orderCode || _order.id} với lý do: "${finalReason}"?\n\n(Hàng vỡ/lỗi sẽ được TỰ ĐỘNG XUẤT HUỶ - Không cộng lại tồn kho)`
                 : hasExported
                     ? `Xác nhận duyệt hoàn đơn ${_order.orderCode || _order.id} với lý do: "${finalReason}"?\n\n(Hàng nguyên vẹn sẽ được TỰ ĐỘNG NHẬP LẠI KHO)`
@@ -4888,8 +4941,8 @@
                 let itemsData = [];
                 const prodList = erpProducts || erpData?.Products || [];
 
-                // Nếu hàng nguyên vẹn và trước đó đã xuất kho -> Nhập lại kho
-                if (!isBrokenOrDefect && hasExported) {
+                // Nếu hàng nguyên vẹn và trước đó đã xuất kho -> Nhập lại kho (TUYỆT ĐỐI KHÔNG CỘNG KHO KHI LÀ THIẾU HÀNG / HOÀN TIỀN NGAY)
+                if (!isMissingItems && !isBrokenOrDefect && hasExported) {
                     (accessories || []).forEach(a => {
                         if (!a._retStatus) {
                             const match = prodList.find(x => String(x.name || '').trim() === String(a.name || '').trim());
@@ -4902,16 +4955,17 @@
                     });
                 }
 
-                const updatedProds = (prods || []).map(p => ({ ...p, status: isBrokenOrDefect ? 'Hủy/Vỡ' : 'Hoàn Kho Đạt' }));
+                const updatedProds = (prods || []).map(p => ({ ...p, status: isMissingItems ? 'Đạt' : (isBrokenOrDefect ? 'Hủy/Vỡ' : 'Hoàn Kho Đạt') }));
                 const safeDateFull = typeof getLocalISODate === 'function' ? getLocalISODate() : new Date().toISOString();
                 const currentFullTime = safeDateFull.replace('T', ' ').slice(0, 19);
                 
                 // Cập nhật Order
-                const cleanOldNote = (_order.note || '').replace(/\[LÝ DO HOÀN:\s*[^\]]+\]/g, '').trim();
-                const newNote = `[LÝ DO HOÀN: ${finalReason}] ${cleanOldNote}`.trim();
+                const cleanOldNote = (_order.note || '').replace(/\[LÝ DO HOÀN:\s*[^\]]+\]/g, '').replace(/\[THIẾU HÀNG[^\]]*\]/g, '').trim();
+                const prefixNote = isMissingItems ? `[THIẾU HÀNG - HOÀN TIỀN NGAY - GIỮ NGUYÊN KHO: ${finalReason}]` : `[LÝ DO HOÀN: ${finalReason}]`;
+                const newNote = `${prefixNote} ${cleanOldNote}`.trim();
                 const updatedOrder = { 
                     ..._order, 
-                    status: 'Hoàn Thành', 
+                    status: isMissingItems ? 'Đối Soát Thành Công' : 'Hoàn Thành', 
                     isReconciled: true, 
                     reconciledAt: currentFullTime,
                     note: newNote,
@@ -4923,7 +4977,7 @@
                     prodItems: updatedProds
                 };
 
-                if (!isBrokenOrDefect && productUpdates.length > 0) {
+                if (!isMissingItems && !isBrokenOrDefect && productUpdates.length > 0) {
                     payload.Products = productUpdates;
                     payload.ImportExport = [{
                         id: 'IE_RET_' + Date.now(),
@@ -5143,7 +5197,7 @@
                         triggerToast('Vui lòng Đẩy Đơn GHN hoặc nhập Mã Vận Đơn/SĐT Xe trước khi Giao ĐVVC!', 'fa-times', 'danger');
                         return;
                     }
-                    const newOrder = { ..._order, status: 'Đã Bàn Giao' };
+                    const newOrder = { ..._order, status: 'Đã Bàn Giao', isCarriedToWH: true };
                     setOptimisticOrder(newOrder);
                     pushDeltas({ orders: [newOrder] }, 'Đã bàn giao & TRỪ TỒN KHO!', 'fa-truck').catch(() => { });
                 }
@@ -5368,11 +5422,25 @@
                 };
             }
             if (isPendingHandover) {
+                const isInternalTransfer = _order.channel === 'Sản Xuất Bù Kho' || _order.channel === 'Sản Xuất Tồn';
+                if (isInternalTransfer) {
+                    return {
+                        label: _order.isCarriedToWH ? 'HOÀN THÀNH CHỞ KHO' : 'CHỜ KHO',
+                        bg: 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border border-blue-400/40',
+                        icon: processing ? 'fas fa-spinner fa-spin' : 'fas fa-truck-loading',
+                        onClick: (e) => { e.stopPropagation(); _order.isCarriedToWH ? handleAct('DONE_CARRY') : handleAct('START_CARRY'); }
+                    };
+                }
                 return {
-                    label: _order.isCarriedToWH ? 'HOÀN THÀNH CHỞ KHO' : 'CHỜ KHO',
-                    bg: 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border border-blue-400/40',
-                    icon: processing ? 'fas fa-spinner fa-spin' : 'fas fa-truck-loading',
-                    onClick: (e) => { e.stopPropagation(); _order.isCarriedToWH ? handleAct('DONE_CARRY') : handleAct('START_CARRY'); }
+                    label: 'BÀN GIAO',
+                    bg: 'bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:brightness-110 text-white border border-blue-400/40 shadow-lg shadow-blue-950/40 font-bold',
+                    icon: processing ? 'fas fa-spinner fa-spin' : 'fas fa-truck',
+                    onClick: (e) => { 
+                        e.stopPropagation(); 
+                        if (window.confirm(`Xác nhận BÀN GIAO & XUẤT KHO đơn ${_order.orderCode || _order.id}?`)) {
+                            handleAct('SHIP'); 
+                        }
+                    }
                 };
             }
             if (isDone) {
@@ -5960,6 +6028,18 @@
                                                 <span>❌ THUA (CHUYỂN DUYỆT KHO)</span>
                                             </button>
                                         </div>
+
+                                        {/* NÚT XỬ LÝ NHANH 1 CHẠM: HOÀN TIỀN THIẾU HÀNG KHÔNG TRẢ HÀNG */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleAppealResult('THIEU_HANG')}
+                                            disabled={processing}
+                                            className="w-full py-2.5 px-3 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:brightness-110 text-white rounded-xl font-black text-[11px] uppercase tracking-wider transition-all border border-amber-400/50 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-md shadow-amber-950/40"
+                                            title="Shopee hoàn tiền thiếu hàng không trả hàng - Giữ nguyên 100% tồn kho và chuyển Đối Soát Thành Công"
+                                        >
+                                            <i className="fas fa-box-open text-xs text-amber-200"></i>
+                                            <span>📦 HOÀN TIỀN THIẾU HÀNG (GIỮ NGUYÊN KHO → ĐỐI SOÁT THÀNH CÔNG)</span>
+                                        </button>
                                     </div>
                                 ) : (
                                     /* BƯỚC 2: CHỌN TÌNH TRẠNG & DUYỆT HOÀN TẤT */
@@ -6011,10 +6091,11 @@
                                         </div>
 
                                         {/* Các nút chọn lý do chi tiết */}
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px]">
+                                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-[10px]">
                                             {[
-                                                { id: 'Vận chuyển bể vỡ (ĐVVC)', icon: 'fa-box-fragile', label: '💥 Bể vỡ (Xuất huỷ)' },
+                                                { id: 'Đóng thiếu hàng (Hoàn tiền ngay)', icon: 'fa-box-open', label: '📦 Thiếu hàng (Giữ nguyên kho)' },
                                                 { id: 'Khách không nhận (Boom hàng)', icon: 'fa-user-slash', label: '🚫 Boom hàng (Nhập kho)' },
+                                                { id: 'Vận chuyển bể vỡ (ĐVVC)', icon: 'fa-box-fragile', label: '💥 Bể vỡ (Xuất huỷ)' },
                                                 { id: 'Chất lượng kém / Lỗi thợ', icon: 'fa-tools', label: '⚠️ Lỗi mẫu (Xuất huỷ)' },
                                                 { id: 'Giao hàng trễ / Khách huỷ', icon: 'fa-clock', label: '⏳ Giao trễ (Nhập kho)' }
                                             ].map(opt => {
@@ -6135,29 +6216,41 @@
 
                                         {/* NÚT DUYỆT HOÀN XONG (CTA CHÍNH - FULL WIDTH) */}
                                         <div className="pt-2">
-                                            <button
-                                                type="button"
-                                                onClick={handleCompleteReturn}
-                                                disabled={processing || !selectedReturnReason}
-                                                className={`w-full py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-lg active:scale-[0.98] border flex items-center justify-center gap-2 cursor-pointer ${
-                                                    selectedReturnReason
-                                                        ? (selectedReturnReason.includes('Boom') || selectedReturnReason.includes('trễ')
-                                                            ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:brightness-110 text-white border-emerald-400/50 shadow-emerald-950/40'
-                                                            : 'bg-gradient-to-r from-fuchsia-600 via-purple-600 to-rose-600 hover:brightness-110 text-white border-fuchsia-400/50 shadow-purple-950/40')
-                                                        : 'bg-zinc-800/60 text-zinc-500 border-white/[0.06] cursor-not-allowed'
-                                                }`}
-                                            >
-                                                <i className={processing ? "fas fa-spinner fa-spin text-sm" : "fas fa-check-circle text-sm"}></i>
-                                                <span>
-                                                    {processing ? 'ĐANG CẬP NHẬT TRẠNG THÁI...' : (
-                                                        selectedReturnReason 
-                                                            ? (selectedReturnReason.includes('Boom') || selectedReturnReason.includes('trễ')
-                                                                ? 'DUYỆT NHẬP LẠI KHO TỔNG → CHUYỂN HOÀN THÀNH'
-                                                                : 'DUYỆT XUẤT HUỶ HÀNG VỠ/LỖI → CHUYỂN HOÀN THÀNH')
-                                                            : 'VUI LÒNG CHỌN TÌNH TRẠNG HÀNG Ở TRÊN ĐỂ DUYỆT'
-                                                    )}
-                                                </span>
-                                            </button>
+                                            {(() => {
+                                                const effReason = (selectedReturnReason === 'Khác' ? customReturnReason : selectedReturnReason) || '';
+                                                const isEffMissing = effReason.toLowerCase().includes('thiếu') || effReason.toLowerCase().includes('không trả hàng');
+                                                const isEffBoom = effReason.includes('Boom') || effReason.includes('trễ');
+                                                
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleCompleteReturn}
+                                                        disabled={processing || !selectedReturnReason}
+                                                        className={`w-full py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-lg active:scale-[0.98] border flex items-center justify-center gap-2 cursor-pointer ${
+                                                            selectedReturnReason
+                                                                ? (isEffMissing
+                                                                    ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:brightness-110 text-white border-amber-400/50 shadow-amber-950/40'
+                                                                    : (isEffBoom
+                                                                        ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:brightness-110 text-white border-emerald-400/50 shadow-emerald-950/40'
+                                                                        : 'bg-gradient-to-r from-fuchsia-600 via-purple-600 to-rose-600 hover:brightness-110 text-white border-fuchsia-400/50 shadow-purple-950/40'))
+                                                                : 'bg-zinc-800/60 text-zinc-500 border-white/[0.06] cursor-not-allowed'
+                                                        }`}
+                                                    >
+                                                        <i className={processing ? "fas fa-spinner fa-spin text-sm" : "fas fa-check-circle text-sm"}></i>
+                                                        <span>
+                                                            {processing ? 'ĐANG CẬP NHẬT TRẠNG THÁI...' : (
+                                                                selectedReturnReason 
+                                                                    ? (isEffMissing
+                                                                        ? 'DUYỆT HOÀN TIỀN (GIỮ NGUYÊN KHO) → ĐỐI SOÁT THÀNH CÔNG'
+                                                                        : (isEffBoom
+                                                                            ? 'DUYỆT NHẬP LẠI KHO TỔNG → CHUYỂN HOÀN THÀNH'
+                                                                            : 'DUYỆT XUẤT HUỶ HÀNG VỠ/LỖI → CHUYỂN HOÀN THÀNH'))
+                                                                    : 'VUI LÒNG CHỌN TÌNH TRẠNG HÀNG Ở TRÊN ĐỂ DUYỆT'
+                                                            )}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })()}
                                         </div>
 
                                         {/* NÚT PHẠT QUÁ HẠN 72H */}
@@ -7818,14 +7911,40 @@
                 let iStatus = findCol(['trạng thái đơn hàng', 'trạng thái đơn', 'trạng thái', 'order status', 'status']);
                 let iReturnStatus = findCol(['trạng thái trả hàng/hoàn tiền', 'trạng thái trả hàng', 'trạng thái hoàn tiền', 'trạng thái hoàn', 'return / refund status', 'return status', 'trả hàng/hoàn tiền']);
 
-                // Tiền thực tế Shopee trả
-                let iRevenue = findCol(['tổng tiền đã thanh toán', 'số tiền được ghi nhận', 'doanh thu đơn hàng (ước tính)', 'doanh thu đơn hàng', 'doanh thu', 'quyết toán', 'thu nhập ròng', 'số tiền chuyển khoản', 'tổng tiền thanh toán', 'net amount']);
+                // Tiền thực tế Shopee trả (Nhận diện chính xác, loại trừ phí NTTD quảng cáo có chứa chữ "doanh thu")
+                const findRevenueCol = () => {
+                    const exactKeys = [
+                        'doanh thu đơn hàng', 
+                        'doanh thu đơn hàng (ước tính)', 
+                        'số tiền được ghi nhận', 
+                        'tổng tiền đã thanh toán', 
+                        'số tiền chuyển khoản', 
+                        'thu nhập ròng', 
+                        'net amount',
+                        'tổng tiền thanh toán'
+                    ];
+                    let idx = headers.findIndex(h => exactKeys.includes(h));
+                    if (idx !== -1) return idx;
+
+                    idx = headers.findIndex(h => 
+                        (h.startsWith('doanh thu đơn hàng') || h === 'doanh thu' || h.includes('doanh thu đơn hàng')) && 
+                        !h.includes('phí') && !h.includes('nttd') && !h.includes('hiển thị') && !h.includes('dịch vụ') && !h.includes('quảng cáo')
+                    );
+                    if (idx !== -1) return idx;
+
+                    return headers.findIndex(h => 
+                        (h.includes('quyết toán') || h.includes('thu nhập ròng') || h.includes('số tiền ghi nhận') || h.includes('chuyển khoản')) && 
+                        !h.includes('phí') && !h.includes('nttd') && !h.includes('hiển thị')
+                    );
+                };
+                let iRevenue = findRevenueCol();
 
                 // Nhóm 1: Tiền Hàng (Gross)
                 let iTotalSale = findCol(['giá sản phẩm', 'tổng giá bán (sản phẩm)', 'tổng giá bán', 'tổng số tiền người mua thanh toán', 'tổng số tiền', 'tổng tiền sản phẩm', 'tổng giá trị đơn hàng (vnd)', 'tổng giá trị đơn hàng', 'giá gốc']);
                 let iOrderTotal = findCol(['tổng giá trị đơn hàng (vnd)', 'tổng giá trị đơn hàng']);
                 let iBuyerPaid = findCol(['tổng số tiền người mua thanh toán']);
                 let iReturnShip = findCol(['phí vận chuyển trả hàng (đơn trả hàng/hoàn tiền)', 'phí vận chuyển trả hàng', 'phí trả hàng']);
+                let iPiShipRefund = findCol(['phí vận chuyển được hoàn bởi piship', 'phí vận chuyển trả hàng được hoàn bởi piship', 'phí vận chuyển trả hàng được hoàn', 'được hoàn bởi piship', 'hoàn bởi piship']);
                 let iReturnQty = findCol(['số lượng sản phẩm được hoàn trả']);
                 let iItemPrice = findCol(['giá ưu đãi', 'giá sản phẩm', 'giá gốc']);
 
@@ -7834,9 +7953,10 @@
                 let iSellerVoucher = findCol(['mã ưu đãi do người bán chịu', 'voucher của shop', 'mã giảm giá của shop', 'tổng số tiền được người bán trợ giá', 'người bán trợ giá']);
 
                 // Nhóm 3: Vận chuyển
+                let iShippingSeller = findCol(['phí vận chuyển do người bán trả', 'phí vận chuyển người bán trả', 'phí vận chuyển người bán chịu', 'người bán trợ giá vận chuyển', 'shop trợ giá vận chuyển']);
                 let iShippingBuyer = findCol(['phí vận chuyển người mua trả']);
-                let iShippingActual = findCol(['phí vận chuyển thực tế', 'phí vận chuyển do người bán trả', 'phí trả đtgh', 'phí vận chuyển ước tính']);
-                let iShippingShopee = findCol(['phí vận chuyển được trợ giá từ shopee', 'được shopee trợ giá']);
+                let iShippingActual = findCol(['phí vận chuyển thực tế', 'phí trả đtgh', 'phí vận chuyển ước tính']);
+                let iShippingShopee = findCol(['phí vận chuyển được trợ giá từ shopee', 'được shopee trợ giá', 'shopee trợ giá vận chuyển']);
 
                 // Nhóm 4: Phí sàn
                 let iFixedFee = findCol(['phí cố định']);
@@ -7916,6 +8036,18 @@
                         return orderRows.reduce((sum, r) => sum + parseAmt(r[colIdx]), 0);
                     };
 
+                    const getOrderLevelVal = (colIdx) => {
+                        if (colIdx === -1) return 0;
+                        if (orderRows.length === 1) return parseAmt(mainCols[colIdx]);
+                        const vals = orderRows.map(r => parseAmt(r[colIdx])).filter(v => v !== 0);
+                        if (vals.length === 0) return 0;
+                        const allIdentical = vals.every(v => v === vals[0]);
+                        if (allIdentical && vals.length > 1) {
+                            return vals[0];
+                        }
+                        return vals.reduce((a, b) => a + b, 0);
+                    };
+
                     const cleanCode = oCode.split(' | ')[0].trim().toUpperCase();
                     const matchOrder = (orders || []).find(o => {
                         const dbCode = String(o.orderCode || o.id || '').toUpperCase().trim();
@@ -7960,10 +8092,23 @@
                     let totalFees = fixedFee + paymentFee + serviceFee + affiliateFee + tax;
 
                     // 3. Phí vận chuyển và cước hoàn hàng:
-                    let rawReturnShip = (iReturnShip > -1) ? sumCol(iReturnShip) : 0;
-                    let returnShippingFee = Math.abs(rawReturnShip);
-                    let rawShipActual = sumCol(iShippingActual);
-                    let shippingFee = (isCancelled ? 0 : Math.abs(rawShipActual)) + returnShippingFee;
+                    // Phí cước hoàn trả: Kiểm tra xem có được PiShip bồi hoàn cước hay không
+                    let rawReturnShip = (iReturnShip > -1) ? getOrderLevelVal(iReturnShip) : 0;
+                    let rawPiShipRefund = (iPiShipRefund > -1) ? getOrderLevelVal(iPiShipRefund) : 0;
+                    let returnShippingFee = Math.max(0, Math.abs(rawReturnShip) - Math.abs(rawPiShipRefund));
+                    let piShipFee = (iPiShip > -1) ? Math.abs(getOrderLevelVal(iPiShip)) : 0;
+
+                    // Cước vận chuyển chiều đi do Người Bán thực tế chi trả (Tuyệt đối không trừ phí vận chuyển thực tế do Shopee/Người mua trả)
+                    let sellerOutgoingShip = 0;
+                    if (iShippingSeller > -1) {
+                        sellerOutgoingShip = Math.abs(getOrderLevelVal(iShippingSeller));
+                    } else if (iShippingActual > -1) {
+                        let actualShip = Math.abs(getOrderLevelVal(iShippingActual));
+                        let buyerShip = (iShippingBuyer > -1) ? Math.abs(getOrderLevelVal(iShippingBuyer)) : 0;
+                        let shopeeShip = (iShippingShopee > -1) ? Math.abs(getOrderLevelVal(iShippingShopee)) : 0;
+                        sellerOutgoingShip = Math.max(0, actualShip - buyerShip - shopeeShip);
+                    }
+                    let shippingFee = (isCancelled ? 0 : sellerOutgoingShip) + returnShippingFee;
 
                     // 4. Số tiền hoàn lại cho người mua (refundAmount):
                     let rawRefund = sumCol(iRefund);
@@ -7987,19 +8132,18 @@
                     }
 
                     // 5. Tiền Shopee thanh toán / quyết toán (actualShopeePaid) & Net Thực Nhận:
-                    let actualShopeePaid = isCancelled ? 0 : sumCol(iRevenue);
+                    let actualShopeePaid = isCancelled ? 0 : (iRevenue > -1 ? getOrderLevelVal(iRevenue) : 0);
                     let calculatedReconciliation = grossRevenue - totalFees - shopVoucher - shippingFee;
                     let netRevenue = 0;
 
                     if (!isCancelled) {
-                        if (actualShopeePaid > 0) {
+                        if (actualShopeePaid !== 0) {
                             netRevenue = actualShopeePaid;
-                        } else if (isDisputeResolved || rawStatus === 'Hoàn thành') {
-                            // Đơn đã giải quyết khiếu nại hoặc hoàn thành: Shopee quyết toán tiền hàng trừ phí sàn và phí ship hoàn
-                            netRevenue = Math.max(0, grossRevenue - totalFees - shopVoucher - shippingFee);
                         } else if (isReturned) {
-                            // Đơn hoàn 100%: nếu bị mất cước hoàn (cột 44) thì net âm cước đó
-                            netRevenue = returnShippingFee > 0 ? -returnShippingFee : 0;
+                            // Đơn hoàn 100%: Người bán không nhận tiền hàng, chỉ chịu phí dịch vụ PiShip (hoặc cước hoàn chưa được bồi hoàn)
+                            netRevenue = -(piShipFee + returnShippingFee);
+                        } else if (isDisputeResolved || rawStatus === 'Hoàn thành') {
+                            netRevenue = Math.max(0, grossRevenue - totalFees - shopVoucher - shippingFee);
                         } else if (grossRevenue > 0) {
                             netRevenue = Math.max(0, grossRevenue - totalFees - shopVoucher - shippingFee);
                         }
@@ -8131,9 +8275,9 @@
                             });
                         }
 
-                        // Phí xử lý đơn hàng hoàn (2,700đ/đơn hoàn)
+                        // Phí xử lý đơn hàng hoàn (ưu tiên đọc phí dịch vụ PiShip thực tế)
                         if (isReturned && netRevenue <= 0) {
-                            const returnProcessingFee = 2700;
+                            const returnProcessingFee = (piShipFee > 0) ? piShipFee : (returnShippingFee > 0 ? returnShippingFee : 2700);
                             let baseTxId = 'TXN_INC_' + Date.now() + '_' + idx;
                             newTransactions.push({
                                 id: baseTxId + '_RETURN_FEE',
@@ -8142,9 +8286,9 @@
                                 amount: returnProcessingFee,
                                 fromAccount: walletTargetId,
                                 toAccount: '',
-                                title: `Phí xử lý đơn hoàn: ${oCode}`,
+                                title: `Phí xử lý đơn hoàn: ${oCode}` + (rawPiShipRefund > 0 ? ' (PiShip hoàn cước)' : ''),
                                 date: txDate,
-                                note: `Phí Shopee 2,700đ xử lý hàng hoàn đơn ${oCode}`,
+                                note: `Phí Shopee ${returnProcessingFee.toLocaleString('vi-VN')}đ xử lý hàng hoàn đơn ${oCode}` + (rawPiShipRefund > 0 ? ` (Cước hoàn ${Number(rawReturnShip).toLocaleString('vi-VN')}đ được PiShip hoàn 100%)` : ''),
                                 isAuto: true
                             });
                         }
@@ -8160,6 +8304,8 @@
                             totalFees: totalFees,
                             shippingFee: shippingFee,
                             returnShippingFee: returnShippingFee,
+                            rawPiShipRefund: Math.abs(rawPiShipRefund),
+                            rawReturnShip: Math.abs(rawReturnShip),
                             refundAmount: refundAmount,
                             isDisputeResolved: isDisputeResolved,
                             isReturned: isReturned,
@@ -8421,6 +8567,11 @@
                                                                                 <span>{'-' + Number(log.shippingFee).toLocaleString('vi-VN') + 'đ'}</span>
                                                                                 {log.returnShippingFee > 0 && <span className="block text-[8.5px] text-rose-400/80 font-bold uppercase tracking-wider">Cước hoàn</span>}
                                                                             </div>
+                                                                        ) : (log.rawPiShipRefund > 0 && log.returnShippingFee === 0) ? (
+                                                                            <div>
+                                                                                <span className="text-emerald-400 font-semibold text-[11px]">0đ</span>
+                                                                                <span className="block text-[8px] text-emerald-400 font-bold uppercase tracking-wider">PiShip hoàn ({Number(log.rawPiShipRefund).toLocaleString('vi-VN')}đ)</span>
+                                                                            </div>
                                                                         ) : '-'}
                                                                     </td>
                                                                     <td className="p-2.5 text-right whitespace-nowrap">
@@ -8443,7 +8594,7 @@
                                                                                     {'-' + Number(Math.abs(log.netRevenue)).toLocaleString('vi-VN') + 'đ'}
                                                                                 </span>
                                                                                 <span className="block text-[9.5px] text-rose-300/80 font-bold">
-                                                                                    Mất cước hoàn {log.refundAmount > 0 ? `(Hoàn: ${Number(log.refundAmount).toLocaleString('vi-VN')}đ)` : ''}
+                                                                                    {log.rawPiShipRefund > 0 ? 'Phí PiShip' : 'Mất cước hoàn'} {log.refundAmount > 0 ? `(Hoàn: ${Number(log.refundAmount).toLocaleString('vi-VN')}đ)` : ''}
                                                                                 </span>
                                                                             </div>
                                                                         ) : (

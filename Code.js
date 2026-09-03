@@ -675,7 +675,18 @@ function handleApiRequest(payload) {
       }
     }
     else if (action === 'autoCalculateGlassTankBOM' || action === 'autoCalculateGlassTankBOM_Dual') {
-      response = autoCalculateGlassTankBOM_Dual();
+      var pin = payload.pin;
+      var auth = validatePin(pin);
+      if (auth && auth.valid) {
+        if (!checkServerPermission(auth, 'CALC_TANK')) {
+          response.message = 'Từ chối quyền: Bạn không có quyền chạy tính toán định mức BOM Bể Kính!';
+          response.error = 'PERMISSION_DENIED';
+        } else {
+          response = autoCalculateGlassTankBOM_Dual();
+        }
+      } else {
+        response.message = 'Xác thực thất bại!';
+      }
     }
     else if (action === 'runDataIntegrityCheck') {
       var pin = payload.pin;
@@ -856,6 +867,49 @@ function calculateDynamicPositionSalary(monthStr, userName) {
   return userName ? (userTotals[userName] || 0) : userTotals;
 }
 
+/**
+ * KIỂM TRA NGÀY NGHỈ XƯỞNG & NGÀY NGHỈ LỄ QUỐC GIA (HOLIDAY CALENDAR ENGINE)
+ * Tránh phạt oan SLA sau 21:00 hoặc 19:30 và không tính SLA vào ngày nghỉ
+ * 1. Chủ Nhật hàng tuần (getDay() === 0)
+ * 2. Ngày lễ cố định Việt Nam (Tết Dương Lịch 01/01, 30/04, 01/05, Quốc Khánh 02/09, 03/09)
+ * 3. Ngày nghỉ xưởng khai báo động trong ScriptProperties ('WORKSHOP_OFF_DATES')
+ * @param {Date|string} dateObj
+ * @returns {boolean}
+ */
+function isWorkshopOffDay(dateObj) {
+  if (!dateObj) return false;
+  var d = new Date(dateObj);
+  if (isNaN(d.getTime())) return false;
+  
+  // 1. Chủ nhật
+  if (d.getDay() === 0) return true;
+
+  // 2. Ngày lễ cố định Việt Nam (MM-DD)
+  var month = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  var md = month + '-' + day;
+  var FIXED_HOLIDAYS = [
+    '01-01', // Tết Dương Lịch
+    '04-30', // Giải phóng Miền Nam
+    '05-01', // Quốc tế Lao Động
+    '09-02', // Quốc Khánh 2/9
+    '09-03'  // Nghỉ Lễ Quốc Khánh
+  ];
+  if (FIXED_HOLIDAYS.indexOf(md) !== -1) return true;
+
+  // 3. Ngày nghỉ xưởng khai báo đặc biệt ('YYYY-MM-DD,YYYY-MM-DD')
+  try {
+    var customOffDays = PropertiesService.getScriptProperties().getProperty('WORKSHOP_OFF_DATES');
+    if (customOffDays) {
+      var ymd = d.getFullYear() + '-' + month + '-' + day;
+      var offList = customOffDays.split(',').map(function (s) { return s.trim(); });
+      if (offList.indexOf(ymd) !== -1) return true;
+    }
+  } catch (e) {}
+
+  return false;
+}
+
 function calculateBusinessHoursSLA(startStr, endStr) {
   if (!startStr || !endStr) return 0;
   var start = new Date(startStr);
@@ -867,9 +921,8 @@ function calculateBusinessHoursSLA(startStr, endStr) {
 
   while (cur < end) {
     var h = cur.getHours();
-    var d = cur.getDay();
 
-    if (d === 0) { // Chủ nhật
+    if (isWorkshopOffDay(cur)) { // Chủ nhật hoặc Ngày nghỉ lễ / Ngày nghỉ xưởng
       cur.setHours(24, 0, 0, 0);
       continue;
     }
@@ -2074,11 +2127,26 @@ function applyDeltasToSheet(sheetName, items, formatter, ss) {
   }
 
   var modified = false;
+  var idColIdx = headers.indexOf('id');
+  if (idColIdx === -1) idColIdx = 0;
+  var codeColIdx = headers.indexOf('orderCode');
+
   items.forEach(function (item) {
     var rowObject = formatter(item);
     var found = false;
     for (var i = 1; i < data.length; i++) {
-      var isMatch = String(data[i][0]) === String(item.id);
+      var rowIdStr = String(data[i][idColIdx] || '').trim();
+      var itemIdStr = String(item.id || '').trim();
+      var isMatch = (itemIdStr !== '' && rowIdStr === itemIdStr);
+
+      // Fallback matching cho Orders theo orderCode nếu id không khớp
+      if (!isMatch && sheetName === 'Orders' && codeColIdx !== -1) {
+        var rowCode = String(data[i][codeColIdx] || '').split(' | ')[0].split('|')[0].trim().toUpperCase();
+        var itemCode = String(item.orderCode || item.id || '').split(' | ')[0].split('|')[0].trim().toUpperCase();
+        if (rowCode && itemCode && (rowCode === itemCode || rowCode.indexOf(itemCode) === 0 || itemCode.indexOf(rowCode) === 0)) {
+          isMatch = true;
+        }
+      }
 
       // Chống x2 phiếu nghỉ trùng lặp trên Google Sheets
       if (!isMatch && sheetName === 'Attendance' && item.id && (String(item.id).indexOf('ATT_LEAVE_') === 0 || String(item.leaveType || '').indexOf('Nghỉ') === 0)) {
@@ -2208,6 +2276,7 @@ function getProductInfoByName(ss, name) {
   var qtyCol = pHeaders.indexOf('quantity');
   var minStockCol = pHeaders.indexOf('minStock');
   var costCol = pHeaders.indexOf('costPrice');
+  var idCol = pHeaders.indexOf('id');
   
   var cleanTarget = normalizeProdName(name);
   if (!cleanTarget) return null;
@@ -2242,10 +2311,12 @@ function getProductInfoByName(ss, name) {
       var isEligible = cat === 'LAYOUT' || cat === 'BỂ KÍNH' || subCat === 'LAYOUT' || subCat === 'BỂ KÍNH' || cat.includes('SẢN XUẤT');
       return {
         rowIndex: i + 1,
+        id: idCol !== -1 ? pData[i][idCol] : '',
         qtyColIndex: qtyCol !== -1 ? qtyCol : 9,
         qty: Number(pData[i][qtyCol]) || 0,
         minStock: Number(pData[i][minStockCol]) || 0,
         costPrice: Number(pData[i][costCol]) || 0,
+        category: cat,
         isEligible: isEligible,
         sku: pData[i][skuCol],
         name: pData[i][nameCol]
@@ -2265,11 +2336,27 @@ function deleteDeltas(sheetName, itemIds, ss) {
   var idCol = headers.indexOf('id');
   if (idCol === -1) idCol = 0; // Fallback
 
-  var strItemIds = itemIds.map(function (id) { return String(id).trim(); });
-  for (var i = data.length - 1; i >= 1; i--) {
-    if (strItemIds.indexOf(String(data[i][idCol]).trim()) !== -1) {
-      sheet.deleteRow(i + 1);
+  var deleteSet = {};
+  itemIds.forEach(function (id) {
+    if (id !== undefined && id !== null) {
+      deleteSet[String(id).trim()] = true;
     }
+  });
+
+  var rowsToKeep = [headers];
+  var hasDeleted = false;
+  for (var i = 1; i < data.length; i++) {
+    var rowId = String(data[i][idCol]).trim();
+    if (deleteSet[rowId]) {
+      hasDeleted = true;
+    } else {
+      rowsToKeep.push(data[i]);
+    }
+  }
+
+  if (hasDeleted) {
+    sheet.clearContents();
+    sheet.getRange(1, 1, rowsToKeep.length, headers.length).setValues(rowsToKeep);
   }
 }
 
@@ -2419,103 +2506,142 @@ function formatReimbursement(r) { return { "id": r.id, "staffName": r.staffName 
 function formatBOMConfig(b) { return { "id": b.id, "layoutCode": b.layoutCode || '', "materialSku": b.materialSku || '', "defaultQty": Number(b.defaultQty) || 0, "unit": b.unit || '' }; }
 function formatThongKeTichLuyXu(x) { return { "id": x.id || ('XU_' + Date.now() + '_' + Math.floor(Math.random() * 1000)), "user": x.user || '', "type": x.type || 'XU_REWARD', "amount_xu": Number(x.amount_xu !== undefined ? x.amount_xu : (x.amount || 0)), "date": x.date ? String(x.date).slice(0, 10) : Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd"), "orderCode": x.orderCode || '', "note": x.note || '', "timestamp": x.timestamp || Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd HH:mm:ss") }; }
 function formatWorkspace(w) { return { "id": w.id, "name": w.name || '', "user": w.user || '', "tools": typeof w.tools === 'string' ? w.tools : JSON.stringify(w.tools || []), "status": w.status || 'Tốt', "handoverDate": w.handoverDate || '', "photo": w.photo || '', "note": w.note || '' }; }
+function formatCTVFinance(t) { return { "id": t.id || ('CTV_' + Date.now() + '_' + Math.floor(Math.random() * 1000)), "date": t.date ? String(t.date).slice(0, 10) : Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd"), "type": t.type || '', "amount": Number(t.amount) || 0, "note": t.note || '', "user": t.user || '', "status": t.status || 'Chờ Duyệt' }; }
 
 // HÀM LƯU PHÂN QUYỀN VÀ CẤU HÌNH NHÂN SỰ VỀ GOOGLE SHEETS
 function updateUserConfigSheet(configPayload) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config_NhanSu');
-  if (!sheet) return;
-  var data = sheet.getDataRange().getValues();
-  var headers = data[0];
-
-  var pinsMap = configPayload.pins || {};
-  var nameToPinData = {};
-  Object.keys(pinsMap).forEach(function (pin) {
-    var pData = pinsMap[pin];
-    if (pData && pData.name) {
-      nameToPinData[pData.name.trim()] = {
-        pin: pin,
-        role: pData.role,
-        title: pData.title,
-        avatar: pData.avatar
-      };
-    }
-  });
-
-  var newRows = [headers];
-  var salariesMap = configPayload.salaries || {};
-  var processedNames = {};
-
-  for (var i = 1; i < data.length; i++) {
-    var name = String(data[i][0] || '').trim();
-    if (!name) continue;
-
-    var updatedRow = [...data[i]];
-
-    if (nameToPinData[name]) {
-      var update = nameToPinData[name];
-      var avatarColIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'id ảnh' });
-      var titleColIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'chức danh' });
-      var subTitleColIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'trách nhiệm' });
-      var roleColIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'phân quyền' });
-      var pinColIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'mã pin' });
-
-      if (avatarColIdx !== -1) updatedRow[avatarColIdx] = update.avatar || '';
-      else updatedRow[1] = update.avatar || '';
-
-      if (titleColIdx !== -1) updatedRow[titleColIdx] = update.title || '';
-      else updatedRow[2] = update.title || '';
-
-      if (subTitleColIdx !== -1 && update.subTitle !== undefined) updatedRow[subTitleColIdx] = update.subTitle || '';
-
-      if (roleColIdx !== -1) updatedRow[roleColIdx] = update.role || '';
-      else updatedRow[3] = update.role || '';
-
-      if (pinColIdx !== -1) updatedRow[pinColIdx] = update.pin || '';
-      else updatedRow[4] = update.pin || '';
-
-      processedNames[name] = true;
-    }
-
-    if (salariesMap[name]) {
-      var salUpdate = salariesMap[name];
-      var baseSalIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'lương cơ bản'; });
-      var funcSalIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'lương chức vụ'; });
-      var allowanceIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'phụ cấp xăng xe'; });
-      var penaltyIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'khoản trừ vi phạm'; });
-
-      if (baseSalIdx !== -1 && salUpdate.baseSalary !== undefined) updatedRow[baseSalIdx] = salUpdate.baseSalary;
-      if (funcSalIdx !== -1 && salUpdate.funcSalary !== undefined) updatedRow[funcSalIdx] = salUpdate.funcSalary;
-      if (allowanceIdx !== -1 && salUpdate.allowance !== undefined) updatedRow[allowanceIdx] = salUpdate.allowance;
-      if (penaltyIdx !== -1 && salUpdate.penalty !== undefined) updatedRow[penaltyIdx] = salUpdate.penalty;
-    }
-
-    newRows.push(updatedRow);
+  var lock = LockService.getScriptLock();
+  var hasLock = false;
+  try {
+    hasLock = lock.tryLock(15000);
+  } catch (e) {
+    hasLock = false;
   }
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config_NhanSu');
+    if (!sheet) return;
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
 
-  Object.keys(nameToPinData).forEach(function (name) {
-    if (!processedNames[name]) {
-      var update = nameToPinData[name];
-      var newRow = [name, update.avatar || '', update.title || '', update.role || '', update.pin || '', 0, 0, 0, 0];
-      newRows.push(newRow);
+    var pinsMap = configPayload.pins || {};
+    var nameToPinData = {};
+    Object.keys(pinsMap).forEach(function (pin) {
+      var pData = pinsMap[pin];
+      if (pData && pData.name) {
+        nameToPinData[pData.name.trim()] = {
+          pin: pin,
+          role: pData.role,
+          title: pData.title,
+          avatar: pData.avatar
+        };
+      }
+    });
+
+    var newRows = [headers];
+    var salariesMap = configPayload.salaries || {};
+    var processedNames = {};
+
+    for (var i = 1; i < data.length; i++) {
+      var name = String(data[i][0] || '').trim();
+      if (!name) continue;
+
+      var updatedRow = [...data[i]];
+
+      if (nameToPinData[name]) {
+        var update = nameToPinData[name];
+        var avatarColIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'id ảnh' });
+        var titleColIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'chức danh' });
+        var subTitleColIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'trách nhiệm' });
+        var roleColIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'phân quyền' });
+        var pinColIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'mã pin' });
+
+        if (avatarColIdx !== -1) updatedRow[avatarColIdx] = update.avatar || '';
+        else updatedRow[1] = update.avatar || '';
+
+        if (titleColIdx !== -1) updatedRow[titleColIdx] = update.title || '';
+        else updatedRow[2] = update.title || '';
+
+        if (subTitleColIdx !== -1 && update.subTitle !== undefined) updatedRow[subTitleColIdx] = update.subTitle || '';
+
+        if (roleColIdx !== -1) updatedRow[roleColIdx] = update.role || '';
+        else updatedRow[3] = update.role || '';
+
+        if (pinColIdx !== -1) updatedRow[pinColIdx] = update.pin || '';
+        else updatedRow[4] = update.pin || '';
+
+        processedNames[name] = true;
+      }
+
+      if (salariesMap[name]) {
+        var salUpdate = salariesMap[name];
+        var baseSalIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'lương cơ bản'; });
+        var funcSalIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'lương chức vụ'; });
+        var allowanceIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'phụ cấp xăng xe'; });
+        var penaltyIdx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === 'khoản trừ vi phạm'; });
+
+        if (baseSalIdx !== -1 && salUpdate.baseSalary !== undefined) updatedRow[baseSalIdx] = salUpdate.baseSalary;
+        if (funcSalIdx !== -1 && salUpdate.funcSalary !== undefined) updatedRow[funcSalIdx] = salUpdate.funcSalary;
+        if (allowanceIdx !== -1 && salUpdate.allowance !== undefined) updatedRow[allowanceIdx] = salUpdate.allowance;
+        if (penaltyIdx !== -1 && salUpdate.penalty !== undefined) updatedRow[penaltyIdx] = salUpdate.penalty;
+      }
+
+      newRows.push(updatedRow);
     }
-  });
 
-  sheet.clearContents();
-  sheet.getRange(1, 1, newRows.length, headers.length).setValues(newRows);
-  CacheService.getScriptCache().remove('USER_CONFIG');
+    Object.keys(nameToPinData).forEach(function (name) {
+      if (!processedNames[name]) {
+        var update = nameToPinData[name];
+        var newRow = [name, update.avatar || '', update.title || '', update.role || '', update.pin || '', 0, 0, 0, 0];
+        newRows.push(newRow);
+      }
+    });
+
+    sheet.clearContents();
+    sheet.getRange(1, 1, newRows.length, headers.length).setValues(newRows);
+    CacheService.getScriptCache().remove('USER_CONFIG');
+  } finally {
+    if (hasLock) {
+      try { lock.releaseLock(); } catch(e) {}
+    }
+  }
 }
 
 function adjustAccountBalanceServer(ss, accountId, change) {
   if (!accountId || change === 0) return;
-  var sheet = ss.getSheetByName('Accounts');
+  var batch = {};
+  batch[String(accountId).trim()] = Number(change) || 0;
+  applyBatchAccountBalanceChanges(ss, batch);
+}
+
+function applyBatchAccountBalanceChanges(ss, balanceChanges) {
+  if (!balanceChanges || typeof balanceChanges !== 'object') return;
+  var keys = Object.keys(balanceChanges);
+  if (keys.length === 0) return;
+  var activeSs = ss || SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = activeSs.getSheetByName('Accounts');
   if (!sheet) return;
   var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return;
+  var headers = data[0];
+  var idCol = headers.indexOf('id');
+  var balCol = headers.indexOf('balance');
+  if (idCol === -1) idCol = 0;
+  if (balCol === -1) balCol = 2;
+
+  var modified = false;
   for (var i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(accountId)) {
-      var currentBalance = Number(data[i][2]) || 0;
-      sheet.getRange(i + 1, 3).setValue(currentBalance + change);
-      break;
+    var accId = String(data[i][idCol]).trim();
+    if (balanceChanges.hasOwnProperty(accId)) {
+      var delta = Number(balanceChanges[accId]) || 0;
+      if (delta !== 0) {
+        var curBal = Number(data[i][balCol]) || 0;
+        data[i][balCol] = curBal + delta;
+        modified = true;
+      }
     }
+  }
+  if (modified) {
+    sheet.getRange(1, 1, data.length, headers.length).setValues(data);
   }
 }
 
@@ -2577,7 +2703,14 @@ function syncDeltas(payload, pin) {
     lock.waitLock(30000);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    // 1. Hoàn trả số dư khi XOÁ giao dịch
+    // 1. Hoàn trả số dư khi XOÁ giao dịch (Batch Account Balance Optimization)
+    var balanceDeltaMap = {};
+    function queueBalanceDelta(accId, amt) {
+      if (!accId || !amt) return;
+      var key = String(accId).trim();
+      balanceDeltaMap[key] = (balanceDeltaMap[key] || 0) + Number(amt);
+    }
+
     if (payload.deletes && payload.deletes.Transactions && payload.deletes.Transactions.length > 0) {
       var txSheet = ss.getSheetByName('Transactions');
       if (txSheet) {
@@ -2596,8 +2729,8 @@ function syncDeltas(payload, pin) {
                 var fromAcc = String(txData[i][fromCol]).trim();
                 var toAcc = String(txData[i][toCol]).trim();
 
-                if (fromAcc) adjustAccountBalanceServer(ss, fromAcc, amt);
-                if (toAcc) adjustAccountBalanceServer(ss, toAcc, -amt);
+                if (fromAcc) queueBalanceDelta(fromAcc, amt);
+                if (toAcc) queueBalanceDelta(toAcc, -amt);
                 break;
               }
             }
@@ -2633,8 +2766,8 @@ function syncDeltas(payload, pin) {
                 var oldFrom = String(txData[i][fromCol]).trim();
                 var oldTo = String(txData[i][toCol]).trim();
 
-                if (oldFrom) adjustAccountBalanceServer(ss, oldFrom, oldAmt);
-                if (oldTo) adjustAccountBalanceServer(ss, oldTo, -oldAmt);
+                if (oldFrom) queueBalanceDelta(oldFrom, oldAmt);
+                if (oldTo) queueBalanceDelta(oldTo, -oldAmt);
                 foundOld = true;
                 break;
               }
@@ -2645,11 +2778,14 @@ function syncDeltas(payload, pin) {
           var newFrom = String(newTx.fromAccount || '').trim();
           var newTo = String(newTx.toAccount || '').trim();
 
-          if (newFrom) adjustAccountBalanceServer(ss, newFrom, -newAmt);
-          if (newTo) adjustAccountBalanceServer(ss, newTo, newAmt);
+          if (newFrom) queueBalanceDelta(newFrom, -newAmt);
+          if (newTo) queueBalanceDelta(newTo, newAmt);
         });
       }
     }
+
+    // Ghi nhận biến động số dư theo lô an toàn
+    applyBatchAccountBalanceChanges(ss, balanceDeltaMap);
 
     // =========================================================================
     // HỆ THỐNG TỰ ĐỘNG HÓA KHO & SẢN XUẤT CHO SẢN PHẨM LAYOUT & BỂ KÍNH
@@ -2846,7 +2982,16 @@ function syncDeltas(payload, pin) {
                         if (pItem.phases[phKey]) pItem.phases[phKey].status = 'Pending';
                       }
                     }
-                    if (isExportOrder) pItem.note = (pItem.note || '') + ' (Đơn Xuất Khẩu - Ép buộc tạo lệnh SX mới)';
+                    // Dọn sạch nhãn tồn kho cũ để tránh mâu thuẫn hiển thị
+                    if (pItem.note) {
+                      pItem.note = String(pItem.note)
+                        .replace(/\|\s*Lấy từ tồn kho có sẵn/gi, '')
+                        .replace(/Lấy từ tồn kho có sẵn\s*\|?/gi, '')
+                        .replace(/\|\s*Có sẵn ở kho[^|]*/gi, '')
+                        .replace(/Có sẵn ở kho[^|]*\|?/gi, '')
+                        .trim();
+                    }
+                    if (isExportOrder) pItem.note = (pItem.note ? (pItem.note + ' | ') : '') + '(Đơn Xuất Khẩu - Ép buộc tạo lệnh SX mới)';
                     if (payload.orders) {
                       for (var oIdx = 0; oIdx < payload.orders.length; oIdx++) {
                         if (String(payload.orders[oIdx].id) === String(pItem.orderId)) {
@@ -3056,7 +3201,13 @@ function syncDeltas(payload, pin) {
         if (isTargetHandover && oIdColIdx !== -1 && oStatusColIdx !== -1) {
           var oldStatus = '';
           for (var r = 1; r < oldOrdersData.length; r++) {
-            if (String(oldOrdersData[r][oIdColIdx]) === String(incomingOrder.id)) {
+            var rowId = String(oldOrdersData[r][oIdColIdx] || '').trim();
+            var incId = String(incomingOrder.id || '').trim();
+            var rowCode = oCodeColIdx !== -1 ? String(oldOrdersData[r][oCodeColIdx] || '').split(' | ')[0].split('|')[0].trim().toUpperCase() : '';
+            var incCode = String(incomingOrder.orderCode || incomingOrder.id || '').split(' | ')[0].split('|')[0].trim().toUpperCase();
+
+            var isRowMatch = (incId !== '' && rowId === incId) || (rowCode !== '' && incCode !== '' && (rowCode === incCode || rowCode.indexOf(incCode) === 0 || incCode.indexOf(rowCode) === 0));
+            if (isRowMatch) {
               oldStatus = String(oldOrdersData[r][oStatusColIdx]).toUpperCase().trim();
               if (!incomingOrder.orderCode && oCodeColIdx !== -1) incomingOrder.orderCode = oldOrdersData[r][oCodeColIdx];
               if (!incomingOrder.accessories && oAccColIdx !== -1) incomingOrder.accessories = oldOrdersData[r][oAccColIdx];
@@ -3142,7 +3293,7 @@ function syncDeltas(payload, pin) {
                      p1Status === 'DONE' || qcStatus.indexOf('DUYỆT') !== -1 || qcStatus.indexOf('PASS') !== -1;
         if (isDone) {
           try {
-            processMaterialDeduction(p.id, null);
+            _processMaterialDeduction_Core(p.id, null, ss);
           } catch (e) {
             Logger.log('Lỗi auto BOM trong syncDeltas: ' + e.toString());
           }
@@ -3289,25 +3440,15 @@ function syncDeltas(payload, pin) {
         }
       }
     }
-    // XỬ LÝ RIÊNG TÀI CHÍNH CỘNG TÁC VIÊN (CÁCH LY VỚI SỔ QUỸ CHÍNH)
+    // XỬ LÝ RIÊNG TÀI CHÍNH CỘNG TÁC VIÊN (CÁCH LY VỚI SỔ QUỸ CHÍNH - CHỐNG TRÙNG LẶP ID)
     if (payload.ctvTransactions && payload.ctvTransactions.length > 0) {
-      let financeSheet = ss.getSheetByName('CTV_Finance');
-
-      // Tự động tạo Sheet "CTV_Finance" nếu chưa tồn tại
-      if (!financeSheet) {
-        financeSheet = ss.insertSheet('CTV_Finance');
-        financeSheet.appendRow(['id', 'date', 'type', 'amount', 'note', 'user', 'status']);
+      if (!ss.getSheetByName('CTV_Finance')) {
+        var financeSheet = ss.insertSheet('CTV_Finance');
+        financeSheet.appendRow(SCHEMA_ERP.CTV_Finance || ['id', 'date', 'type', 'amount', 'note', 'user', 'status']);
         financeSheet.getRange("A1:G1").setFontWeight("bold").setBackground("#d4af37");
+        financeSheet.setFrozenRows(1);
       }
-
-      // Nạp các phiếu tài chính vào Sheet riêng biệt
-      var ctvRows = [];
-      payload.ctvTransactions.forEach(t => {
-        ctvRows.push([t.id, t.date, t.type, t.amount, t.note, t.user, t.status]);
-      });
-      if (ctvRows.length > 0) {
-        financeSheet.getRange(financeSheet.getLastRow() + 1, 1, ctvRows.length, ctvRows[0].length).setValues(ctvRows);
-      }
+      applyDeltasToSheet('CTV_Finance', payload.ctvTransactions, formatCTVFinance, ss);
     }
     if (payload.UserConfigs && payload.UserConfigs.length > 0) {
       updateUserConfigSheet(payload.UserConfigs[0]);
@@ -3343,7 +3484,11 @@ function syncDeltas(payload, pin) {
         'Models3D': 'Models3D',
         'BOM_Config': 'BOM_Config',
         'ThongKe_TichLuyXu': 'ThongKe_TichLuyXu',
-        'xuTransactions': 'ThongKe_TichLuyXu'
+        'xuTransactions': 'ThongKe_TichLuyXu',
+        'CTV_Finance': 'CTV_Finance',
+        'ctvTransactions': 'CTV_Finance',
+        'Workspaces': 'Workspaces',
+        'workspaces': 'Workspaces'
       };
       Object.keys(payload.deletes).forEach(function (clientKey) {
         var sName = keyMapping[clientKey] || clientKey;
@@ -3661,7 +3806,7 @@ function checkServerPermission(auth, actionCode) {
   if (!auth || !auth.valid) return false;
   
   // Boss Tối Cao luôn có toàn quyền
-  if (auth.isBoss || auth.role === 'TỐI CAO' || (auth.user && auth.user.indexOf('Tiến') > -1)) {
+  if (auth.isBoss || auth.role === 'TỐI CAO') {
     return true;
   }
   
@@ -3729,7 +3874,7 @@ function requireServerPermission(auth, actionCode, actionDesc) {
  */
 function validateTableWritePermission(auth, tableName, isDelete, deltaItems) {
   if (!auth || !auth.valid) return { allowed: false, reason: 'Chưa xác thực danh tính (PIN không hợp lệ)' };
-  if (auth.isBoss || auth.role === 'TỐI CAO' || (auth.user && auth.user.indexOf('Tiến') > -1)) {
+  if (auth.isBoss || auth.role === 'TỐI CAO') {
     return { allowed: true };
   }
 
@@ -4724,6 +4869,13 @@ function processGHNEmail(subject, plainBody, emailDate, messageId, ss, txSheet, 
 }
 
 function processSPXReturnEmail(message, ss) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch (e) {
+    console.error("Hệ thống đang bận, bỏ qua lượt quét SPX Return Email:", e);
+    return;
+  }
   try {
     if (typeof Drive === 'undefined' || typeof Drive.Files === 'undefined') {
       console.error("Vui lòng bật Drive API (v2 hoặc v3) trong phần Services của Apps Script để dùng OCR đọc PDF!");
@@ -4841,6 +4993,8 @@ function processSPXReturnEmail(message, ss) {
 
   } catch (e) {
     console.error("Lỗi processSPXReturnEmail: " + e.toString());
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -4864,70 +5018,19 @@ function classifyCategory(type, title) {
 }
 
 function updateAccountBalance(ss, accountId, amount, type) {
-  if (!accountId) return;
-  var sheet = ss.getSheetByName('Accounts');
-  if (!sheet) return;
-
-  var data = sheet.getDataRange().getValues();
-  for (var i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(accountId)) {
-      var currentBalance = Number(data[i][2]) || 0;
-      var change = Number(amount) || 0;
-      var newBalance = currentBalance;
-
-      if (type === "Thu") {
-        newBalance += change;
-      } else if (type === "Chi") {
-        newBalance -= change;
-      }
-
-      sheet.getRange(i + 1, 3).setValue(newBalance);
-      break;
-    }
-  }
-}
-
-
-function normalizeProdName(str) {
-  return String(str || '').toLowerCase().replace(/[-\s]+/g, ' ').trim();
-}
-
-function getProductInfoByName(ss, pName) {
-  var sheet = ss.getSheetByName('Products');
-  if (!sheet) return null;
-  var data = sheet.getDataRange().getValues();
-  var headers = data[0];
-  var nameCol = headers.indexOf('name');
-  var qtyCol = headers.indexOf('quantity');
-  var minCol = headers.indexOf('minStock');
-  var costCol = headers.indexOf('costPrice');
-  var idCol = headers.indexOf('id');
-  var catCol = headers.indexOf('category');
-
-  if (nameCol === -1) return null;
-  var searchName = normalizeProdName(pName);
-  for (var i = 1; i < data.length; i++) {
-    var rowName = normalizeProdName(data[i][nameCol]);
-    if (rowName === searchName) {
-      var category = catCol !== -1 ? String(data[i][catCol]).toUpperCase().trim() : '';
-      var isEligible = true; // Luôn kiểm tra tồn kho, không phụ thuộc vào category
-      return {
-        rowIndex: i + 1,
-        id: data[i][idCol],
-        name: data[i][nameCol],
-        qty: qtyCol !== -1 ? (Number(data[i][qtyCol]) || 0) : 0,
-        minStock: minCol !== -1 ? (Number(data[i][minCol]) || 0) : 0,
-        costPrice: costCol !== -1 ? (Number(data[i][costCol]) || 0) : 0,
-        category: category,
-        isEligible: isEligible,
-        qtyColIndex: qtyCol
-      };
-    }
-  }
-  return null;
+  if (!accountId || !amount) return;
+  var change = Number(amount) || 0;
+  if (type === "Chi") change = -change;
+  adjustAccountBalanceServer(ss, accountId, change);
 }
 
 function syncBIDVEmails() {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch (e) {
+    return { success: false, message: 'Hệ thống đang bận, thử lại sau!' };
+  }
   try {
     var query = 'bidvsmartbanking@bidv.com.vn is:unread';
     var threads = GmailApp.search(query, 0, 50);
@@ -5030,6 +5133,8 @@ function syncBIDVEmails() {
     return { success: true, count: count, message: 'Đã đồng bộ ' + count + ' giao dịch BIDV.' };
   } catch (e) {
     return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -6124,15 +6229,11 @@ function cleanUpOldReconciliationJunk() {
       var id = idCol >= 0 ? String(row[idCol]) : '';
 
       var isJunk = false;
-      // Xoá rác đối soát cũ và phiếu tự động trùng lặp
-      if (note.indexOf('Đối soát tự động (Batch)') > -1) isJunk = true;
-      if (note.indexOf('Nhóm') > -1 && note.indexOf('=> THỰC NHẬN') > -1) isJunk = true;
-      if (cat.indexOf('Đối soát') > -1) isJunk = true;
-      if (note.indexOf('Doanh thu Shopee') > -1) isJunk = true;
-      if (id.indexOf('TX_SHPINC') > -1 || id.indexOf('SHPINC') > -1) isJunk = true;
-      if (note.indexOf('Order.all') > -1) isJunk = true;
-      if (id.indexOf('TX_PRE_') > -1) isJunk = true;
-      if (note.indexOf('Tự động từ BIDV') > -1) isJunk = true;
+      // Xoá rác đối soát cũ và phiếu tự động trùng lặp (chỉ xoá phiếu rác test rõ ràng, bảo vệ doanh thu thật)
+      if (note.indexOf('Đối soát tự động (Batch) - RÁC') > -1) isJunk = true;
+      if (note.indexOf('Nhóm') > -1 && note.indexOf('=> THỰC NHẬN') > -1 && id.indexOf('TX_TEST') > -1) isJunk = true;
+      if (id.indexOf('TX_JUNK_') > -1) isJunk = true;
+      if (note.indexOf('Order.all.test') > -1) isJunk = true;
 
       if (!isJunk) {
         rowsToKeep.push(row);
@@ -8705,16 +8806,9 @@ function getBomFromBomLayoutSheet(ss, prodName, targetSku) {
  * Trừ số lượng vật tư trong bảng Products khi lệnh sản xuất hoàn thành
  * Ghi log xuất kho vào bảng ImportExport chuẩn 100%
  */
-function processMaterialDeduction(prodId, materialUsageData) {
-  var lock = LockService.getScriptLock();
+function _processMaterialDeduction_Core(prodId, materialUsageData, ss) {
   try {
-    lock.waitLock(15000);
-  } catch (e) {
-    return { success: false, message: 'Hệ thống đang bận, thử lại sau!' };
-  }
-
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
     var prodSheet = ss.getSheetByName('Production');
     var bomSheet = ss.getSheetByName('BOM_Config');
     var productSheet = ss.getSheetByName('Products');
@@ -9237,6 +9331,22 @@ function processMaterialDeduction(prodId, materialUsageData) {
       deducted: itemsDeducted
     };
 
+  } catch (err) {
+    console.error("Lỗi _processMaterialDeduction_Core:", err);
+    return { success: false, message: 'Lỗi: ' + err.toString() };
+  }
+}
+
+function processMaterialDeduction(prodId, materialUsageData) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch (e) {
+    return { success: false, message: 'Hệ thống đang bận, thử lại sau!' };
+  }
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    return _processMaterialDeduction_Core(prodId, materialUsageData, ss);
   } catch (err) {
     console.error("Lỗi processMaterialDeduction:", err);
     return { success: false, message: 'Lỗi: ' + err.toString() };
@@ -10071,6 +10181,12 @@ function autoCalculateGlassTankBOM_Dual() {
  * Phạt 50,000 VND vào quỹ của Nguyễn Thị Diệu Hương
  */
 function cronCheckUnpackedOrdersAt1930() {
+  const now = new Date();
+  if (isWorkshopOffDay(now)) {
+    Logger.log('Hôm nay là ngày nghỉ của xưởng (Chủ nhật / Nghỉ lễ / Nghỉ đột xuất). Bỏ qua tự động phạt đóng gói SLA 19:30.');
+    return;
+  }
+
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000);

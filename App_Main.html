@@ -781,9 +781,267 @@
 
         const RELEASES = [
             {
+                version: 'Royal v2.37.7',
+                date: '04/09/2026',
+                isLatest: true,
+                badge: 'XỬ LÝ THIẾU HÀNG & GIỮ NGUYÊN TỒN KHO',
+                badgeColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                title: 'Tích Hợp Xử Lý Đơn Thiếu Hàng (Hoàn Tiền Ngay) & Bảo Toàn Tồn Kho',
+                summary: 'Xử lý triệt để bài toán đơn Shopee hoàn tiền ngay do đóng thiếu hàng không có hàng hoàn về: Thêm nút 1-chạm "Hoàn Tiền Thiếu Hàng" tại Trạm Xử Lý Hàng Hoàn, cam kết bảo toàn 100% tồn kho (không cộng khống, không xuất hủy), tự động chuyển đơn sang Đối Soát Thành Công theo đúng số tiền thực nhận.',
+                categories: ['Đơn Hàng', 'Hàng Hoàn', 'Kho Hàng', 'Đối Soát', 'Shopee'],
+                items: [
+                    {
+                        icon: 'fa-box-open',
+                        color: 'text-amber-400',
+                        title: 'Nút 1 Chạm Hoàn Tiền Thiếu Hàng (Giữ Nguyên Tồn Kho)',
+                        desc: 'Bổ sung nút xử lý nhanh ngay tại Bước 1 & Bước 2 Trạm Hàng Hoàn, lập tức chuyển đơn sang Đối Soát Thành Công mà không tạo bất kỳ phiếu nhập/xuất kho nào.'
+                    },
+                    {
+                        icon: 'fa-shield-halved',
+                        color: 'text-emerald-400',
+                        title: 'Chống Lệch Khống Tồn Kho (Zero Muda Kho Hàng)',
+                        desc: 'Ngăn chặn triệt để tình trạng hệ thống tự động cộng bù toàn bộ phụ kiện vào kho khi khách chỉ nhận thiếu 1 món và không có hàng hoàn về.'
+                    },
+                    {
+                        icon: 'fa-receipt',
+                        color: 'text-sky-400',
+                        title: 'Đồng Bộ Doanh Thu Thực Quyết Toán Theo Sàn',
+                        desc: 'Số tiền Shopee trừ đi phần thiếu (vd: -18.418đ) được phản ánh chuẩn xác trên doanh thu đơn hàng, bảo đảm tiền về ví khớp từng đồng.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.37.6',
+                date: '04/09/2026',
+                isLatest: false,
+                badge: 'QUÉT ĐƠN HOÀN & GHI CHÚ LÝ DO TỰ ĐỘNG',
+                badgeColor: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+                title: 'Tích Hợp Nhập Lý Do Hoàn Hàng & Tự Động Trích Xuất File Excel',
+                summary: 'Nâng cấp toàn diện Modal Quét Đơn Hoàn Tự Động theo chuẩn Hallmark UI: Bổ sung bộ preset chip chọn nhanh lý do (Bom hàng, Bể vỡ ship, Giao sai mẫu, Khách đổi ý, Giao chậm) + Ô nhập tự do; tự động trích xuất lý do từ cột file báo cáo Shopee và cài đặt lý do mặc định khi tít súng bắn mã vạch.',
+                categories: ['Đơn Hàng', 'Hàng Hoàn', 'Hallmark UI', 'Barcode', 'Shopee'],
+                items: [
+                    {
+                        icon: 'fa-clipboard-question',
+                        color: 'text-purple-400',
+                        title: 'Bộ Preset Chips Chọn Nhanh & Ô Nhập Tự Do Chuẩn Hallmark',
+                        desc: 'Thiết kế trực quan các tag lý do hoàn thường gặp (Bom hàng, Bể vỡ, Sai mẫu, Đổi ý, Giao chậm) chọn 1 chạm, hỗ trợ nhập tự do chi tiết và xóa nhanh với micro-interaction tinh tế.'
+                    },
+                    {
+                        icon: 'fa-file-excel',
+                        color: 'text-emerald-400',
+                        title: 'Tự Động Bóc Tách Cột Lý Do Từ File Báo Cáo Shopee / TikTok',
+                        desc: 'Hệ thống tự động dò tìm các header lý do trả hàng / khiếu nại trong file Excel, gắn nhãn lý do trực tiếp dưới từng mã đơn và tự động đề xuất lý do hoàn cho đợt quét.'
+                    },
+                    {
+                        icon: 'fa-barcode',
+                        color: 'text-amber-400',
+                        title: 'Hỗ Trợ Cài Sẵn Lý Do Hoàn Cho Súng Bắn Mã Vạch (Barcode Gun)',
+                        desc: 'Cho phép nhân viên kho chọn sẵn lý do hoàn trước khi tít mã hàng loạt; mọi đơn tít thành công đều được tự động lưu chuẩn vào CSDL Orders.note [Hoàn: <lý do>].'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.37.5',
+                date: '04/09/2026',
+                isLatest: false,
+                badge: 'ĐỐI SOÁT CHUẨN XÁC DOANH THU & PISHIP',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Khắc Phục Lệch Doanh Thu Thực Nhận Về Ví & Bồi Hoàn Cước Hoàn PiShip',
+                summary: 'Khắc phục triệt để lỗi quét file Order.all trừ nhầm phí vận chuyển thực tế của đơn vị vận chuyển vào tiền hàng người bán; bóc tách bồi hoàn cước hoàn 40.000đ từ gói PiShip và chỉ ghi nhận 2.700đ phí dịch vụ; bảo toàn 100% doanh thu thực nhận về ví.',
+                categories: ['Đơn Hàng', 'Đối Soát', 'Tài Chính', 'PiShip', 'Shopee'],
+                items: [
+                    {
+                        icon: 'fa-wallet',
+                        color: 'text-emerald-400',
+                        title: 'Bảo Toàn Doanh Thu Thực Nhận Về Ví (Không Trừ Oan Cước Ship)',
+                        desc: 'Phân định ranh giới giữa Phí vận chuyển thực tế (Shopee trợ giá 100% hoặc người mua trả) với Phí do shop tự chịu. Tuyệt đối không trừ cước ship 140k/65k vào doanh thu người bán, bảo đảm tiền về ví hơn 200k hiển thị chuẩn xác hơn 200k.'
+                    },
+                    {
+                        icon: 'fa-shield-halved',
+                        color: 'text-sky-400',
+                        title: 'Tự Động Bù Trừ Bồi Hoàn Cước Hoàn PiShip (Zero Muda Cước Hoàn)',
+                        desc: 'Bóc tách đồng thời cột Phí vận chuyển được hoàn bởi PiShip (+40.000đ) bù trừ với Cước hoàn (-40.000đ). Cước hoàn về 0đ và chỉ ghi nhận 2.700đ phí dịch vụ PiShip.'
+                    },
+                    {
+                        icon: 'fa-magnifying-glass-dollar',
+                        color: 'text-amber-400',
+                        title: 'Nhận Diện Chuẩn Cột Doanh Thu & Chống Bắt Nhầm Phí NTTD',
+                        desc: 'Loại trừ triệt để các cột phí quảng cáo NTTD có chứa chữ doanh thu, ưu tiên nhận diện chính xác cột Doanh thu đơn hàng / Số tiền được ghi nhận theo đúng dữ liệu Shopee quyết toán.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.37.4',
+                date: '04/09/2026',
+                isLatest: false,
+                badge: 'BẢO VỆ TIẾN ĐỘ THỢ & PHÂN ĐỊNH TRẠNG THÁI',
+                badgeColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                title: 'Sửa Lỗi Lệnh Sản Xuất Chưa Làm Bị Ép Sang Tab Đã Xong & Bảo Vệ Tiến Độ Thợ',
+                summary: 'Khắc phục việc lệnh xưởng đang làm dở dang (khâu 2 chờ nhận việc hoặc KCS yêu cầu làm lại) bị đẩy nhầm sang tab Đã Xong; phân định ranh giới nghiêm ngặt giữa tiến độ vật lý của thợ và trạng thái đơn hàng.',
+                categories: ['Sản Xuất', 'Vận Hành', 'Lean', 'Bảo Vệ Tiến Độ'],
+                items: [
+                    {
+                        icon: 'fa-hammer',
+                        color: 'text-amber-400',
+                        title: 'Giữ Chặt Lệnh Dở Dang ở Chờ Sản Xuất',
+                        desc: 'Lệnh xưởng chỉ được coi là ĐÃ XONG khi cả 2 khâu thợ đã hoàn thành thực tế hoặc lấy từ kho có sẵn. Các lệnh đang làm khâu 1, chờ khâu 2 hay bị yêu cầu làm lại bắt buộc nằm ở Chờ Sản Xuất để thợ tiếp tục làm.'
+                    },
+                    {
+                        icon: 'fa-ban',
+                        color: 'text-rose-400',
+                        title: 'Tự Động Huỷ Lệnh Thừa Khi Đơn Đã Giao',
+                        desc: 'Nếu đơn hàng mẹ đã giao/bàn giao nhưng xưởng chưa từng có thợ nào đụng tay vào khâu nào, lệnh tự động chuyển sang ĐÃ HUỶ để chống làm trùng và cãi nhau, không đẩy sang Đã Xong.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.37.3',
+                date: '03/09/2026',
+                isLatest: false,
+                badge: 'BẢO VỆ ĐƠN HÀNG & XOÁ LỆNH AN TOÀN',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Bảo Vệ Trạng Thái Đơn Hàng & Đồng Bộ Hai Chiều Khi Xoá Lệnh Sản Xuất',
+                summary: 'Khắc phục triệt để lỗi xoá lệnh sản xuất nhưng đơn hàng bị nhảy hoặc kẹt ở Sẵn Sàng Đóng Gói; kiểm tra chặt chẽ điều kiện hasProduction và bổ sung hộp thoại điều hướng thông minh khi xoá lệnh.',
+                categories: ['Sản Xuất', 'Đơn Hàng', 'Vận Hành', 'Bảo Vệ Dữ Liệu'],
+                items: [
+                    {
+                        icon: 'fa-shield-halved',
+                        color: 'text-emerald-400',
+                        title: 'Chốt Chặn Trạng Thái Đơn Yêu Cầu Sản Xuất',
+                        desc: 'Nếu đơn hàng có cờ hasProduction nhưng chưa có lệnh sản xuất hoặc lệnh bị xoá, allProdDone bắt buộc nhận giá trị false và đơn được giữ chặt ở Chờ Sản Xuất, không cho trôi sang Sẵn Sàng Đóng Gói.'
+                    },
+                    {
+                        icon: 'fa-trash-can-arrow-up',
+                        color: 'text-rose-400',
+                        title: 'Hộp Thoại Điều Hướng Thông Minh Khi Xoá Lệnh',
+                        desc: 'Khi xoá lệnh xưởng, hệ thống hỏi rõ người dùng: Huỷ luôn đơn hàng (Đơn Huỷ) hay giữ đơn và đưa về Chờ Sản Xuất để tạo lại lệnh mới, đồng bộ tức thì vào CSDL Orders.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.37.2',
+                date: '03/09/2026',
+                isLatest: false,
+                badge: 'LIÊN KẾT ĐƠN - XƯỞNG & GHI CHÚ CHUẨN XÁC',
+                badgeColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                title: 'Liên Kết Trạng Thái Đơn - Xưởng (Parent-Child Cascade), Quét Ghi Chú Đơn Hàng Shopee & Triệt Tiêu Nhãn Ảo Tồn Kho',
+                summary: 'Khắc phục triệt để việc đơn đã bàn giao nhưng lệnh sản xuất vẫn treo ở Chờ Sản Xuất gây hiểu lầm; bổ sung quét cột ghi chú người mua từ file Excel Shopee; dọn sạch các nhãn tồn kho tự sinh gây mâu thuẫn trên thẻ thợ.',
+                categories: ['Sản Xuất', 'Đơn Hàng', 'Kho Hàng', 'Vận Hành'],
+                items: [
+                    {
+                        icon: 'fa-link',
+                        color: 'text-amber-400',
+                        title: 'Liên Kết Trạng Thái Cha - Con (Parent-Child Cascade)',
+                        desc: 'Tự động chuyển lệnh sản xuất con sang ĐÃ XONG khi đơn hàng mẹ đã Đã Bàn Giao, Hoàn Thành hoặc Đối Soát Thành Công; biến mất vĩnh viễn khỏi tab Chờ Sản Xuất.'
+                    },
+                    {
+                        icon: 'fa-comment-dots',
+                        color: 'text-indigo-400',
+                        title: 'Quét Chuẩn Ghi Chú Của Người Mua Từ File Shopee',
+                        desc: 'Bổ sung nhận diện đa ngôn ngữ cho cột ghi chú khách trong file import, lưu chuẩn xác vào Orders.note và hiển thị nổi bật ở khối LƯU Ý ĐƠN HÀNG trên thẻ thợ.'
+                    },
+                    {
+                        icon: 'fa-eraser',
+                        color: 'text-rose-400',
+                        title: 'Triệt Tiêu Nhãn Ma Tồn Kho & Text Tự Sinh Rác',
+                        desc: 'Tự động dọn sạch các nhãn Lấy từ tồn kho có sẵn và chuỗi text rác tự sinh khi lệnh đang chờ thợ làm, bảo toàn thông số kỹ thuật và yêu cầu thực tế.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.37.1',
+                date: '03/09/2026',
+                isLatest: false,
+                badge: 'ĐỒNG BỘ ĐƠN HÀNG & 1-CLICK BÀN GIAO',
+                badgeColor: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+                title: 'Khắc Phục Lỗi Đồng Bộ Bàn Giao Đơn Hàng & Tích Hợp Nút Bàn Giao Trực Tiếp 1-Click',
+                summary: 'Khắc phục triệt để lỗi hoàn trạng thái Chờ Bàn Giao khi tải lại trang qua thuật toán so khớp đa tầng (id + orderCode) trong applyDeltasToSheet, đồng thời tích hợp nút BÀN GIAO trực tiếp 1-click xuất kho trên từng thẻ đơn hàng.',
+                categories: ['Đơn Hàng', 'Vận Hành', 'Kho Hàng', 'Sàn TMĐT'],
+                items: [
+                    {
+                        icon: 'fa-truck-fast',
+                        color: 'text-blue-400',
+                        title: 'Nút BÀN GIAO Trực Tiếp 1-Click Trên Thẻ Đơn Hàng',
+                        desc: 'Thay thế nút CHỜ KHO bằng nút BÀN GIAO nổi bật cho các đơn sàn TMĐT (Shopee, TikTok, GHN, Bán Lẻ), cho phép thợ bấm 1 chạm xuất kho và chuyển trạng thái Đã Bàn Giao tức thì.'
+                    },
+                    {
+                        icon: 'fa-database',
+                        color: 'text-emerald-400',
+                        title: 'So Khớp Đa Tầng ID & Mã Vận Đơn Tránh Ghi Đè Lệch Dòng',
+                        desc: 'Nâng cấp applyDeltasToSheet và syncDeltas tìm chính xác cột id và kích hoạt cơ chế dự phòng khớp theo orderCode, đảm bảo Google Sheets cập nhật chuẩn dòng hiện tại thay vì chèn dòng mới.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.37.0',
+                date: '03/09/2026',
+                isLatest: false,
+                badge: 'ĐẠI TU KIẾN TRÚC & AN TOÀN DỮ LIỆU',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Đại Tu Kiến Trúc Toàn Diện: Triệt Tiêu Mất Dữ Liệu, Deadlock & Chống Lệch Kho',
+                summary: 'Đại tu cốt lõi backend Google Apps Script: loại bỏ hàm trùng lặp ghi đè logic kho, giải quyết deadlock khóa lồng trong trừ BOM tự động, batch hóa biến động số dư tài khoản, nâng cấp deleteDeltas nguyên khối và siết chặt an ninh phân quyền.',
+                categories: ['Hệ Thống', 'Kho Hàng', 'Bảo Mật', 'Tài Chính', 'Cơ Sở Dữ Liệu'],
+                items: [
+                    {
+                        icon: 'fa-cubes-stacked',
+                        color: 'text-amber-400',
+                        title: 'Loại Bỏ Hàm Trùng Lặp & Bảo Toàn Phân Loại Tồn Kho',
+                        desc: 'Xoá triệt để bản khai báo trùng lặp đơn giản của normalizeProdName và getProductInfoByName ghi đè logic sản xuất, khôi phục 100% cơ chế bóc tách kích thước đa chiều và kiểm tra đủ điều kiện trừ kho chuẩn xác.'
+                    },
+                    {
+                        icon: 'fa-lock',
+                        color: 'text-emerald-400',
+                        title: 'Khắc Phục Deadlock Khóa Lồng & Nhả Khóa Sớm Trong Trừ BOM',
+                        desc: 'Tách biệt engine xử lý trừ BOM _processMaterialDeduction_Core khỏi tầng lock wrapper, đảm bảo syncDeltas giữ vững ScriptLock liên tục xuyên suốt giao dịch mà không bị nhả khóa non.'
+                    },
+                    {
+                        icon: 'fa-wallet',
+                        color: 'text-sky-400',
+                        title: 'Batch Hóa Cập Nhật Số Dư Tài Khoản (applyBatchAccountBalanceChanges)',
+                        desc: 'Gom toàn bộ biến động thu/chi tài khoản phát sinh từ thêm, sửa, xoá giao dịch thành một lượt ghi duy nhất, triệt tiêu hoàn toàn race condition và đọc cache cũ.'
+                    },
+                    {
+                        icon: 'fa-trash-can',
+                        color: 'text-rose-400',
+                        title: 'Xóa Dữ Liệu Nguyên Khối O(1) (Atomic deleteDeltas)',
+                        desc: 'Thay thế vòng lặp deleteRow đơn lẻ bằng thuật toán lọc mảng trong bộ nhớ kết hợp clearContents và setValues một lần, ngăn chặn timeout và đứt gãy dữ liệu khi xoá nhiều dòng.'
+                    },
+                    {
+                        icon: 'fa-user-shield',
+                        color: 'text-purple-400',
+                        title: 'Siết Chặt Phân Quyền Backend RBAC & Bảo Mật Endpoint',
+                        desc: 'Loại bỏ logic so khớp lỏng lẻo theo tên trong checkServerPermission và validateTableWritePermission; bổ sung xác thực mã PIN và quyền CALC_TANK cho API tính định mức bể kính.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.36.7',
+                date: '03/09/2026',
+                isLatest: false,
+                badge: 'BẢN CŨ',
+                badgeColor: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
+                title: 'Khắc Phục Dứt Điểm Lỗi Hiển Thị Khối Giao Diện Phân Hệ Trách Nhiệm',
+                summary: 'Sửa lỗi thứ tự khởi tạo hàm normalizeTools trong Tab_Workspaces.html (ReferenceError: Cannot access normalizeTools before initialization) khiến màn hình sập khối giao diện khi tải phân hệ Trách Nhiệm.',
+                categories: ['Trách Nhiệm', 'Hotfix', 'UI/UX'],
+                items: [
+                    {
+                        icon: 'fa-shield-halved',
+                        color: 'text-emerald-400',
+                        title: 'Đưa normalizeTools & getConditionBadge Ra Đầu Script Cấp Module',
+                        desc: 'Chuyển đổi và nâng khai báo hàm normalizeTools và getConditionBadge lên trước component WorkspaceTab, đảm bảo các hook useMemo (allManagerStats, displayedWorkspaces) truy cập ngay lập tức, triệt tiêu 100% lỗi TDZ ReferenceError.'
+                    },
+                    {
+                        icon: 'fa-check-double',
+                        color: 'text-sky-400',
+                        title: 'Khôi Phục Hoàn Toàn Trạng Thái Hoạt Động Tab Trách Nhiệm',
+                        desc: 'Bảo toàn vẹn nguyên dải Tab nhanh nhân sự, bento grid quản lý thiết bị, thống kê giá trị tài sản và modal bàn giao/kỷ luật.'
+                    }
+                ]
+            },
+            {
                 version: 'Royal v2.36.6',
                 date: '03/09/2026',
-                isLatest: true,
+                isLatest: false,
                 badge: 'MUA CÔNG CỤ & THIẾT BỊ NGOÀI KHO',
                 badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
                 title: 'Hỗ Trợ Nhập Thủ Công Tên Công Cụ, Trang Thiết Bị Ngoài Danh Mục Kho Hàng',
@@ -4302,7 +4560,7 @@
                                 Nhật Ký Cập Nhật Hệ Thống
                             </h1>
                             <span className="px-2 py-0.5 rounded bg-[#d4af37]/10 text-[#d4af37] text-[11px] font-mono font-bold border border-[#d4af37]/30">
-                                Royal v2.36.3
+                                Royal v2.37.7
                             </span>
                         </div>
                         <p className="text-[12px] text-zinc-400 mt-0.5">
@@ -5617,7 +5875,7 @@
                                     <div className="w-5 flex justify-center text-[#d4af37] text-[13px]"><i className="fas fa-rocket"></i></div>
                                     <span>Bản Cập Nhật</span>
                                 </div>
-                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.36.6</span>
+                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.37.7</span>
                             </button>
                         </div>
                     </div>

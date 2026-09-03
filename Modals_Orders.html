@@ -7823,6 +7823,11 @@
 
                 // Nhóm 1: Tiền Hàng (Gross)
                 let iTotalSale = findCol(['giá sản phẩm', 'tổng giá bán (sản phẩm)', 'tổng giá bán', 'tổng số tiền người mua thanh toán', 'tổng số tiền', 'tổng tiền sản phẩm', 'tổng giá trị đơn hàng (vnd)', 'tổng giá trị đơn hàng', 'giá gốc']);
+                let iOrderTotal = findCol(['tổng giá trị đơn hàng (vnd)', 'tổng giá trị đơn hàng']);
+                let iBuyerPaid = findCol(['tổng số tiền người mua thanh toán']);
+                let iReturnShip = findCol(['phí vận chuyển trả hàng (đơn trả hàng/hoàn tiền)', 'phí vận chuyển trả hàng', 'phí trả hàng']);
+                let iReturnQty = findCol(['số lượng sản phẩm được hoàn trả']);
+                let iItemPrice = findCol(['giá ưu đãi', 'giá sản phẩm', 'giá gốc']);
 
                 // Nhóm 2: Bù trừ
                 let iRefund = findCol(['số tiền hoàn lại']);
@@ -7924,67 +7929,85 @@
 
                     const isCancelled = mappedStatus === 'Đơn Huỷ';
                     const isReturned = mappedStatus === 'Hàng Hoàn';
+                    const isDisputeResolved = (rawReturnStatus && rawReturnStatus.toLowerCase().includes('khiếu nại')) ||
+                        (rawStatus && rawStatus.toLowerCase().includes('khiếu nại'));
 
-                    // Giá trị gốc (có thể âm) cộng dồn từ tất cả các dòng sản phẩm của đơn
-                    let rawTotalSale = isCancelled || isReturned ? 0 : sumCol(iTotalSale);
-                    let rawRefund = sumCol(iRefund);
-                    let rawSellerVoucher = isCancelled || isReturned ? 0 : sumCol(iSellerVoucher);
-
-                    let rawShipBuyer = sumCol(iShippingBuyer);
-                    let rawShipActual = isCancelled || isReturned ? 0 : sumCol(iShippingActual);
-                    let rawShipShopee = sumCol(iShippingShopee);
-
-                    let rawFixed = isCancelled || isReturned ? 0 : sumCol(iFixedFee);
-                    let rawService = isCancelled || isReturned ? 0 : sumCol(iServiceFee);
-                    let rawPayment = isCancelled || isReturned ? 0 : sumCol(iPaymentFee);
-                    let rawAffiliate = isCancelled || isReturned ? 0 : sumCol(iAffiliate);
-                    let rawPiShip = isCancelled || isReturned ? 0 : sumCol(iPiShip);
-                    let rawNTTD = isCancelled || isReturned ? 0 : sumCol(iNTTD);
-                    let rawTroGia = isCancelled || isReturned ? 0 : sumCol(iTroGia);
-
-                    let rawTaxVAT = isCancelled || isReturned ? 0 : sumCol(iTaxVAT);
-                    let rawTaxTNCN = isCancelled || isReturned ? 0 : sumCol(iTaxTNCN);
-
-                    // Tiền đối soát tính toán
-                    let calculatedReconciliation = rawTotalSale + rawRefund + rawSellerVoucher + rawTroGia +
-                        rawShipBuyer + rawShipActual + rawShipShopee +
-                        rawFixed + rawService + rawPayment + rawAffiliate + rawPiShip + rawNTTD +
-                        rawTaxVAT + rawTaxTNCN;
-
-                    // Tổng tiền đã thanh toán (Shopee trả)
-                    let actualShopeePaid = isCancelled || isReturned ? 0 : sumCol(iRevenue);
-
-                    // Absolute values for legacy object and transactions
-                    let grossRevenue = rawTotalSale;
-                    if (grossRevenue <= 0 && iRevenue > -1 && !isCancelled && !isReturned) {
-                        grossRevenue = actualShopeePaid;
+                    // 1. Gross Revenue (Tổng giá trị đơn hàng):
+                    let orderTotalColVal = (iOrderTotal > -1 && mainCols[iOrderTotal]) ? parseAmt(mainCols[iOrderTotal]) : 0;
+                    let rawTotalSale = orderTotalColVal > 0 ? orderTotalColVal : sumCol(iTotalSale);
+                    if (rawTotalSale <= 0) {
+                        rawTotalSale = sumCol(iItemPrice) || sumCol(iBuyerPaid);
                     }
+                    let grossRevenue = isCancelled ? 0 : rawTotalSale;
+
+                    // 2. Phí sàn (Shopee thu):
+                    let rawFixed = isCancelled ? 0 : sumCol(iFixedFee);
+                    let rawService = isCancelled ? 0 : sumCol(iServiceFee);
+                    let rawPayment = isCancelled ? 0 : sumCol(iPaymentFee);
+                    let rawAffiliate = isCancelled ? 0 : sumCol(iAffiliate);
+                    let rawPiShip = isCancelled ? 0 : sumCol(iPiShip);
+                    let rawNTTD = isCancelled ? 0 : sumCol(iNTTD);
+                    let rawTroGia = isCancelled ? 0 : sumCol(iTroGia);
+                    let rawTaxVAT = isCancelled ? 0 : sumCol(iTaxVAT);
+                    let rawTaxTNCN = isCancelled ? 0 : sumCol(iTaxTNCN);
 
                     let fixedFee = Math.abs(rawFixed);
                     let paymentFee = Math.abs(rawPayment);
                     let serviceFee = Math.abs(rawService) + Math.abs(rawPiShip) + Math.abs(rawNTTD);
                     let affiliateFee = Math.abs(rawAffiliate);
                     let tax = Math.abs(rawTaxVAT) + Math.abs(rawTaxTNCN);
-                    let shopVoucher = Math.abs(rawSellerVoucher);
-                    let shippingFee = Math.abs(rawShipActual);
+                    let shopVoucher = isCancelled ? 0 : Math.abs(sumCol(iSellerVoucher));
                     let totalFees = fixedFee + paymentFee + serviceFee + affiliateFee + tax;
 
-                    // Net thực nhận (Lợi nhuận ròng sau phí sàn & chiết khấu)
+                    // 3. Phí vận chuyển và cước hoàn hàng:
+                    let rawReturnShip = (iReturnShip > -1) ? sumCol(iReturnShip) : 0;
+                    let returnShippingFee = Math.abs(rawReturnShip);
+                    let rawShipActual = sumCol(iShippingActual);
+                    let shippingFee = (isCancelled ? 0 : Math.abs(rawShipActual)) + returnShippingFee;
+
+                    // 4. Số tiền hoàn lại cho người mua (refundAmount):
+                    let rawRefund = sumCol(iRefund);
+                    let returnQtyTotal = 0;
+                    let refundValFromItems = 0;
+                    orderRows.forEach(r => {
+                        let rQty = (iReturnQty > -1 && r[iReturnQty]) ? parseAmt(r[iReturnQty]) : 0;
+                        if (rQty > 0) {
+                            returnQtyTotal += rQty;
+                            let pPrice = (iItemPrice > -1 && r[iItemPrice]) ? parseAmt(r[iItemPrice]) : 0;
+                            refundValFromItems += rQty * pPrice;
+                        }
+                    });
+
+                    let refundAmount = Math.abs(rawRefund);
+                    if (refundAmount <= 0 && refundValFromItems > 0) {
+                        refundAmount = refundValFromItems;
+                    }
+                    if (refundAmount <= 0 && isReturned && !isDisputeResolved) {
+                        refundAmount = (iBuyerPaid > -1 && parseAmt(mainCols[iBuyerPaid]) > 0) ? parseAmt(mainCols[iBuyerPaid]) : grossRevenue;
+                    }
+
+                    // 5. Tiền Shopee thanh toán / quyết toán (actualShopeePaid) & Net Thực Nhận:
+                    let actualShopeePaid = isCancelled ? 0 : sumCol(iRevenue);
+                    let calculatedReconciliation = grossRevenue - totalFees - shopVoucher - shippingFee;
                     let netRevenue = 0;
-                    if (!isCancelled && !isReturned) {
+
+                    if (!isCancelled) {
                         if (actualShopeePaid > 0) {
                             netRevenue = actualShopeePaid;
+                        } else if (isDisputeResolved || rawStatus === 'Hoàn thành') {
+                            // Đơn đã giải quyết khiếu nại hoặc hoàn thành: Shopee quyết toán tiền hàng trừ phí sàn và phí ship hoàn
+                            netRevenue = Math.max(0, grossRevenue - totalFees - shopVoucher - shippingFee);
+                        } else if (isReturned) {
+                            // Đơn hoàn 100%: nếu bị mất cước hoàn (cột 44) thì net âm cước đó
+                            netRevenue = returnShippingFee > 0 ? -returnShippingFee : 0;
                         } else if (grossRevenue > 0) {
                             netRevenue = Math.max(0, grossRevenue - totalFees - shopVoucher - shippingFee);
-                            if (netRevenue === 0 && calculatedReconciliation > 0) {
-                                netRevenue = calculatedReconciliation;
-                            }
                         }
                     }
 
                     // Chênh lệch đối soát
-                    let delta = (!isCancelled && !isReturned && actualShopeePaid > 0) ? (actualShopeePaid - calculatedReconciliation) : 0;
-                    let isWarning = (!isCancelled && !isReturned && actualShopeePaid > 0 && Math.abs(delta) > 5000);
+                    let delta = (!isCancelled && actualShopeePaid > 0) ? (actualShopeePaid - calculatedReconciliation) : 0;
+                    let isWarning = (!isCancelled && actualShopeePaid > 0 && Math.abs(delta) > 5000);
 
                     // Trích xuất danh sách sản phẩm từ các dòng trong file
                     let extractedProducts = [];
@@ -8002,22 +8025,26 @@
                         displayFileStatus = rawReturnStatus;
                     }
 
+                    // Giá trị nội bộ ban đầu trên hệ thống RF Workspace Pro:
+                    let expected = matchOrder ? parseAmt(matchOrder.totalAmount || matchOrder.revenue) : 0;
+
                     if (matchOrder) {
-                        let expected = parseAmt(matchOrder.totalAmount || matchOrder.revenue);
                         const effectiveTxDate = (iDate > -1 && mainCols[iDate]) ? txDate : (matchOrder.createdAt || matchOrder.date || txDate || safeDateFull);
+
+                        const isSettled = mappedStatus === 'Đối Soát Thành Công' || (netRevenue > 0 && isDisputeResolved) || (actualShopeePaid > 0 && !isCancelled);
 
                         let updatedOrderObj = {
                             ...matchOrder,
-                            revenue: (isCancelled || isReturned) ? 0 : (grossRevenue > 0 ? grossRevenue : Number(matchOrder.revenue || 0)),
-                            feeFixed: (isCancelled || isReturned) ? 0 : fixedFee,
-                            feeService: (isCancelled || isReturned) ? 0 : serviceFee,
-                            feePayment: (isCancelled || isReturned) ? 0 : paymentFee,
-                            feeAffiliate: (isCancelled || isReturned) ? 0 : affiliateFee,
-                            shopVoucher: (isCancelled || isReturned) ? 0 : shopVoucher,
-                            tax: (isCancelled || isReturned) ? 0 : tax,
-                            isReconciled: (mappedStatus === 'Đối Soát Thành Công' || (matchOrder.isReconciled && !isCancelled && !isReturned) || (actualShopeePaid > 0 && !isCancelled && !isReturned)),
-                            reconciledAt: (mappedStatus === 'Đối Soát Thành Công' || actualShopeePaid > 0) ? (matchOrder.reconciledAt || effectiveTxDate) : (matchOrder.reconciledAt || ''),
-                            status: mappedStatus
+                            revenue: isCancelled ? 0 : (isReturned && netRevenue <= 0 ? 0 : (grossRevenue > 0 ? grossRevenue : Number(matchOrder.revenue || 0))),
+                            feeFixed: isCancelled ? 0 : fixedFee,
+                            feeService: isCancelled ? 0 : serviceFee,
+                            feePayment: isCancelled ? 0 : paymentFee,
+                            feeAffiliate: isCancelled ? 0 : affiliateFee,
+                            shopVoucher: isCancelled ? 0 : shopVoucher,
+                            tax: isCancelled ? 0 : tax,
+                            isReconciled: isSettled,
+                            reconciledAt: isSettled ? (matchOrder.reconciledAt || effectiveTxDate) : (matchOrder.reconciledAt || ''),
+                            status: (isDisputeResolved && netRevenue > 0) ? 'Đối Soát Thành Công' : mappedStatus
                         };
 
                         // Bổ sung danh sách sản phẩm nếu đơn hàng trên hệ thống chưa có thông tin sản phẩm
@@ -8035,7 +8062,7 @@
 
                         const walletTargetId = walletAcc ? walletAcc.id : (newAccounts[0] ? newAccounts[0].id : 'ACC_SHOPEE');
 
-                        if (!hasTx && (mappedStatus === 'Đối Soát Thành Công' || actualShopeePaid > 0) && !isCancelled && !isReturned) {
+                        if (!hasTx && isSettled && !isCancelled) {
                             let baseTxId = 'TXN_INC_' + Date.now() + '_' + idx;
                             newTransactions.push({
                                 id: baseTxId + '_REV',
@@ -8044,7 +8071,7 @@
                                 amount: grossRevenue,
                                 fromAccount: '',
                                 toAccount: walletTargetId,
-                                title: `Doanh thu Shopee: ${oCode}`,
+                                title: `Doanh thu Shopee: ${oCode}` + (isDisputeResolved ? ' (Giải quyết khiếu nại)' : ''),
                                 date: effectiveTxDate,
                                 note: `Kênh: ${matchOrder.channel || 'Shopee'} | Khách: ${matchOrder.customer || ''}`,
                                 isAuto: true
@@ -8065,10 +8092,10 @@
                                 });
                             }
 
-                            // Phí ship quá cân (Phí thực tế > Khách trả + Trợ giá)
-                            const buyerShip = Math.abs(rawShipBuyer);
-                            const actualShip = Math.abs(rawShipActual);
-                            const shopeeShip = Math.abs(rawShipShopee);
+                            // Phí ship quá cân
+                            const buyerShip = Math.abs(sumCol(iShippingBuyer));
+                            const actualShip = Math.abs(sumCol(iShippingActual));
+                            const shopeeShip = Math.abs(sumCol(iShippingShopee));
                             const shipOverweight = Math.max(0, actualShip - (buyerShip + shopeeShip));
 
                             if (shipOverweight > 0) {
@@ -8087,8 +8114,25 @@
                             }
                         }
 
+                        // Cước hoàn hàng do Shopee trừ (nếu có cột 44 > 0)
+                        if (returnShippingFee > 0) {
+                            let baseTxId = 'TXN_INC_' + Date.now() + '_' + idx;
+                            newTransactions.push({
+                                id: baseTxId + '_RETURN_SHIP',
+                                type: 'Chi',
+                                category: 'Chi Phí Vận Chuyển',
+                                amount: returnShippingFee,
+                                fromAccount: walletTargetId,
+                                toAccount: '',
+                                title: `Phí cước hoàn hàng: ${oCode}`,
+                                date: txDate,
+                                note: `Cước hoàn hàng do Shopee trừ đơn ${oCode}`,
+                                isAuto: true
+                            });
+                        }
+
                         // Phí xử lý đơn hàng hoàn (2,700đ/đơn hoàn)
-                        if (isReturned) {
+                        if (isReturned && netRevenue <= 0) {
                             const returnProcessingFee = 2700;
                             let baseTxId = 'TXN_INC_' + Date.now() + '_' + idx;
                             newTransactions.push({
@@ -8110,12 +8154,17 @@
                             fileStatus: displayFileStatus,
                             mappedStatus: mappedStatus,
                             customerName: matchOrder.customer || '',
-                            expected: (isCancelled || isReturned) ? 0 : expected,
-                            netRevenue: (isCancelled || isReturned) ? 0 : netRevenue,
-                            grossRevenue: (isCancelled || isReturned) ? 0 : grossRevenue,
-                            totalFees: (isCancelled || isReturned) ? 0 : totalFees,
-                            shippingFee: (isCancelled || isReturned) ? 0 : shippingFee,
-                            shopVoucher: (isCancelled || isReturned) ? 0 : Math.abs(Number(shopVoucher || 0)),
+                            expected: expected,
+                            netRevenue: netRevenue,
+                            grossRevenue: grossRevenue,
+                            totalFees: totalFees,
+                            shippingFee: shippingFee,
+                            returnShippingFee: returnShippingFee,
+                            refundAmount: refundAmount,
+                            isDisputeResolved: isDisputeResolved,
+                            isReturned: isReturned,
+                            isCancelled: isCancelled,
+                            shopVoucher: shopVoucher,
                             delta,
                             isWarning,
                             type: 'income'
@@ -8127,6 +8176,13 @@
                             mappedStatus: mappedStatus,
                             isError: true,
                             msg: 'Không tìm thấy đơn hàng trên hệ thống',
+                            expected: 0,
+                            grossRevenue: grossRevenue,
+                            totalFees: totalFees,
+                            shippingFee: shippingFee,
+                            returnShippingFee: returnShippingFee,
+                            refundAmount: refundAmount,
+                            netRevenue: netRevenue,
                             type: 'income'
                         });
                     }
@@ -8356,11 +8412,53 @@
                                                                             </span>
                                                                         )}
                                                                     </td>
-                                                                    <td className="p-2.5 text-right text-gray-400 whitespace-nowrap">{log.expected ? Number(log.expected).toLocaleString('vi-VN') + 'đ' : '-'}</td>
+                                                                    <td className="p-2.5 text-right text-gray-300 font-medium whitespace-nowrap">{log.expected > 0 ? Number(log.expected).toLocaleString('vi-VN') + 'đ' : '-'}</td>
                                                                     <td className="p-2.5 text-right text-emerald-400 font-bold whitespace-nowrap">{log.grossRevenue > 0 ? Number(log.grossRevenue).toLocaleString('vi-VN') + 'đ' : '-'}</td>
                                                                     <td className="p-2.5 text-right text-rose-300 whitespace-nowrap">{log.totalFees > 0 ? '-' + Number(log.totalFees).toLocaleString('vi-VN') + 'đ' : '-'}</td>
-                                                                    <td className="p-2.5 text-right text-rose-400 font-bold whitespace-nowrap">{log.shippingFee > 0 ? '-' + Number(log.shippingFee).toLocaleString('vi-VN') + 'đ' : '-'}</td>
-                                                                    <td className="p-2.5 text-right text-sky-400 font-black whitespace-nowrap">{log.netRevenue > 0 ? Number(log.netRevenue).toLocaleString('vi-VN') + 'đ' : '-'}</td>
+                                                                    <td className="p-2.5 text-right text-rose-400 font-bold whitespace-nowrap">
+                                                                        {log.shippingFee > 0 ? (
+                                                                            <div>
+                                                                                <span>{'-' + Number(log.shippingFee).toLocaleString('vi-VN') + 'đ'}</span>
+                                                                                {log.returnShippingFee > 0 && <span className="block text-[8.5px] text-rose-400/80 font-bold uppercase tracking-wider">Cước hoàn</span>}
+                                                                            </div>
+                                                                        ) : '-'}
+                                                                    </td>
+                                                                    <td className="p-2.5 text-right whitespace-nowrap">
+                                                                        {log.netRevenue > 0 ? (
+                                                                            <div>
+                                                                                <span className="text-sky-400 font-black text-[12px]">
+                                                                                    {'+' + Number(log.netRevenue).toLocaleString('vi-VN') + 'đ'}
+                                                                                </span>
+                                                                                {log.refundAmount > 0 ? (
+                                                                                    <span className="block text-[9.5px] text-amber-400/90 font-bold">
+                                                                                        Hoàn khách: {Number(log.refundAmount).toLocaleString('vi-VN')}đ
+                                                                                    </span>
+                                                                                ) : (
+                                                                                    <span className="block text-[8.5px] text-emerald-400/80 font-semibold">Thực nhận về ví</span>
+                                                                                )}
+                                                                            </div>
+                                                                        ) : log.netRevenue < 0 ? (
+                                                                            <div>
+                                                                                <span className="text-rose-400 font-black text-[12px]">
+                                                                                    {'-' + Number(Math.abs(log.netRevenue)).toLocaleString('vi-VN') + 'đ'}
+                                                                                </span>
+                                                                                <span className="block text-[9.5px] text-rose-300/80 font-bold">
+                                                                                    Mất cước hoàn {log.refundAmount > 0 ? `(Hoàn: ${Number(log.refundAmount).toLocaleString('vi-VN')}đ)` : ''}
+                                                                                </span>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div>
+                                                                                <span className="text-zinc-400 font-bold text-[11px]">
+                                                                                    {log.isCancelled ? '0đ (Hủy)' : '0đ'}
+                                                                                </span>
+                                                                                {log.refundAmount > 0 && (
+                                                                                    <span className="block text-[9.5px] text-amber-400/90 font-bold">
+                                                                                        Hoàn khách 100% ({Number(log.refundAmount).toLocaleString('vi-VN')}đ)
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
                                                                 </tr>
                                                             );
                                                         })}

@@ -2,6 +2,38 @@
 
 Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến trúc, tối ưu nghiệp vụ và sửa lỗi của hệ điều hành `RF_Workspace_Pro`.
 
+## [v2.36.4] - 2026-09-03
+
+### 🚚 Tối Ưu Bàn Giao Hàng Loạt Thông Minh, Chống Bấm Nhầm Đơn Đã Giao & Auto-Scroll Tab Trạng Thái
+- **Phân Tích & Giải Quyết Triệt Để Trải Nghiệm "Kẹt Đơn Chờ Bàn Giao" (`Tab_Orders.html`)**:
+  - **Nguyên nhân gốc rễ 1 (Khuất Tab Trạng Thái)**: Thanh 9 tab trạng thái bị tràn ngang trên màn hình hẹp, đẩy tab số 6 `Đã Bàn Giao` ra ngoài mép phải khung nhìn. Khi người dùng bấm bàn giao hoặc chuyển sang xem đơn đã giao, tab ngoài cùng bên phải hiển thị trong tầm mắt là `Chờ Bàn Giao (14)` (đang ở trạng thái inactive), gây lầm tưởng người dùng vẫn đang đứng ở tab "Chờ Bàn Giao".
+  - **Nguyên nhân gốc rễ 2 (Thanh Tác Vụ Nổi Thiếu Bộ Lọc)**: Thanh dock nổi màu đen luôn hiển thị nút xanh lá `BÀN GIAO (N)` bất kể đơn được chọn đã ở trạng thái `Đã Bàn Giao` hay chưa. Khi người dùng tick "Chọn tất cả" một nhóm kênh, nút `BÀN GIAO (1)` lại bật lên, tạo cảm giác đơn chưa được giao và thao tác bàn giao không có tác dụng.
+- **Triển Khai Nâng Cấp Kỹ Thuật (Lean Muda & Hallmark UX)**:
+  - **Auto-Scroll Active Tab (`tabsContainerRef`)**: Trang bị hook `useEffect` tự động phát hiện tab đang được chọn (`data-active="true"`) và cuộn mượt mà (`scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })`) đưa tab active ra giữa khung nhìn, đảm bảo người dùng luôn nhận biết 100% mình đang ở tab nào.
+  - **Thanh Tác Vụ Nổi Thông Minh (Smart Bulk Handover Dock)**:
+    - Bổ sung bộ lọc `eligibleHandoverOrders`: Chỉ lọc những đơn thực sự chưa giao (loại trừ `Đã Bàn Giao`, `Đã Nhập Kho`, `Hoàn Thành`, `Đơn Huỷ`, `Hàng Hoàn`).
+    - Nếu tất cả đơn đã chọn đều đã bàn giao: Thay thế nút bấm xanh lá bằng huy hiệu cố định `✓ ĐÃ BÀN GIAO (N)` màu xanh lục bảo sang trọng, không cho phép bấm lặp lại.
+    - Nếu có đơn cần giao: Hiển thị đúng số lượng đơn đủ điều kiện `BÀN GIAO (N)`.
+  - **Chuẩn Hóa Độ Ưu Tiên Trạng Thái (`timeFilteredOrders`)**:
+    - Ưu tiên giá trị `o.status` thực tế trước `_effectiveStatus` để triệt tiêu việc đọc nhầm cache trạng thái cũ khi Optimistic UI vừa cập nhật `pushDeltas`.
+    - Bổ sung nhánh so khớp chính xác `rawStatus === 'ĐÃ BÀN GIAO' || rawStatus === 'ĐÃ NHẬP KHO' => eff = 'ĐÃ BÀN GIAO'`.
+
+---
+
+## [v2.36.3] - 2026-09-03
+
+### 👑 Bảo Toàn Cấp Độ & EXP Lũy Kế Trọn Đời (Lifetime) & Chuẩn Hóa So Khớp Tên Nhân Sự
+- **Khắc Phục Dứt Điểm Tình Trạng Tụt Cấp Đầu Tháng (`Tab_HR.html`)**:
+  - **Nguyên nhân**: Hệ thống thẻ nhân sự vô tình tính toán biến `totalKPIVnd` và `xuTasksKPI` dựa trên mảng `claimedKPIs` đã bị lọc theo dropdown tháng (`isKpiInSelectedMonth`). Khi bước sang tháng 9 mới trôi qua 3 ngày, toàn bộ KPI đã nghiệm thu của các tháng trước bị ẩn, làm `totalKPIVnd` tụt về 0đ và nhân sự tụt cấp thê thảm.
+  - **Khắc phục**: Tách biệt hoàn toàn bộ lọc thời gian của Quest Board với biến tính cấp độ. Cấp độ và EXP sử dụng `allClaimedKPIs` từ toàn bộ lịch sử cống hiến trọn đời, bảo toàn thành quả phấn đấu và không bị reset khi chuyển tháng.
+- **Chuẩn Hóa Thuật Toán So Khớp Nhân Sự Thông Minh (`matchUser`)**:
+  - Chặn danh sách từ khóa tài chính & hệ thống: `"tiền mặt"`, `"tiền gửi"`, `"ngân hàng"`, `"chuyển khoản"`, `"công nợ"`, `"chi phí"`...
+  - Kiểm tra thanh điệu tiếng Việt: Phân biệt rõ ràng dấu sắc ("Tiến") với dấu huyền ("tiền"), ngăn ngừa triệt để việc nhận nhầm các giao dịch dòng tiền xưởng vào nick cá nhân của Boss.
+- **Đồng Bộ Hoàn Hảo Header & Thẻ Nhân Sự (`App_Main.html` & `Tab_HR.html`)**:
+  - Cập nhật hàm `computeUserTotalExp` và `ExpHistoryRoadmapModal` loại bỏ lọc nhầm ghi chú chứa chữ "xuất" (như "sản xuất", "xuất kho"), đồng bộ 100% số dư Xu và cấp độ hiển thị giữa Header trên cùng và Thẻ nhân sự bên dưới.
+
+---
+
 ## [v2.36.1] - 2026-09-03
 
 ### 🛠️ Sửa Lỗi Phạm Vi Biến Bảng Đối Soát Doanh Thu (`shortenStatusText is not defined`) & Tối Ưu UX Dừng Hỏa Tốc

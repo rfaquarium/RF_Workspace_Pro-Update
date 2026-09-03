@@ -4,16 +4,42 @@
     // CHỨC NĂNG: Trung Tâm Nhân Sự (Chấm Công, Giao Việc KPI, Bảng Lương)
     // NÂNG CẤP: Lọc thời gian theo Tháng (Tùy chỉnh) & Phân quyền RBAC CHUẨN CHỈ
     // =========================================================================
-    // HÀM SO KHỚP TÊN NHÂN SỰ TOÀN DIỆN (Hỗ trợ họ tên đầy đủ & tên gọi)
     const matchUser = (u1, u2) => {
         if (!u1 || !u2) return false;
         const s1 = String(u1).toLowerCase().trim();
         const s2 = String(u2).toLowerCase().trim();
         if (s1 === s2) return true;
+
+        const nonUserTerms = [
+            'tiền mặt', 'tien mat', 'tiền gửi', 'tien gui', 'ngân hàng', 'ngan hang', 
+            'chuyển khoản', 'chuyen khoan', 'công nợ', 'cong no', 'chi phí', 'chi phi', 
+            'kho tổng', 'kho layout', 'kho bể kính', 'shopee', 'tiktok', 'ghn', 'viettel',
+            'quỹ phát triển', 'quỹ lương', 'tài khoản'
+        ];
+        if (nonUserTerms.some(t => s1 === t || s1.startsWith(t) || s2 === t)) return false;
+
+        const words1 = s1.split(/\s+/);
+        const words2 = s2.split(/\s+/);
+        if (words1.length === 1 && words2.includes(words1[0])) return true;
+        if (words2.length === 1 && words1.includes(words2[0])) return true;
         if (s1.includes(s2) || s2.includes(s1)) return true;
-        const c1 = s1.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
-        const c2 = s2.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
-        return c1 === c2 || c1.includes(c2) || c2.includes(c1);
+
+        const stripAccents = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
+        const hasAcc1 = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(s1);
+        const hasAcc2 = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(s2);
+        if (hasAcc1 && hasAcc2) return false;
+
+        const c1 = stripAccents(s1);
+        const c2 = stripAccents(s2);
+        if (c1 === c2) return true;
+
+        const w1 = c1.split(/\s+/);
+        const w2 = c2.split(/\s+/);
+        if (w1.length === 1 && w2.includes(w1[0])) return true;
+        if (w2.length === 1 && w1.includes(w2[0])) return true;
+        if (c1.includes(c2) || c2.includes(c1)) return true;
+
+        return false;
     };
 
     const formatDR = (s, e) => {
@@ -375,10 +401,37 @@
             const s1 = String(u1).toLowerCase().trim();
             const s2 = String(u2).toLowerCase().trim();
             if (s1 === s2) return true;
+
+            const nonUserTerms = [
+                'tiền mặt', 'tien mat', 'tiền gửi', 'tien gui', 'ngân hàng', 'ngan hang', 
+                'chuyển khoản', 'chuyen khoan', 'công nợ', 'cong no', 'chi phí', 'chi phi', 
+                'kho tổng', 'kho layout', 'kho bể kính', 'shopee', 'tiktok', 'ghn', 'viettel',
+                'quỹ phát triển', 'quỹ lương', 'tài khoản'
+            ];
+            if (nonUserTerms.some(t => s1 === t || s1.startsWith(t) || s2 === t)) return false;
+
+            const words1 = s1.split(/\s+/);
+            const words2 = s2.split(/\s+/);
+            if (words1.length === 1 && words2.includes(words1[0])) return true;
+            if (words2.length === 1 && words1.includes(words2[0])) return true;
             if (s1.includes(s2) || s2.includes(s1)) return true;
-            const c1 = s1.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
-            const c2 = s2.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
-            return c1 === c2 || c1.includes(c2) || c2.includes(c1);
+
+            const stripAccents = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
+            const hasAcc1 = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(s1);
+            const hasAcc2 = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(s2);
+            if (hasAcc1 && hasAcc2) return false;
+
+            const c1 = stripAccents(s1);
+            const c2 = stripAccents(s2);
+            if (c1 === c2) return true;
+
+            const w1 = c1.split(/\s+/);
+            const w2 = c2.split(/\s+/);
+            if (w1.length === 1 && w2.includes(w1[0])) return true;
+            if (w2.length === 1 && w1.includes(w2[0])) return true;
+            if (c1.includes(c2) || c2.includes(c1)) return true;
+
+            return false;
         };
 
         // O(1) FAST LOOKUP MAP FOR ORDERS (Prevents UI freezing / lag on render)
@@ -4748,13 +4801,15 @@
                                         amount: Number(x.amount_xu !== undefined && x.amount_xu !== '' ? x.amount_xu : (x.amount || 0)),
                                         date: x.date || x.timestamp || ''
                                     }));
-                                    const xuTasksKPI = claimedKPIs.filter(k => String(k.unit || '').toLowerCase() === 'xu' || String(k.id || '').startsWith('KPI_XU_')).map(k => ({
+                                    // TOÀN BỘ KPI ĐÃ NGHIỆM THU (Lũy kế cống hiến trọn đời, không bị reset hay lọc theo tháng)
+                                    const allClaimedKPIs = (kpiData || []).filter(k => matchUser(k.user, u) && (k.isClaimed === 'true' || k.isClaimed === true));
+                                    const xuTasksKPI = allClaimedKPIs.filter(k => String(k.unit || '').toLowerCase() === 'xu' || String(k.id || '').startsWith('KPI_XU_')).map(k => ({
                                         id: String(k.id),
                                         name: k.kpiName || 'Nhiệm vụ Xu',
                                         amount: Number(k.reward) || 0,
                                         date: formatDR(k.startTime, k.endTime) || k.lastUpdated
                                     }));
-                                    const xuTasksBP = (bpData || []).filter(b => matchUser(b.user, u) && (b.type === 'XU_REWARD' || b.type === 'Thưởng Xu' || String(b.note || '').toLowerCase().includes('xu'))).map(b => ({
+                                    const xuTasksBP = (bpData || []).filter(b => matchUser(b.user, u) && (b.type === 'XU_REWARD' || b.type === 'Thưởng Xu' || b.type === 'XU' || (String(b.note || '').toLowerCase().includes('xu') && !String(b.note || '').toLowerCase().includes('xuất')))).map(b => ({
                                         id: String(b.id),
                                         name: b.note || 'Thưởng Xu',
                                         amount: Number(b.amount) || 0,
@@ -4770,7 +4825,10 @@
                                     }).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 
                                     const totalXu = xuTasks.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-                                    const totalKPIVnd = claimedKPIs.reduce((sum, k) => sum + (Number(k.reward) || 0), 0);
+                                    
+                                    // Thưởng KPI trọn đời: lấy từ allClaimedKPIs để cấp độ không bị tụt khi sang tháng mới
+                                    const allKpiVndList = allClaimedKPIs.filter(k => !(String(k.unit || '').toLowerCase() === 'xu' || String(k.id || '').startsWith('KPI_XU_')));
+                                    const totalKPIVnd = allKpiVndList.reduce((sum, k) => sum + (Number(k.reward) || 0), 0);
 
                                     const userAttRecords = (rawAttData || []).filter(a => matchUser(a.user, u));
                                     const userSal = userConfigs?.salaries?.[u] || userConfigs?.pins?.[u] || (userConfigs?.raw || []).find(ns => matchUser(ns['Tên Nhân Sự'] || ns.name, u)) || {};
@@ -7037,7 +7095,7 @@
             badgeBg: 'bg-amber-500/15 border-amber-500/40 text-amber-300'
         }));
 
-        const xuTasksBP = (bpData || []).filter(b => matchUser(b.user, u) && (b.type === 'XU_REWARD' || b.type === 'Thưởng Xu' || String(b.note || '').toLowerCase().includes('xu'))).map(b => ({
+        const xuTasksBP = (bpData || []).filter(b => matchUser(b.user, u) && (b.type === 'XU_REWARD' || b.type === 'Thưởng Xu' || b.type === 'XU' || (String(b.note || '').toLowerCase().includes('xu') && !String(b.note || '').toLowerCase().includes('xuất')))).map(b => ({
             id: String(b.id),
             type: 'XU',
             sourceName: 'Nhiệm Vụ Xu Thưởng',

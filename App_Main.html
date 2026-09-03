@@ -305,10 +305,37 @@
             const s1 = String(u1).toLowerCase().trim();
             const s2 = String(u2).toLowerCase().trim();
             if (s1 === s2) return true;
+
+            const nonUserTerms = [
+                'tiền mặt', 'tien mat', 'tiền gửi', 'tien gui', 'ngân hàng', 'ngan hang', 
+                'chuyển khoản', 'chuyen khoan', 'công nợ', 'cong no', 'chi phí', 'chi phi', 
+                'kho tổng', 'kho layout', 'kho bể kính', 'shopee', 'tiktok', 'ghn', 'viettel',
+                'quỹ phát triển', 'quỹ lương', 'tài khoản'
+            ];
+            if (nonUserTerms.some(t => s1 === t || s1.startsWith(t) || s2 === t)) return false;
+
+            const words1 = s1.split(/\s+/);
+            const words2 = s2.split(/\s+/);
+            if (words1.length === 1 && words2.includes(words1[0])) return true;
+            if (words2.length === 1 && words1.includes(words2[0])) return true;
             if (s1.includes(s2) || s2.includes(s1)) return true;
-            const c1 = s1.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
-            const c2 = s2.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
-            return c1 === c2 || c1.includes(c2) || c2.includes(c1);
+
+            const stripAccents = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
+            const hasAcc1 = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(s1);
+            const hasAcc2 = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(s2);
+            if (hasAcc1 && hasAcc2) return false;
+
+            const c1 = stripAccents(s1);
+            const c2 = stripAccents(s2);
+            if (c1 === c2) return true;
+
+            const w1 = c1.split(/\s+/);
+            const w2 = c2.split(/\s+/);
+            if (w1.length === 1 && w2.includes(w1[0])) return true;
+            if (w2.length === 1 && w1.includes(w2[0])) return true;
+            if (c1.includes(c2) || c2.includes(c1)) return true;
+
+            return false;
         };
 
         // 1. Chấm công & Chuyên cần
@@ -345,7 +372,7 @@
         const userPackings = safePackings.filter(p => matchUser(p.user, u) && (p.status === 'Done' || p.status === 'Đã đóng gói'));
         const totalPackingReward = userPackings.reduce((sum, p) => sum + (Number(p.reward_vnd) || 0), 0);
 
-        // 4. KPI đạt mốc
+        // 4. KPI đạt mốc (Lũy kế toàn bộ các kỳ)
         const kpiData = erpData?.KPI_Progress || [];
         const claimedKPIs = kpiData.filter(k => matchUser(k.user, u) && (k.isClaimed === 'true' || k.isClaimed === true));
         const kpiVndList = claimedKPIs.filter(k => !(String(k.unit || '').toLowerCase() === 'xu' || String(k.id || '').startsWith('KPI_XU_')));
@@ -364,7 +391,7 @@
         }));
 
         const bpData = erpData?.BonusPenalty || [];
-        const xuTasksBP = bpData.filter(b => matchUser(b.user, u) && (b.type === 'XU_REWARD' || b.type === 'Thưởng Xu' || String(b.note || '').toLowerCase().includes('xu'))).map(b => ({
+        const xuTasksBP = bpData.filter(b => matchUser(b.user, u) && (b.type === 'XU_REWARD' || b.type === 'Thưởng Xu' || b.type === 'XU' || (String(b.note || '').toLowerCase().includes('xu') && !String(b.note || '').toLowerCase().includes('xuất')))).map(b => ({
             id: String(b.id),
             amount: Number(b.amount) || 0
         }));
@@ -754,11 +781,89 @@
 
         const RELEASES = [
             {
-                version: 'Royal v2.36.1',
+                version: 'Royal v2.36.4',
                 date: '03/09/2026',
                 isLatest: true,
-                badge: 'SỬA LỖI PHẠM VI BIẾN ĐỐI SOÁT',
+                badge: 'TỐI ƯU BÀN GIAO & AUTO-SCROLL TAB',
                 badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Tối Ưu Bàn Giao Hàng Loạt Thông Minh, Chống Bấm Nhầm Đơn Đã Giao & Auto-Scroll Tab Trạng Thái',
+                summary: 'Khắc phục triệt để hiểu lầm đơn hàng kẹt ở Chờ Bàn Giao: Tự động trượt mượt mà đưa Tab đang chọn vào tầm nhìn (tránh bị khuất mép màn hình). Đồng thời trang bị bộ lọc thông minh cho thanh tác vụ nổi, tự động nhận diện và hiển thị huy hiệu [ĐÃ BÀN GIAO] thay vì nút bấm bàn giao thừa thãi.',
+                categories: ['Đơn Hàng', 'Kho & Vận Hành', 'UI/UX', 'Lean Muda'],
+                items: [
+                    {
+                        icon: 'fa-truck-fast',
+                        color: 'text-emerald-400',
+                        title: 'Thanh Tác Vụ Nổi Thông Minh (Smart Handover Dock)',
+                        desc: 'Tự động kiểm tra danh sách đơn được chọn. Nếu đơn đã bàn giao thành công, thanh dock hiển thị huy hiệu [Đã Bàn Giao] thay vì nút bấm xanh lá; chỉ kích hoạt bàn giao cho các đơn thực sự còn chờ xuất xưởng.'
+                    },
+                    {
+                        icon: 'fa-arrows-left-right',
+                        color: 'text-sky-400',
+                        title: 'Tự Động Cuộn Đến Tab Trạng Thái Đang Chọn (Auto-Scroll Tab Strip)',
+                        desc: 'Hàng tab trạng thái tự động trượt mượt mà (smooth center) đưa tab đang active vào chính giữa khung nhìn màn hình, không bao giờ để tab Đã Bàn Giao bị tràn ẩn ngoài rìa màn hình.'
+                    },
+                    {
+                        icon: 'fa-shield-check',
+                        color: 'text-amber-400',
+                        title: 'Đồng Bộ Tuyệt Đối Trạng Thái Đơn Hàng (Status Precedence)',
+                        desc: 'Ưu tiên tuyệt đối giá trị status chính thức trước _effectiveStatus và chuẩn hóa trạng thái ĐÃ BÀN GIAO / ĐÃ NHẬP KHO, bảo toàn tính nhất quán giữa thẻ đơn hàng và bộ đếm tab.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.36.3',
+                date: '03/09/2026',
+                isLatest: false,
+                badge: 'BẢO TOÀN CẤP ĐỘ EXP TRỌN ĐỜI',
+                badgeColor: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
+                title: 'Bảo Toàn Cấp Độ & EXP Lũy Kế Trọn Đời (Lifetime), Khắc Phục Lệch Cấp Đầu Tháng & Chuẩn Hóa So Khớp Tên',
+                summary: 'Khắc phục triệt để hiện tượng nhân sự bị tụt cấp khi bước sang tháng mới do bộ lọc tháng. EXP và Cấp Độ được bảo toàn trọn đời từ toàn bộ lịch sử cống hiến. Đồng thời nâng cấp thuật toán matchUser chống nhận nhầm tiền mặt/ngân hàng với tên nhân sự.',
+                categories: ['Nhân Sự', 'EXP & Cấp Độ', 'Gamification', 'UI/UX'],
+                items: [
+                    {
+                        icon: 'fa-trophy',
+                        color: 'text-amber-400',
+                        title: 'Bảo Toàn EXP & Cấp Độ Trọn Đời (Lifetime Cumulative)',
+                        desc: 'Tách biệt bộ lọc kỳ báo cáo tháng với tổng EXP cống hiến. Toàn bộ KPI và Xu tích lũy từ các tháng trước luôn được giữ trọn vẹn, không bị reset hay tụt hạng khi sang đầu tháng mới.'
+                    },
+                    {
+                        icon: 'fa-user-shield',
+                        color: 'text-sky-400',
+                        title: 'Chuẩn Hóa Thuật Toán So Khớp Tên Nhân Sự (matchUser)',
+                        desc: 'Bổ sung danh sách chặn từ khóa tài chính (tiền mặt, ngân hàng, công nợ...) và kiểm tra thanh điệu tiếng Việt, ngăn chặn việc nhận nhầm dòng tiền của xưởng vào nick cá nhân.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.36.2',
+                date: '03/09/2026',
+                isLatest: false,
+                badge: 'MINH BẠCH TÀI CHÍNH KHIẾU NẠI & HOÀN TIỀN',
+                badgeColor: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
+                title: 'Bóc Tách Minh Bạch Tài Chính Đơn Khiếu Nại & Hàng Hoàn Trong Bảng Đối Soát Order.all',
+                summary: 'Xóa bỏ hoàn toàn tình trạng gạch ngang (- - - - -) trên các đơn khiếu nại hoặc hàng hoàn. Bóc tách và hiển thị chi tiết số tiền thực tế khách được hoàn, số tiền thực tế Shop nhận về ví (nếu thắng khiếu nại/nhận tiền phần sản phẩm không hoàn) hoặc số tiền mất cước hoàn do Shopee trừ.',
+                categories: ['Đối Soát', 'Tài Chính', 'Khiếu Nại', 'Hàng Hoàn', 'UI/UX'],
+                items: [
+                    {
+                        icon: 'fa-scale-balanced',
+                        color: 'text-amber-400',
+                        title: 'Minh Bạch Số Tiền Hoàn Khách & Thực Nhận Của Shop',
+                        desc: 'Bóc tách từ cột hoàn tiền và số lượng sản phẩm trả hàng. Hiển thị rõ số tiền Shopee quyết toán về ví (màu xanh sky) kèm ghi chú hoàn khách (màu vàng amber), hoặc mất cước hoàn (màu đỏ rose).'
+                    },
+                    {
+                        icon: 'fa-truck-arrow-right',
+                        color: 'text-rose-400',
+                        title: 'Tách Bạch Phí Vận Chuyển Chiều Về (Cước Hoàn)',
+                        desc: 'Bóc tách trực tiếp cột Phí vận chuyển trả hàng (cột 44 trong file Shopee) và gắn nhãn [Cước hoàn] giúp kế toán nắm bắt ngay chi phí phát sinh.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.36.1',
+                date: '03/09/2026',
+                isLatest: false,
+                badge: 'SỬA LỖI PHẠM VI BIẾN ĐỐI SOÁT',
+                badgeColor: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
                 title: 'Khắc Phục Lỗi Hiển Thị Khối Giao Diện: shortenStatusText is not defined (BulkFinanceModal)',
                 summary: 'Đưa các hàm chuẩn hóa trạng thái normalizeStatus, shortenStatusText và getStatusBadgeStyle từ phạm vi cục bộ processExcel ra cấp component BulkFinanceModal, giúp bảng xem trước đối soát file doanh thu hiển thị mượt mà không bị lỗi giao diện.',
                 categories: ['Đối Soát', 'Tài Chính', 'Hotfix', 'UI/UX'],
@@ -4137,7 +4242,7 @@
                                 Nhật Ký Cập Nhật Hệ Thống
                             </h1>
                             <span className="px-2 py-0.5 rounded bg-[#d4af37]/10 text-[#d4af37] text-[11px] font-mono font-bold border border-[#d4af37]/30">
-                                Royal v2.36.1
+                                Royal v2.36.3
                             </span>
                         </div>
                         <p className="text-[12px] text-zinc-400 mt-0.5">
@@ -5452,7 +5557,7 @@
                                     <div className="w-5 flex justify-center text-[#d4af37] text-[13px]"><i className="fas fa-rocket"></i></div>
                                     <span>Bản Cập Nhật</span>
                                 </div>
-                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.36.1</span>
+                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.36.4</span>
                             </button>
                         </div>
                     </div>

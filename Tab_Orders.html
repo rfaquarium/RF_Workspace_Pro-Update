@@ -1124,6 +1124,7 @@
         const [addingMode, setAddingMode] = React.useState(false);
         const [draftData, setDraftData] = React.useState(null);
         const [selectedIds, setSelectedIds] = React.useState([]);
+        const tabsContainerRef = React.useRef(null);
 
         // STATE KÍCH HOẠT MÁY QUÉT HOÀN HÀNG & HỦY ĐƠN
         const [isScanningReturn, setIsScanningReturn] = React.useState(false);
@@ -1222,6 +1223,16 @@
             setSelectedIds([]);
             setRenderLimit(30);
         }, [filterStatus, filterTime, searchCode]);
+
+        // TỰ ĐỘNG CUỘN ĐẾN TAB ĐANG HOẠT ĐỘNG (AUTO-SCROLL TO ACTIVE TAB)
+        React.useEffect(() => {
+            if (tabsContainerRef.current) {
+                const activeBtn = tabsContainerRef.current.querySelector('[data-active="true"]');
+                if (activeBtn) {
+                    activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                }
+            }
+        }, [filterStatus]);
 
         // LẮNG NGHE SỰ KIỆN ĐIỀU HƯỚNG NHANH TỪ DASHBOARD
         React.useEffect(() => {
@@ -1548,7 +1559,7 @@
         const timeFilteredOrders = React.useMemo(() => {
             return sourceOrders.map(o => {
                 let rawStatus = String(o.status || '').toUpperCase().trim();
-                let eff = String(o._effectiveStatus || o.status || '').toUpperCase().trim();
+                let eff = String(o.status || o._effectiveStatus || '').toUpperCase().trim();
                 const isRec = isReconciledSafe(o.isReconciled);
 
                 if (!rawStatus || rawStatus === '0' || rawStatus === 'NULL' || rawStatus === 'UNDEFINED') {
@@ -1558,6 +1569,8 @@
                 
                 if (rawStatus === 'HOÀN THÀNH' || rawStatus === 'ĐỐI SOÁT THÀNH CÔNG' || isRec) {
                     eff = 'HOÀN THÀNH';
+                } else if (rawStatus === 'ĐÃ BÀN GIAO' || rawStatus === 'ĐÃ NHẬP KHO') {
+                    eff = 'ĐÃ BÀN GIAO';
                 } else if (rawStatus === 'HÀNG HOÀN' || rawStatus === 'HOÀN' || rawStatus.includes('HOÀN CHỜ XỬ') || rawStatus.includes('HOÀN TRẢ')) {
                     eff = 'HÀNG HOÀN CHỜ XỬ LÝ';
                 } else if (rawStatus.includes('HUỶ') || rawStatus.includes('HỦY') || rawStatus.includes('CANCEL') || rawStatus.includes('ยกเลิก')) {
@@ -1947,25 +1960,43 @@
             exportToExcel(sortedFiltered, columns, `Danh_Sach_Don_Hang_${new Date().toISOString().slice(0, 10)}.xlsx`);
         };
 
+        const selectedOrdersList = React.useMemo(() => {
+            if (!selectedIds || selectedIds.length === 0) return [];
+            return (orders || []).filter(o => selectedIds.some(sId => String(sId) === String(o.id)));
+        }, [orders, selectedIds]);
+
+        // Lọc các đơn thực sự ĐỦ ĐIỀU KIỆN bàn giao (chưa bàn giao, chưa hoàn thành, chưa huỷ/hoàn)
+        const eligibleHandoverOrders = React.useMemo(() => {
+            return selectedOrdersList.filter(o => {
+                const st = String(o.status || o._effectiveStatus || '').toUpperCase().trim();
+                return st !== 'ĐÃ BÀN GIAO' && st !== 'ĐÃ NHẬP KHO' && st !== 'HOÀN THÀNH' && st !== 'ĐỐI SOÁT THÀNH CÔNG' &&
+                       st !== 'ĐƠN HUỶ' && st !== 'HUỶ' && st !== 'ĐƠN HỦY' && st !== 'HỦY' && !st.includes('HUỶ') && !st.includes('HỦY') &&
+                       st !== 'HÀNG HOÀN' && !st.includes('HOÀN');
+            });
+        }, [selectedOrdersList]);
+
         const handleBulkHandover = async () => {
-            const selectedOrders = (orders || []).filter(o => selectedIds.some(sId => String(sId) === String(o.id)));
-            if (selectedOrders.length === 0) {
+            if (selectedOrdersList.length === 0) {
                 triggerToast('Chưa chọn đơn hàng nào hoặc đơn không tồn tại!', 'fa-exclamation', 'warning');
                 return;
             }
-            if (!window.confirm(`Xác nhận BÀN GIAO & XUẤT KHO ${selectedOrders.length} đơn đã chọn?`)) return;
+            if (eligibleHandoverOrders.length === 0) {
+                triggerToast('Tất cả các đơn đã chọn đều đã ở trạng thái ĐÃ BÀN GIAO rồi!', 'fa-check-double', 'info');
+                return;
+            }
+            if (!window.confirm(`Xác nhận BÀN GIAO & XUẤT KHO ${eligibleHandoverOrders.length} đơn đã chọn?`)) return;
 
             setIsBulkHandovering(true);
-            triggerToast(`Đang xuất kho & bàn giao ${selectedOrders.length} đơn...`, 'fa-spinner fa-spin', 'info');
+            triggerToast(`Đang xuất kho & bàn giao ${eligibleHandoverOrders.length} đơn...`, 'fa-spinner fa-spin', 'info');
             try {
-                const updatedOrders = selectedOrders.map(order => ({
+                const updatedOrders = eligibleHandoverOrders.map(order => ({
                     ...order,
                     status: 'Đã Bàn Giao'
                 }));
 
                 // Payload siêu nhẹ (Fast Payload): Chỉ cần gửi danh sách đơn với status 'Đã Bàn Giao'
                 // Động cơ safeDeductInventoryOnHandover trên Apps Script Backend sẽ tự động trừ tồn kho (cho phép âm kho phụ kiện) và tạo log xuất kho ngầm.
-                await pushDeltas({ orders: updatedOrders }, `Đã xuất kho & bàn giao thành công ${selectedOrders.length} đơn!`, 'fa-truck');
+                await pushDeltas({ orders: updatedOrders }, `Đã xuất kho & bàn giao thành công ${eligibleHandoverOrders.length} đơn!`, 'fa-truck');
                 clearSelection();
             } catch (e) {
                 console.error("Lỗi handleBulkHandover:", e);
@@ -2830,29 +2861,32 @@
                 </div>
 
                 {/* BỘ LỌC TRẠNG THÁI */}
-                <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar no-scrollbar mb-4 pb-1">
-                    {tabs.map(t => {
-                        const cur = String(filterStatus || '').toUpperCase().trim();
-                        const target = String(t.id || '').toUpperCase().trim();
-                        const isActive = (cur === target) ||
-                            ((target === 'ĐƠN HUỶ' || target === 'ĐƠN HỦY') && (cur === 'ĐƠN HUỶ' || cur === 'ĐƠN HỦY' || cur === 'HỦY' || cur === 'HUỶ')) ||
-                            ((target === 'HÀNG HOÀN' || target.includes('HOÀN CHỜ XỬ')) && (cur === 'HÀNG HOÀN' || (cur.includes('HOÀN') && !cur.includes('HOÀN THÀNH')))) ||
-                            (target === 'HOÀN THÀNH' && (cur === 'HOÀN THÀNH' || cur === 'ĐỐI SOÁT THÀNH CÔNG'));
+                <div className="relative mb-4">
+                    <div ref={tabsContainerRef} className="flex items-center gap-2 overflow-x-auto custom-scrollbar no-scrollbar pb-1 scroll-smooth">
+                        {tabs.map(t => {
+                            const cur = String(filterStatus || '').toUpperCase().trim();
+                            const target = String(t.id || '').toUpperCase().trim();
+                            const isActive = (cur === target) ||
+                                ((target === 'ĐƠN HUỶ' || target === 'ĐƠN HỦY') && (cur === 'ĐƠN HUỶ' || cur === 'ĐƠN HỦY' || cur === 'HỦY' || cur === 'HUỶ')) ||
+                                ((target === 'HÀNG HOÀN' || target.includes('HOÀN CHỜ XỬ')) && (cur === 'HÀNG HOÀN' || (cur.includes('HOÀN') && !cur.includes('HOÀN THÀNH')))) ||
+                                (target === 'HOÀN THÀNH' && (cur === 'HOÀN THÀNH' || cur === 'ĐỐI SOÁT THÀNH CÔNG'));
 
-                        return (
-                            <button
-                                key={t.id}
-                                onClick={() => setFilterStatus(t.id)}
-                                className={`shrink-0 px-3.5 py-2 rounded-xl text-[11px] transition-all duration-200 flex items-center gap-2 active:scale-95 ${isActive ? t.activeClass : t.inactiveClass}`}
-                            >
-                                <i className={`fas ${t.icon} ${isActive ? '' : 'opacity-80'}`}></i>
-                                <span>{t.label}</span>
-                                <span className={`px-1.5 py-0.5 rounded-md text-[9px] min-w-[20px] text-center ${isActive ? t.activeBadgeClass : t.inactiveBadgeClass}`}>
-                                    {t.count}
-                                </span>
-                            </button>
-                        );
-                    })}
+                            return (
+                                <button
+                                    key={t.id}
+                                    data-active={isActive ? "true" : "false"}
+                                    onClick={() => setFilterStatus(t.id)}
+                                    className={`shrink-0 px-3.5 py-2 rounded-xl text-[11px] transition-all duration-200 flex items-center gap-2 active:scale-95 cursor-pointer ${isActive ? t.activeClass : t.inactiveClass}`}
+                                >
+                                    <i className={`fas ${t.icon} ${isActive ? '' : 'opacity-80'}`}></i>
+                                    <span>{t.label}</span>
+                                    <span className={`px-1.5 py-0.5 rounded-md text-[9px] min-w-[20px] text-center ${isActive ? t.activeBadgeClass : t.inactiveBadgeClass}`}>
+                                        {t.count}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
 
                 {/* TÁC VỤ HÀNG LOẠT (HALLMARK COMPACT DOCK) */}
@@ -2903,15 +2937,26 @@
                             )}
 
                             {hasPerm('ORDER_STATUS_DELIVERED') && (
-                                <button 
-                                    type="button"
-                                    onClick={handleBulkHandover} 
-                                    disabled={isBulkHandovering} 
-                                    className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[11px] uppercase active:scale-95 transition-all shadow-[0_0_15px_rgba(16,185,129,0.25)] border border-emerald-300 disabled:opacity-50 cursor-pointer"
-                                >
-                                    <i className={`fas ${isBulkHandovering ? 'fa-spinner fa-spin' : 'fa-truck-fast'} text-[11px]`}></i>
-                                    <span>{isBulkHandovering ? 'Đang Giao...' : `Bàn Giao (${selectedIds.length})`}</span>
-                                </button>
+                                eligibleHandoverOrders.length > 0 ? (
+                                    <button 
+                                        type="button"
+                                        onClick={handleBulkHandover} 
+                                        disabled={isBulkHandovering} 
+                                        className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[11px] uppercase active:scale-95 transition-all shadow-[0_0_15px_rgba(16,185,129,0.25)] border border-emerald-300 disabled:opacity-50 cursor-pointer"
+                                        title={`Bàn giao hàng loạt ${eligibleHandoverOrders.length} đơn`}
+                                    >
+                                        <i className={`fas ${isBulkHandovering ? 'fa-spinner fa-spin' : 'fa-truck-fast'} text-[11px]`}></i>
+                                        <span>{isBulkHandovering ? 'Đang Giao...' : `Bàn Giao (${eligibleHandoverOrders.length})`}</span>
+                                    </button>
+                                ) : (
+                                    <div 
+                                        className="flex items-center gap-1.5 bg-emerald-950/70 border border-emerald-500/40 text-emerald-400 font-bold px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-[11px] uppercase tracking-wider select-none shadow-sm"
+                                        title="Tất cả các đơn đã chọn đều đã ở trạng thái ĐÃ BÀN GIAO"
+                                    >
+                                        <i className="fas fa-check-double text-[10px]"></i>
+                                        <span>Đã Bàn Giao ({selectedOrdersList.length})</span>
+                                    </div>
+                                )
                             )}
                         </div>
                     </div>

@@ -2,6 +2,37 @@
 
 Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến trúc, tối ưu nghiệp vụ và sửa lỗi của hệ điều hành `RF_Workspace_Pro`.
 
+## [v2.36.6] - 2026-09-03
+
+### 🛠️ Hỗ Trợ Nhập Thủ Công Tên Công Cụ, Trang Thiết Bị Ngoài Kho Trên Bảng Báo Nhập Hàng
+- **Bổ Sung Chế Độ Nhập Thủ Công Công Cụ / Trang Thiết Bị (`Tab_Dashboard.html`)**:
+  - **Vấn đề**: Form Bảng Báo Nhập Hàng trước đây chỉ cho phép chọn từ danh sách hàng hoá (`Products`) hiện có trong kho. Khi xưởng cần mua sắm công cụ, máy móc, trang thiết bị mới (máy khoan, kìm, thước, súng bắn keo, bàn chà, thùng rác, đồ bảo hộ...) chưa từng có mã SKU trong kho, thợ và quản lý không thể nhập tên và gửi phiếu lên list mua.
+  - **Giải pháp**: Thiết kế bộ chuyển đổi chế độ linh hoạt dạng Segmented Pills:
+    - **`[ 📦 Chọn Từ Kho Hàng ]`**: Giữ nguyên danh mục vật tư/phụ kiện kho có sẵn, tích hợp thêm lựa chọn chuyển nhanh sang nhập tay ở cuối dropdown.
+    - **`[ 🛠️ Nhập Thủ Công (Công Cụ / Thiết Bị) ]`**: Cho phép gõ tự do tên công cụ/thiết bị cần mua, chọn phân loại (*Công cụ / Dụng cụ, Trang thiết bị xưởng, Vật tư tiêu hao, Đồ bảo hộ lao động, Văn phòng phẩm...*), đơn vị tính (*cái, bộ, cuộn, hộp...*) và đơn giá ước tính.
+- **Phân Biệt Trực Quan Trong Danh Sách Hàng Đợi (`Tab_Dashboard.html`)**:
+  - Bổ sung huy hiệu phân loại trực quan:
+    - Huy hiệu vàng hổ phách: `[🛠️ Thiết Bị / Công Cụ]` cho các mặt hàng nhập thủ công ngoài danh mục kho.
+    - Huy hiệu xanh lục: `[📦 Hàng Kho]` cho các mặt hàng vật tư/phụ kiện lấy từ kho.
+  - Tự động gắn tag và đồng bộ chuẩn xác sang bảng chứng từ `ImportExport` (loại `ĐẶT HÀNG`), giúp bộ phận mua sắm và kế toán dễ dàng gom đơn đặt hàng.
+
+---
+
+## [v2.36.5] - 2026-09-03
+
+### 🛠️ Tab Nhanh Nhân Sự Chịu Trách Nhiệm Trên Cùng, Bỏ Cột Trùng Lặp & Mở Rộng 100% Tên Thiết Bị
+- **Khắc Phục Vấn Đề Tên Thiết Bị Bị Cắt Cụt (`Tab_Workspaces.html`)**:
+  - **Nguyên nhân**: Cột `TÊN THIẾT BỊ / DỤNG CỤ` trước đây chỉ được cấp `col-span-3` (25% chiều rộng bảng) do phải chia đất cho cột `NGƯỜI QUẢN LÝ` (`col-span-3`). Thuộc tính `truncate` khiến mọi tên thiết bị dài như *Dàn Máy Tính Màn 49 Inch Cong UltraWide*, *Hệ Thống Bể Trưng Bày Đa Tầng 1m5*, *Bàn Gỗ MDF Nâu 180x80*... đều bị cắt cụt sau vài ký tự, gây khó khăn cho việc kiểm kê và bàn giao.
+  - **Giải pháp**: Xóa bỏ hoàn toàn cột `Người Quản Lý` dư thừa ở từng dòng bảng; nâng chiều rộng cột `TÊN THIẾT BỊ / DỤNG CỤ` lên gấp đôi (`col-span-6` - 50% diện tích). Thay thế `truncate` bằng `break-words whitespace-normal text-zinc-100 font-semibold leading-snug`, cho phép tên thiết bị hiển thị trọn vẹn 100% nội dung một cách thoáng đãng và rõ ràng.
+- **Bổ Sung Dải Tab Nhanh Nhân Sự Chịu Trách Nhiệm Trên Cùng (Quick Responsible Tabs - `Tab_Workspaces.html`)**:
+  - Đưa bộ lọc nhân sự chịu trách nhiệm lên đỉnh trang dưới dạng thanh Tab nhanh hiện đại, tự động tính toán tổng số lượng thiết bị và tổng giá trị tài sản do từng nhân sự quản lý (Tiến, Hương, Dương, Tâm...).
+  - Chạm 1 chạm vào tab của bất kỳ nhân sự nào sẽ lập tức lọc toàn bộ màn hình chỉ hiển thị các trạm và thiết bị thuộc quyền quản lý của nhân sự đó.
+  - Hỗ trợ nút `[Xem tất cả trạm & nhân sự]` để quay lại chế độ xem tổng quan toàn bộ phân xưởng.
+- **Bảo Toàn Logic Nghiệp Vụ Xử Lý Sự Cố & Phạt Khấu Trừ**:
+  - Các thao tác Báo sự cố, Phạt vi phạm, Sửa trạm, Xoá thiết bị vẫn tự động nhận diện chính xác 100% người chịu trách nhiệm trực tiếp của từng món đồ theo CSDL.
+
+---
+
 ## [v2.36.4] - 2026-09-03
 
 ### 🚚 Tối Ưu Bàn Giao Hàng Loạt Thông Minh, Chống Bấm Nhầm Đơn Đã Giao & Auto-Scroll Tab Trạng Thái

@@ -980,13 +980,15 @@ const MonthlyPenaltyLedger = React.memo(function MonthlyPenaltyLedger({
   );
 });
 
-// -------------------------------------------------------------------------
-// 🏆 BỘ PHẬN GIAO VIỆC & NHIỆM VỤ CHUNG TRÊN DASHBOARD
-// -------------------------------------------------------------------------
 const DashboardTasksSection = React.memo(function DashboardTasksSection({ importExport = [], currentUser, pushDeltas, triggerToast, isAdmin, userConfigs, reimbursements = [], products = [], isBoss }) {
   const [showAddReminder, setShowAddReminder] = React.useState(false);
   // States for material order request
+  const [inputMode, setInputMode] = React.useState('CATALOG'); // 'CATALOG' | 'CUSTOM'
   const [selectedProdId, setSelectedProdId] = React.useState('');
+  const [customName, setCustomName] = React.useState('');
+  const [customCategory, setCustomCategory] = React.useState('Công cụ / Dụng cụ');
+  const [customUnit, setCustomUnit] = React.useState('cái');
+  const [customPrice, setCustomPrice] = React.useState('');
   const [reqQty, setReqQty] = React.useState('1');
   const [reqNote, setReqNote] = React.useState('');
   const [remText, setRemText] = React.useState('');
@@ -1018,18 +1020,23 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ import
     const itemQty = firstItem.quantity || 1;
     const itemUnit = firstItem.unit || 'cái';
     const isOrdered = Boolean(req.note && req.note.includes('[ĐÃ ĐẶT HÀNG]'));
+    const isManual = Boolean(firstItem.isManual || firstItem.sku === 'MANUAL' || firstItem.sku === 'TOOL_MANUAL' || (req.note && (req.note.includes('công cụ') || req.note.includes('thiết bị') || req.note.includes('Báo mua'))));
     
     let creator = 'Nhân viên';
     if (req.note) {
-      const match = req.note.match(/báo nhập vật tư từ:?\s*([^(]+)/i);
+      const match = req.note.match(/(?:báo nhập|báo mua)[^:]*từ:?\s*([^(]+)/i);
       if (match) creator = match[1].trim();
       else if (req.note.includes('từ:')) creator = req.note.split('từ:')[1].split('(')[0].trim();
     }
 
     return {
       displayName: `${itemName} x${itemQty} ${itemUnit}`,
+      itemName,
+      itemQty,
+      itemUnit,
       creator,
       isOrdered,
+      isManual,
       firstItem,
       cleanNote: req.note ? req.note.replace(/\[ĐÃ ĐẶT HÀNG\]/g, '').trim() : ''
     };
@@ -1044,48 +1051,76 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ import
   }, [materialRequests, parseReqDetails]);
 
   const handleCreateMaterialRequest = async () => {
-    const selectedProd = selectableProducts.find(p => String(p.id) === String(selectedProdId)) || (selectedProdId ? null : selectableProducts[0]);
+    const isCustom = inputMode === 'CUSTOM';
     const qty = Math.max(1, Number(reqQty) || 1);
-    
-    if (!selectedProd && !remText.trim()) {
-      triggerToast('Vui lòng chọn hàng hoá / vật tư cần nhập!', 'fa-exclamation-triangle', 'warning');
-      return;
-    }
-    
-    const prodName = selectedProd ? selectedProd.name : remText.trim();
-    const prodSku = selectedProd ? (selectedProd.sku || '') : '';
-    const prodUnit = selectedProd ? (selectedProd.unit || 'cái') : 'cái';
-    const prodCostPrice = selectedProd ? Number(selectedProd.costPrice || selectedProd.price || 0) : 0;
-    const totalCost = prodCostPrice * qty;
 
+    let prodName = '';
+    let prodSku = '';
+    let prodUnit = 'cái';
+    let prodCostPrice = 0;
+    let selectedProd = null;
+    let categoryTag = 'Vật tư';
+
+    if (isCustom) {
+      if (!customName.trim()) {
+        triggerToast('Vui lòng nhập tên công cụ / trang thiết bị cần mua!', 'fa-exclamation-triangle', 'warning');
+        return;
+      }
+      prodName = customName.trim();
+      prodSku = 'TOOL_MANUAL';
+      prodUnit = customUnit.trim() || 'cái';
+      prodCostPrice = parseInt(String(customPrice).replace(/[^0-9]/g, '')) || 0;
+      categoryTag = customCategory || 'Công cụ / Dụng cụ';
+    } else {
+      if (!selectedProdId) {
+        triggerToast('Vui lòng chọn hàng hoá / vật tư cần nhập từ kho!', 'fa-exclamation-triangle', 'warning');
+        return;
+      }
+      selectedProd = selectableProducts.find(p => String(p.id) === String(selectedProdId));
+      if (!selectedProd) {
+        triggerToast('Hàng hoá đã chọn không hợp lệ!', 'fa-exclamation-triangle', 'warning');
+        return;
+      }
+      prodName = selectedProd.name;
+      prodSku = selectedProd.sku || '';
+      prodUnit = selectedProd.unit || 'cái';
+      prodCostPrice = Number(selectedProd.costPrice || selectedProd.price || 0);
+      categoryTag = selectedProd.category || 'Vật tư';
+    }
+
+    const totalCost = prodCostPrice * qty;
     setProcessing(true);
     try {
       const nowIso = new Date().toISOString();
       const nowStr = nowIso.slice(0, 19).replace('T', ' ');
 
       // Tạo DUY NHẤT phiếu ĐẶT HÀNG trong bảng ImportExport (Chứng từ Kho)
-      // TUYỆT ĐỐI KHÔNG TẠO LỆNH TRONG BẢNG PRODUCTION
       const ieTicket = {
         id: 'IE_' + Date.now(),
         type: 'ĐẶT HÀNG',
-        target: (selectedProd && selectedProd.supplier) ? selectedProd.supplier : 'Khác',
+        target: isCustom ? (customCategory || 'Công cụ / Dụng cụ') : ((selectedProd && selectedProd.supplier) ? selectedProd.supplier : 'Khác'),
         totalAmount: totalCost,
         date: nowStr,
-        note: `Báo nhập vật tư từ: ${currentUser}${reqNote ? ' (' + reqNote.trim() + ')' : ''}`,
+        note: `Báo mua [${categoryTag}] từ: ${currentUser}${reqNote ? ' (' + reqNote.trim() + ')' : ''}`,
         itemsData: JSON.stringify([{
-          id: selectedProd ? selectedProd.id : ('ITEM_' + Date.now()),
+          id: isCustom ? ('TOOL_' + Date.now()) : selectedProd.id,
           sku: prodSku,
           name: prodName,
           quantity: qty,
           unit: prodUnit,
-          costPrice: prodCostPrice
+          costPrice: prodCostPrice,
+          category: categoryTag,
+          isManual: isCustom
         }])
       };
 
-      await pushDeltas({ ImportExport: [ieTicket] }, `Đã gửi yêu cầu & tạo phiếu ĐẶT HÀNG: ${prodName} x${qty}`, 'fa-boxes');
-      triggerToast('Đã tạo phiếu ĐẶT HÀNG thành công trong kho hàng!', 'fa-check', 'success');
+      await pushDeltas({ ImportExport: [ieTicket] }, `Đã gửi yêu cầu & lên list đặt: ${prodName} x${qty}`, 'fa-boxes');
+      triggerToast(`Đã lên list mua [${prodName}] thành công!`, 'fa-check', 'success');
       
       setSelectedProdId('');
+      setCustomName('');
+      setCustomPrice('');
+      setCustomUnit('cái');
       setReqQty('1');
       setReqNote('');
       setRemText('');
@@ -1195,58 +1230,182 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ import
 
         {/* Form Yêu cầu nhập hàng của Nhân sự */}
         {showAddReminder && (
-          <div className="bg-[#121214] border border-[#27272a] p-4 rounded-lg space-y-4 mb-4 text-[12px] animate-fade-in">
-            <div>
-              <label className="text-[10px] font-bold text-zinc-400 block mb-1.5 uppercase tracking-wide">
-                Chọn Vật Tư / Phụ Kiện <span className="text-rose-500">*</span>
-              </label>
-              <select 
-                value={selectedProdId} 
-                onChange={e => setSelectedProdId(e.target.value)} 
-                className="w-full bg-[#09090b] border border-[#27272a] text-zinc-100 font-medium rounded px-3 py-2 outline-none focus:border-emerald-500/50 transition-colors"
+          <div className="bg-[#121214] border border-[#27272a] p-4 rounded-xl space-y-4 mb-4 text-[12px] animate-fade-in shadow-lg">
+            {/* Thanh chuyển đổi chế độ: Chọn từ Kho vs Nhập Thủ Công */}
+            <div className="flex items-center gap-2 p-1 bg-[#09090b] rounded-lg border border-[#27272a]">
+              <button
+                type="button"
+                onClick={() => setInputMode('CATALOG')}
+                className={`flex-1 py-1.5 px-3 rounded text-[11px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  inputMode === 'CATALOG'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
               >
-                <option value="">-- Chọn vật tư / phụ kiện --</option>
-                {selectableProducts.map(p => (
-                  <option key={p.id} value={p.id}>
-                    [{p.category || 'Vật tư'}] {p.name} {p.sku ? `(${p.sku})` : ''} - {Number(p.costPrice || p.price || 0).toLocaleString('vi-VN')}đ
-                  </option>
-                ))}
-              </select>
+                <i className="fas fa-boxes text-[10px]"></i> Chọn Từ Kho Hàng
+              </button>
+              <button
+                type="button"
+                onClick={() => setInputMode('CUSTOM')}
+                className={`flex-1 py-1.5 px-3 rounded text-[11px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  inputMode === 'CUSTOM'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <i className="fas fa-tools text-[10px]"></i> Nhập Thủ Công (Công Cụ / Thiết Bị)
+              </button>
             </div>
 
+            {inputMode === 'CATALOG' ? (
+              /* Chế độ 1: Chọn từ danh mục hàng hóa kho */
+              <div>
+                <label className="text-[10px] font-bold text-zinc-400 block mb-1.5 uppercase tracking-wide">
+                  Chọn Hàng Hoá / Vật Tư Có Sẵn Trong Kho <span className="text-rose-500">*</span>
+                </label>
+                <select 
+                  value={selectedProdId} 
+                  onChange={e => {
+                    if (e.target.value === '__SWITCH_CUSTOM__') {
+                      setInputMode('CUSTOM');
+                      setSelectedProdId('');
+                    } else {
+                      setSelectedProdId(e.target.value);
+                    }
+                  }} 
+                  className="w-full bg-[#09090b] border border-[#27272a] text-zinc-100 font-medium rounded-lg px-3 py-2 outline-none focus:border-emerald-500/50 transition-colors cursor-pointer"
+                >
+                  <option value="">-- Chọn vật tư / phụ kiện trong kho --</option>
+                  {selectableProducts.map(p => (
+                    <option key={p.id} value={p.id}>
+                      [{p.category || 'Vật tư'}] {p.name} {p.sku ? `(${p.sku})` : ''} - {Number(p.costPrice || p.price || 0).toLocaleString('vi-VN')}đ
+                    </option>
+                  ))}
+                  <option value="__SWITCH_CUSTOM__">✍️ + Nhập thủ công công cụ / thiết bị khác ngoài kho...</option>
+                </select>
+              </div>
+            ) : (
+              /* Chế độ 2: Nhập tên thủ công cho công cụ, trang thiết bị ngoài kho */
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-bold text-amber-400 block mb-1.5 uppercase tracking-wide flex items-center gap-1.5">
+                    <i className="fas fa-pen-to-square text-[10px]"></i>
+                    Tên Công Cụ / Trang Thiết Bị Cần Mua <span className="text-rose-500">*</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    value={customName} 
+                    onChange={e => setCustomName(e.target.value)} 
+                    placeholder="VD: Máy khoan pin Makita, Kìm bấm chết, Thước nhôm 1m, Thùng rác công nghiệp..."
+                    className="w-full bg-[#09090b] border border-amber-500/30 text-white font-semibold rounded-lg px-3 py-2 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all placeholder-zinc-600"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-400 block mb-1.5 uppercase tracking-wide">
+                      Phân Loại
+                    </label>
+                    <select
+                      value={customCategory}
+                      onChange={e => setCustomCategory(e.target.value)}
+                      className="w-full bg-[#09090b] border border-[#27272a] text-zinc-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-amber-500/50"
+                    >
+                      <option value="Công cụ / Dụng cụ">🛠️ Công cụ / Dụng cụ</option>
+                      <option value="Trang thiết bị xưởng">⚙️ Trang thiết bị xưởng</option>
+                      <option value="Vật tư tiêu hao">📦 Vật tư tiêu hao</option>
+                      <option value="Đồ bảo hộ lao động">🦺 Đồ bảo hộ lao động</option>
+                      <option value="Văn phòng phẩm">📎 Văn phòng phẩm</option>
+                      <option value="Khác">🏷️ Khác</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-400 block mb-1.5 uppercase tracking-wide">
+                      Đơn Vị Tính
+                    </label>
+                    <input 
+                      type="text" 
+                      value={customUnit} 
+                      onChange={e => setCustomUnit(e.target.value)} 
+                      placeholder="cái, bộ, cuộn, hộp..."
+                      className="w-full bg-[#09090b] border border-[#27272a] text-zinc-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-amber-500/50 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-400 block mb-1.5 uppercase tracking-wide">
+                      Đơn Giá Dự Kiến (Nếu có)
+                    </label>
+                    <input 
+                      type="text" 
+                      value={customPrice ? parseInt(String(customPrice).replace(/[^0-9]/g, '')).toLocaleString('vi-VN') : ''} 
+                      onChange={e => setCustomPrice(e.target.value.replace(/[^0-9]/g, ''))} 
+                      placeholder="0 ₫"
+                      className="w-full bg-[#09090b] border border-[#27272a] text-amber-400 font-mono font-bold text-xs rounded-lg px-3 py-2 outline-none focus:border-amber-500/50"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Số lượng & Ghi chú dùng chung */}
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-1">
-                <label className="text-[10px] font-bold text-zinc-400 block mb-1.5 uppercase tracking-wide">Số Lượng <span className="text-rose-500">*</span></label>
+                <label className="text-[10px] font-bold text-zinc-400 block mb-1.5 uppercase tracking-wide">
+                  Số Lượng <span className="text-rose-500">*</span>
+                </label>
                 <input 
                   type="number" 
                   min="1"
                   value={reqQty} 
                   onChange={e => setReqQty(e.target.value)} 
-                  className="w-full bg-[#09090b] border border-[#27272a] text-emerald-400 font-bold rounded px-3 py-2 outline-none focus:border-emerald-500/50 transition-colors" 
-                  placeholder="SL"
+                  className="w-full bg-[#09090b] border border-[#27272a] text-emerald-400 font-bold rounded-lg px-3 py-2 outline-none focus:border-emerald-500/50 transition-colors font-mono" 
+                  placeholder="1"
                 />
               </div>
               <div className="col-span-2">
-                <label className="text-[10px] font-bold text-zinc-400 block mb-1.5 uppercase tracking-wide">Ghi chú</label>
+                <label className="text-[10px] font-bold text-zinc-400 block mb-1.5 uppercase tracking-wide">
+                  Ghi Chú Thêm
+                </label>
                 <input 
                   type="text" 
                   value={reqNote} 
                   onChange={e => setReqNote(e.target.value)} 
-                  className="w-full bg-[#09090b] border border-[#27272a] text-zinc-100 font-medium rounded px-3 py-2 outline-none focus:border-emerald-500/50 transition-colors" 
-                  placeholder="Ghi chú thêm..."
+                  className="w-full bg-[#09090b] border border-[#27272a] text-zinc-100 font-medium rounded-lg px-3 py-2 outline-none focus:border-emerald-500/50 transition-colors" 
+                  placeholder="Mục đích dùng, phòng ban, link Shopee nếu có..."
                 />
               </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t border-[#27272a]">
               <button 
-                onClick={() => { setSelectedProdId(''); setReqQty('1'); setReqNote(''); setRemText(''); setShowAddReminder(false); }} 
-                className="bg-transparent hover:bg-[#27272a] text-zinc-400 font-bold px-4 py-2 rounded transition-colors uppercase text-[10px] tracking-wide cursor-pointer"
+                type="button"
+                onClick={() => { 
+                  setSelectedProdId(''); 
+                  setCustomName('');
+                  setCustomPrice('');
+                  setReqQty('1'); 
+                  setReqNote(''); 
+                  setShowAddReminder(false); 
+                }} 
+                className="bg-transparent hover:bg-[#27272a] text-zinc-400 font-bold px-4 py-2 rounded-lg transition-colors uppercase text-[10px] tracking-wide cursor-pointer"
               >
                 Huỷ
               </button>
-              <button onClick={handleCreateMaterialRequest} disabled={processing} className="bg-emerald-500 hover:bg-emerald-600 text-[#09090b] font-black px-5 py-2 rounded transition-colors uppercase text-[10px] tracking-wide flex items-center gap-1.5 cursor-pointer">
-                <i className="fas fa-check"></i> Tạo Phiếu Đặt
+              <button 
+                type="button"
+                onClick={handleCreateMaterialRequest} 
+                disabled={processing} 
+                className={`font-black px-5 py-2 rounded-lg transition-all uppercase text-[10px] tracking-wide flex items-center gap-1.5 cursor-pointer shadow-md ${
+                  inputMode === 'CUSTOM'
+                    ? 'bg-amber-500 hover:bg-amber-400 text-zinc-950 shadow-amber-500/20'
+                    : 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950 shadow-emerald-500/20'
+                }`}
+              >
+                {processing ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-check"></i>}
+                {inputMode === 'CUSTOM' ? 'Lên List Mua Công Cụ' : 'Tạo Phiếu Đặt Hàng'}
               </button>
             </div>
           </div>
@@ -1268,7 +1427,18 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ import
                 return (
                   <div key={req.id} className="p-3 bg-[#121214] border border-[#27272a] rounded-lg flex items-center justify-between gap-3 flex-wrap group hover:border-amber-500/30 transition-colors">
                     <div className="flex-1 min-w-0">
-                      <span className="font-bold text-[12px] text-zinc-100 block">{details.displayName}</span>
+                      <span className="font-bold text-[12px] text-zinc-100 flex items-center gap-1.5 flex-wrap">
+                        <span>{details.displayName}</span>
+                        {details.isManual ? (
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 uppercase tracking-wide inline-flex items-center gap-1">
+                            <i className="fas fa-tools text-[8px]"></i> {details.firstItem?.category || 'Công cụ / Thiết bị'}
+                          </span>
+                        ) : (
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide inline-flex items-center gap-1">
+                            <i className="fas fa-box text-[8px]"></i> Hàng kho
+                          </span>
+                        )}
+                      </span>
                       <span className="text-[10px] font-medium text-zinc-500 block mt-1"><i className="fas fa-user-circle mr-1"></i> {details.creator} {details.cleanNote && <span className="text-zinc-400">({details.cleanNote})</span>}</span>
                     </div>
                     <div className="flex gap-2">
@@ -1294,7 +1464,18 @@ const DashboardTasksSection = React.memo(function DashboardTasksSection({ import
                 return (
                   <div key={req.id} className="p-3 bg-[#121214] border border-[#27272a] rounded-lg flex items-center justify-between gap-3 flex-wrap group hover:border-blue-500/30 transition-colors">
                     <div className="flex-1 min-w-0">
-                      <span className="font-bold text-[12px] text-zinc-100 block">{details.displayName}</span>
+                      <span className="font-bold text-[12px] text-zinc-100 flex items-center gap-1.5 flex-wrap">
+                        <span>{details.displayName}</span>
+                        {details.isManual ? (
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 uppercase tracking-wide inline-flex items-center gap-1">
+                            <i className="fas fa-tools text-[8px]"></i> {details.firstItem?.category || 'Công cụ / Thiết bị'}
+                          </span>
+                        ) : (
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide inline-flex items-center gap-1">
+                            <i className="fas fa-box text-[8px]"></i> Hàng kho
+                          </span>
+                        )}
+                      </span>
                       <span className="text-[10px] font-medium text-blue-400/80 block mt-1"><i className="fas fa-check-circle mr-1"></i> Đã đặt hàng {details.creator && `(${details.creator})`}</span>
                     </div>
                     <div className="flex gap-2">

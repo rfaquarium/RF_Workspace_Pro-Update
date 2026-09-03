@@ -781,11 +781,71 @@
 
         const RELEASES = [
             {
-                version: 'Royal v2.36.4',
+                version: 'Royal v2.36.6',
                 date: '03/09/2026',
                 isLatest: true,
-                badge: 'TỐI ƯU BÀN GIAO & AUTO-SCROLL TAB',
+                badge: 'MUA CÔNG CỤ & THIẾT BỊ NGOÀI KHO',
                 badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Hỗ Trợ Nhập Thủ Công Tên Công Cụ, Trang Thiết Bị Ngoài Danh Mục Kho Hàng',
+                summary: 'Nâng cấp toàn diện form Bảng Báo Nhập Hàng trên Dashboard: Bổ sung thanh tab chuyển đổi linh hoạt giữa chọn hàng hoá có sẵn trong kho hoặc nhập thủ công tên công cụ, trang thiết bị phát sinh (kèm phân loại, đơn vị tính và đơn giá dự kiến) để thợ và quản lý dễ dàng lên danh sách mua sắm trang thiết bị cho xưởng.',
+                categories: ['Dashboard', 'Kho & Mua Sắm', 'Công Cụ', 'UI/UX'],
+                items: [
+                    {
+                        icon: 'fa-tools',
+                        color: 'text-amber-400',
+                        title: 'Tab Nhập Thủ Công Công Cụ / Thiết Bị (Manual Tool Purchase Request)',
+                        desc: 'Cho phép gõ tự do tên mọi công cụ, thiết bị xưởng (máy khoan, kìm, thước, thùng rác, đồ bảo hộ...) không có sẵn SKU trong bảng Products, kèm lựa chọn phân loại và đơn vị tính.'
+                    },
+                    {
+                        icon: 'fa-boxes',
+                        color: 'text-emerald-400',
+                        title: 'Bộ Chuyển Đổi Chế Độ Linh Hoạt (Segmented Input Mode)',
+                        desc: 'Chuyển đổi 1 chạm giữa chế độ Chọn hàng có sẵn trong kho và Nhập công cụ ngoài kho; dropdown hàng kho cũng tích hợp sẵn lối tắt chuyển nhanh sang chế độ nhập tay.'
+                    },
+                    {
+                        icon: 'fa-tags',
+                        color: 'text-sky-400',
+                        title: 'Huy Hiệu Phân Loại Trực Quan Trong Hàng Đợi (Visual Item Badges)',
+                        desc: 'Tự động hiển thị huy hiệu [Thiết bị / Công cụ] màu vàng hổ phách hoặc [Hàng kho] màu xanh lục bảo trong danh sách Chờ đặt hàng và Đã đặt - Chờ nhận, giúp người mua phân biệt ngay tức thì.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.36.5',
+                date: '03/09/2026',
+                isLatest: false,
+                badge: 'TAB NHANH TRÁCH NHIỆM & 100% TÊN THIẾT BỊ',
+                badgeColor: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
+                title: 'Tab Nhanh Nhân Sự Chịu Trách Nhiệm Trên Cùng, Xóa Bỏ Cột Trùng Lặp & Mở Rộng 100% Tên Thiết Bị',
+                summary: 'Tối ưu toàn diện giao diện Phân hệ Trách Nhiệm: Đưa bộ lọc nhân sự chịu trách nhiệm lên trên cùng dạng dải Tab nhanh kèm số lượng món và giá trị tài sản. Loại bỏ hoàn toàn cột Người Quản Lý trong bảng giúp cột Tên Thiết Bị mở rộng gấp đôi diện tích, hiển thị đầy đủ tên thiết bị không còn bị cắt cụt dấu ba chấm.',
+                categories: ['Trách Nhiệm', 'Kho & Tài Sản', 'UI/UX', 'Lean Muda'],
+                items: [
+                    {
+                        icon: 'fa-users-viewfinder',
+                        color: 'text-amber-400',
+                        title: 'Dải Tab Nhanh Nhân Sự Chịu Trách Nhiệm Trên Cùng (Quick Responsible Tabs)',
+                        desc: 'Hiển thị dải tab trực quan ở đầu trang với thống kê tổng số món và giá trị tài sản của từng nhân sự (Tiến, Hương, Dương, Tâm...). Click 1 chạm để lọc ngay các trạm và thiết bị do nhân sự đó quản lý.'
+                    },
+                    {
+                        icon: 'fa-arrows-left-right-to-line',
+                        color: 'text-emerald-400',
+                        title: 'Mở Rộng Gấp Đôi Cột Tên Thiết Bị / Dụng Cụ (Full Equipment Name Visibility)',
+                        desc: 'Giải phóng diện tích từ 3 cột (25%) lên 6 cột (50%), loại bỏ hoàn toàn thuộc tính cắt chữ (truncate), tự động wrap dòng mượt mà giúp nhìn trọn vẹn 100% tên thiết bị dài mà không bị mất chữ.'
+                    },
+                    {
+                        icon: 'fa-table-columns',
+                        color: 'text-rose-400',
+                        title: 'Loại Bỏ Hoàn Toàn Cột "Người Quản Lý" Trùng Lặp (Zero Muda Columns)',
+                        desc: 'Xóa bỏ cột Người Quản Lý lặp lại dư thừa ở từng dòng bảng. Quy trách nhiệm xử lý sự cố và phạt khấu trừ vẫn hoạt động chính xác 100% theo đúng dữ liệu người quản lý của từng món đồ.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.36.4',
+                date: '03/09/2026',
+                isLatest: false,
+                badge: 'TỐI ƯU BÀN GIAO & AUTO-SCROLL TAB',
+                badgeColor: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
                 title: 'Tối Ưu Bàn Giao Hàng Loạt Thông Minh, Chống Bấm Nhầm Đơn Đã Giao & Auto-Scroll Tab Trạng Thái',
                 summary: 'Khắc phục triệt để hiểu lầm đơn hàng kẹt ở Chờ Bàn Giao: Tự động trượt mượt mà đưa Tab đang chọn vào tầm nhìn (tránh bị khuất mép màn hình). Đồng thời trang bị bộ lọc thông minh cho thanh tác vụ nổi, tự động nhận diện và hiển thị huy hiệu [ĐÃ BÀN GIAO] thay vì nút bấm bàn giao thừa thãi.',
                 categories: ['Đơn Hàng', 'Kho & Vận Hành', 'UI/UX', 'Lean Muda'],
@@ -5557,7 +5617,7 @@
                                     <div className="w-5 flex justify-center text-[#d4af37] text-[13px]"><i className="fas fa-rocket"></i></div>
                                     <span>Bản Cập Nhật</span>
                                 </div>
-                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.36.4</span>
+                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.36.6</span>
                             </button>
                         </div>
                     </div>

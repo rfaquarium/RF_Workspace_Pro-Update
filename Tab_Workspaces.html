@@ -6,6 +6,7 @@
     const [selectedItemForPenalty, setSelectedItemForPenalty] = React.useState(null);
     const [actionType, setActionType] = React.useState(''); // 'assign' | 'report' | 'item_penalty'
     const [managerFilterMap, setManagerFilterMap] = React.useState({});
+    const [selectedGlobalManager, setSelectedGlobalManager] = React.useState('ALL');
 
     const role = propUserRole || localStorage.getItem('rf_role') || '';
     const currentUser = (propCurrentUser || localStorage.getItem('rf_user') || '').trim();
@@ -21,6 +22,47 @@
     const canConfigLayout = hasPerm('WS_CONFIG_LAYOUT'); // Tiến, Tâm
 
     const workspaces = data?.Workspaces || [];
+
+    // Tính danh sách nhân sự phụ trách thực tế từ tất cả workspaces (cho Tab nhanh trên cùng)
+    const allManagerStats = React.useMemo(() => {
+      const map = {};
+      let totalTools = 0;
+      let totalVal = 0;
+
+      workspaces.forEach(ws => {
+        const toolsList = normalizeTools(ws.tools, ws.user);
+        toolsList.forEach(tool => {
+          const mgr = (tool.user || ws.user || 'Chưa gán').trim();
+          if (!map[mgr]) {
+            map[mgr] = { count: 0, totalValue: 0, stations: new Set() };
+          }
+          map[mgr].count += (tool.qty || 1);
+          map[mgr].totalValue += (tool.value * (tool.qty || 1));
+          map[mgr].stations.add(ws.name || ws.id);
+          totalTools += (tool.qty || 1);
+          totalVal += (tool.value * (tool.qty || 1));
+        });
+      });
+
+      const list = Object.keys(map).sort((a, b) => map[b].count - map[a].count).map(name => ({
+        name,
+        count: map[name].count,
+        totalValue: map[name].totalValue,
+        stationCount: map[name].stations.size
+      }));
+
+      return { list, totalTools, totalVal };
+    }, [workspaces]);
+
+    // Lọc danh sách trạm theo Tab nhanh nhân sự trên cùng
+    const displayedWorkspaces = React.useMemo(() => {
+      if (selectedGlobalManager === 'ALL') return workspaces;
+      return workspaces.filter(ws => {
+        const toolsList = normalizeTools(ws.tools, ws.user);
+        const managers = toolsList.map(t => (t.user || ws.user || 'Chưa gán').trim());
+        return managers.includes(selectedGlobalManager) || (ws.user && ws.user.trim() === selectedGlobalManager);
+      });
+    }, [workspaces, selectedGlobalManager]);
     
     // Lấy danh sách nhân sự an toàn tuyệt đối
     const employees = React.useMemo(() => {
@@ -179,15 +221,98 @@
           )}
         </div>
 
+        {/* THANH TAB NHANH: NHÂN SỰ CHỊU TRÁCH NHIỆM TRÊN CÙNG */}
+        {allManagerStats.list.length > 0 && (
+          <div className="mb-6 bg-[#121214]/90 border border-zinc-800/80 rounded-2xl p-3 sm:p-4 backdrop-blur-sm shadow-xl">
+            <div className="flex items-center justify-between gap-3 mb-2.5 pb-2.5 border-b border-zinc-800/60 flex-wrap">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xs">
+                  <i className="fa-solid fa-users-viewfinder"></i>
+                </div>
+                <span className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+                  Tab Nhanh: Nhân Sự Chịu Trách Nhiệm
+                </span>
+                <span className="text-[11px] text-zinc-500 font-mono">
+                  ({allManagerStats.list.length} nhân sự • {allManagerStats.totalTools} thiết bị • {allManagerStats.totalVal.toLocaleString('vi-VN')} ₫)
+                </span>
+              </div>
+
+              {selectedGlobalManager !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedGlobalManager('ALL')}
+                  className="text-[11px] font-semibold text-zinc-400 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer bg-zinc-800/60 px-2.5 py-1 rounded-lg border border-zinc-700/50 hover:bg-zinc-700"
+                >
+                  <i className="fa-solid fa-rotate-left text-[10px]"></i> Xem tất cả trạm & nhân sự
+                </button>
+              )}
+            </div>
+
+            {/* Dải Tab cuộn ngang mượt mà */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
+              {/* Tab Tất Cả */}
+              <button
+                type="button"
+                onClick={() => setSelectedGlobalManager('ALL')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer ${
+                  selectedGlobalManager === 'ALL'
+                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-zinc-950 shadow-[0_0_15px_rgba(245,158,11,0.25)] border border-amber-400 font-black'
+                    : 'bg-[#18181b] text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 border border-zinc-800'
+                }`}
+              >
+                <i className="fa-solid fa-layer-group text-[11px]"></i>
+                <span>Tất cả nhân sự</span>
+                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-md ${
+                  selectedGlobalManager === 'ALL' ? 'bg-black/20 text-zinc-950' : 'bg-zinc-800 text-zinc-300'
+                }`}>
+                  {allManagerStats.totalTools} món
+                </span>
+              </button>
+
+              {/* Từng nhân sự */}
+              {allManagerStats.list.map(mgr => {
+                const isSelected = selectedGlobalManager === mgr.name;
+                return (
+                  <button
+                    key={mgr.name}
+                    type="button"
+                    onClick={() => setSelectedGlobalManager(isSelected ? 'ALL' : mgr.name)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer ${
+                      isSelected
+                        ? 'bg-white text-zinc-950 shadow-[0_0_15px_rgba(255,255,255,0.2)] border border-white scale-[1.02] font-black'
+                        : 'bg-[#18181b] text-zinc-300 hover:text-white hover:bg-zinc-800/80 border border-zinc-800'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                      isSelected ? 'bg-zinc-900 text-white' : 'bg-zinc-800 text-amber-400 border border-zinc-700'
+                    }`}>
+                      <i className="fa-solid fa-user"></i>
+                    </div>
+                    <span>{mgr.name}</span>
+                    <span className={`text-[10.5px] font-mono font-bold px-1.5 py-0.2 rounded-md ${
+                      isSelected ? 'bg-zinc-200 text-zinc-900' : 'bg-zinc-800 text-amber-400'
+                    }`}>
+                      {mgr.count} món
+                    </span>
+                    <span className={`text-[10px] font-mono hidden sm:inline ${
+                      isSelected ? 'text-zinc-600' : 'text-zinc-500'
+                    }`}>
+                      ({mgr.totalValue.toLocaleString('vi-VN')}₫)
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Bento Grid Layout */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {workspaces.map((ws, i) => {
+          {displayedWorkspaces.map((ws, i) => {
             const toolsList = normalizeTools(ws.tools, ws.user);
-            const totalValue = toolsList.reduce((sum, t) => sum + (t.value * t.qty), 0);
-            const totalQty = toolsList.reduce((sum, t) => sum + t.qty, 0);
 
             // Danh sách các nhân sự phụ trách vật tư trong phòng
-            const distinctManagers = Array.from(new Set(toolsList.map(t => t.user || ws.user || 'Chưa gán'))).filter(Boolean);
+            const distinctManagers = Array.from(new Set(toolsList.map(t => (t.user || ws.user || 'Chưa gán').trim()))).filter(Boolean);
             const isMine = distinctManagers.some(m => m.includes(currentUser.split(' ').pop()) || currentUser === m) || ws.user.includes(currentUser.split(' ').pop()) || currentUser === ws.user;
 
             // Tính % tình trạng trung bình của trạm
@@ -196,11 +321,17 @@
               : 100;
             const avgCondBadge = getConditionBadge(avgCondition);
 
-            // Filter tools theo nhân sự được chọn trong card
-            const currentFilter = managerFilterMap[ws.id] || 'ALL';
-            const filteredTools = currentFilter === 'ALL' 
+            // Filter tools theo nhân sự: ưu tiên selectedGlobalManager nếu khác 'ALL', ngược lại theo managerFilterMap[ws.id]
+            const effectiveFilter = selectedGlobalManager !== 'ALL' 
+              ? selectedGlobalManager 
+              : (managerFilterMap[ws.id] || 'ALL');
+
+            const filteredTools = effectiveFilter === 'ALL' 
               ? toolsList 
-              : toolsList.filter(t => (t.user || ws.user || 'Chưa gán') === currentFilter);
+              : toolsList.filter(t => (t.user || ws.user || 'Chưa gán').trim() === effectiveFilter);
+
+            const totalValue = filteredTools.reduce((sum, t) => sum + (t.value * t.qty), 0);
+            const totalQty = filteredTools.reduce((sum, t) => sum + t.qty, 0);
 
             let statusBadge = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
             if (ws.status === 'Hỏng' || toolsList.some(t => t.status === 'Hỏng')) {
@@ -245,7 +376,9 @@
                   {/* Summary Metric Badges */}
                   <div className="flex items-center gap-2 bg-[#18181b] border border-zinc-800 px-3.5 py-2 rounded-xl shrink-0">
                     <div className="text-right">
-                      <div className="text-[10px] uppercase font-bold tracking-wider text-zinc-500">Tổng tài sản ({totalQty} món)</div>
+                      <div className="text-[10px] uppercase font-bold tracking-wider text-zinc-500">
+                        {effectiveFilter !== 'ALL' ? `Tài sản (${effectiveFilter})` : `Tổng tài sản (${totalQty} món)`}
+                      </div>
                       <div className="text-sm font-mono font-bold text-amber-400">
                         {totalValue.toLocaleString('vi-VN')} ₫
                       </div>
@@ -253,93 +386,109 @@
                   </div>
                 </div>
 
-                {/* Filter / Group theo nhân sự trong phòng */}
-                {distinctManagers.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap bg-[#18181b]/50 p-2 rounded-xl border border-zinc-800/50">
-                    <span className="text-[10.5px] font-bold text-zinc-500 uppercase tracking-wider mr-1 flex items-center gap-1">
-                      <i className="fa-solid fa-filter text-zinc-400"></i> Lọc nhân sự:
-                    </span>
+                {/* Thanh Lọc / Thông Báo Nhân Sự Trong Card */}
+                {selectedGlobalManager !== 'ALL' ? (
+                  <div className="flex items-center justify-between gap-2 bg-amber-500/10 border border-amber-500/20 px-3.5 py-2 rounded-xl text-amber-300 text-xs font-semibold">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <i className="fa-solid fa-user-check text-amber-400"></i>
+                      <span>Đang lọc thiết bị của: <strong className="text-white">{selectedGlobalManager}</strong></span>
+                      <span className="text-[11px] font-mono text-amber-400/90 font-bold">({filteredTools.length} món)</span>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => setManagerFilterMap(prev => ({ ...prev, [ws.id]: 'ALL' }))}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                        currentFilter === 'ALL'
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
-                          : 'bg-zinc-800/70 text-zinc-400 hover:text-white border border-zinc-700/40'
-                      }`}
+                      onClick={() => setSelectedGlobalManager('ALL')}
+                      className="text-[11px] font-bold text-amber-400 hover:text-amber-200 underline cursor-pointer shrink-0"
                     >
-                      Tất cả ({toolsList.length})
+                      Bỏ lọc
                     </button>
-                    {distinctManagers.map(mgr => {
-                      const mgrTools = toolsList.filter(t => (t.user || ws.user || 'Chưa gán') === mgr);
-                      const mgrVal = mgrTools.reduce((s, t) => s + (t.value * t.qty), 0);
-                      const isSelected = currentFilter === mgr;
-                      return (
-                        <button
-                          key={mgr}
-                          type="button"
-                          onClick={() => setManagerFilterMap(prev => ({ ...prev, [ws.id]: isSelected ? 'ALL' : mgr }))}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                            isSelected
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-                              : 'bg-zinc-800/70 text-zinc-300 hover:text-white border border-zinc-700/40 hover:bg-zinc-700'
-                          }`}
-                        >
-                          <i className="fa-solid fa-user text-[9px] text-zinc-400"></i>
-                          <span>{mgr}</span>
-                          <span className="text-[10px] font-mono text-amber-400/90 font-bold">({mgrTools.length} món)</span>
-                        </button>
-                      );
-                    })}
                   </div>
+                ) : (
+                  distinctManagers.length > 1 && (
+                    <div className="flex items-center gap-1.5 flex-wrap bg-[#18181b]/50 p-2 rounded-xl border border-zinc-800/50">
+                      <span className="text-[10.5px] font-bold text-zinc-500 uppercase tracking-wider mr-1 flex items-center gap-1">
+                        <i className="fa-solid fa-filter text-zinc-400"></i> Lọc tại trạm:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setManagerFilterMap(prev => ({ ...prev, [ws.id]: 'ALL' }))}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                          effectiveFilter === 'ALL'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                            : 'bg-zinc-800/70 text-zinc-400 hover:text-white border border-zinc-700/40'
+                        }`}
+                      >
+                        Tất cả ({toolsList.length})
+                      </button>
+                      {distinctManagers.map(mgr => {
+                        const mgrTools = toolsList.filter(t => (t.user || ws.user || 'Chưa gán').trim() === mgr);
+                        const isSelected = effectiveFilter === mgr;
+                        return (
+                          <button
+                            key={mgr}
+                            type="button"
+                            onClick={() => setManagerFilterMap(prev => ({ ...prev, [ws.id]: isSelected ? 'ALL' : mgr }))}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                              isSelected
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                                : 'bg-zinc-800/70 text-zinc-300 hover:text-white border border-zinc-700/40 hover:bg-zinc-700'
+                            }`}
+                          >
+                            <i className="fa-solid fa-user text-[9px] text-zinc-400"></i>
+                            <span>{mgr}</span>
+                            <span className="text-[10px] font-mono text-amber-400/90 font-bold">({mgrTools.length} món)</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )
                 )}
 
-                {/* Body: Danh sách chia từng dòng chi tiết */}
+                {/* Body: Danh sách bảng thiết bị - BỎ CỘT NGƯỜI QUẢN LÝ, MỞ RỘNG TÊN THIẾT BỊ KHÔNG BỊ CẮT CỤT */}
                 <div className="flex-1 bg-[#18181b]/70 rounded-xl border border-zinc-800/60 overflow-hidden">
-                  <div className="px-4 py-2.5 bg-zinc-900/80 border-b border-zinc-800/60 grid grid-cols-12 text-[10.5px] font-bold text-zinc-400 uppercase tracking-wider gap-1.5 items-center">
-                    <div className="col-span-4 sm:col-span-3">Tên Thiết Bị / Dụng Cụ</div>
-                    <div className="col-span-3 sm:col-span-3">Người Quản Lý</div>
+                  <div className="px-4 py-2.5 bg-zinc-900/80 border-b border-zinc-800/60 grid grid-cols-12 text-[10.5px] font-bold text-zinc-400 uppercase tracking-wider gap-2 items-center">
+                    <div className="col-span-6 sm:col-span-6">Tên Thiết Bị / Dụng Cụ</div>
                     <div className="col-span-2 sm:col-span-2 text-center">Tình Trạng Giao</div>
                     <div className="col-span-1 sm:col-span-1 text-center">SL</div>
                     <div className="col-span-2 sm:col-span-2 text-right">Giá Trị</div>
-                    <div className="hidden sm:block sm:col-span-1 text-right">Thao Tác</div>
+                    <div className="col-span-1 sm:col-span-1 text-right">Thao Tác</div>
                   </div>
 
-                  <div className="divide-y divide-zinc-800/50 max-h-[380px] overflow-y-auto custom-scrollbar">
+                  <div className="divide-y divide-zinc-800/50 max-h-[420px] overflow-y-auto custom-scrollbar">
                     {filteredTools.length > 0 ? (
                       filteredTools.map((tool, tIdx) => {
-                        let itemStatusColor = 'text-zinc-200';
+                        let itemStatusColor = 'text-zinc-100';
                         if (tool.status === 'Hỏng') itemStatusColor = 'text-amber-400 line-through opacity-80';
                         if (tool.status === 'Mất') itemStatusColor = 'text-rose-400 line-through opacity-80';
                         const condStyle = getConditionBadge(tool.conditionPct);
-                        const toolManager = tool.user || ws.user || 'Chưa gán';
+                        const toolManager = (tool.user || ws.user || 'Chưa gán').trim();
 
                         return (
                           <div 
                             key={tool.id || tIdx} 
-                            className="px-4 py-2.5 grid grid-cols-12 items-center hover:bg-zinc-800/40 transition-colors text-xs gap-1.5"
+                            className="px-4 py-2.5 grid grid-cols-12 items-center hover:bg-zinc-800/40 transition-colors text-xs gap-2"
                           >
-                            {/* Tên thiết bị */}
-                            <div className="col-span-4 sm:col-span-3 flex items-center gap-2 pr-1 min-w-0">
-                              <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 shrink-0"></span>
-                              <span className={`font-medium truncate ${itemStatusColor}`} title={tool.name}>
-                                {tool.name}
-                              </span>
-                              {tool.status !== 'Tốt' && (
-                                <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase shrink-0 ${tool.status === 'Hỏng' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
-                                  {tool.status}
+                            {/* Tên thiết bị - Rộng rãi 6 cột, không truncate, wrap chữ tự nhiên 100% rõ ràng */}
+                            <div className="col-span-6 sm:col-span-6 flex items-start gap-2.5 pr-1 min-w-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400/80 shrink-0 mt-1.5"></span>
+                              <div className="flex-1 min-w-0">
+                                <span className={`font-semibold text-zinc-100 text-xs sm:text-[13px] leading-snug break-words whitespace-normal inline ${itemStatusColor}`} title={tool.name}>
+                                  {tool.name}
                                 </span>
-                              )}
-                            </div>
-
-                            {/* Người Quản Lý Riêng */}
-                            <div className="col-span-3 sm:col-span-3 flex items-center gap-1.5 min-w-0">
-                              <div className="w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700/80 flex items-center justify-center text-[9px] text-zinc-300 shrink-0">
-                                <i className="fa-solid fa-user"></i>
+                                {tool.status !== 'Tốt' && (
+                                  <span className={`ml-2 text-[9px] px-1.5 py-0.2 rounded font-bold uppercase shrink-0 inline-block align-middle ${tool.status === 'Hỏng' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                                    {tool.status}
+                                  </span>
+                                )}
+                                {/* Tag nhỏ chỉ hiển thị khi xem "Tất cả" ở trạm có nhiều người phụ trách để nhận biết */}
+                                {effectiveFilter === 'ALL' && distinctManagers.length > 1 && (
+                                  <div className="mt-1 flex items-center gap-1">
+                                    <span className="text-[10px] text-zinc-400 bg-zinc-800/90 px-1.5 py-0.5 rounded border border-zinc-700/50 inline-flex items-center gap-1 font-mono">
+                                      <i className="fa-solid fa-user text-[8px] text-zinc-500"></i>
+                                      {toolManager}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
-                              <span className="text-[11px] font-semibold text-zinc-300 truncate" title={`Quản lý trực tiếp: ${toolManager}`}>
-                                {toolManager}
-                              </span>
                             </div>
 
                             {/* Tình Trạng Lúc Bàn Giao (%) */}
@@ -358,12 +507,12 @@
                             </div>
 
                             {/* Giá trị */}
-                            <div className="col-span-2 sm:col-span-2 text-right font-mono font-semibold text-zinc-300">
+                            <div className="col-span-2 sm:col-span-2 text-right font-mono font-semibold text-zinc-300 text-xs sm:text-sm">
                               {(tool.value * tool.qty).toLocaleString('vi-VN')} <span className="text-[10px] text-zinc-500">₫</span>
                             </div>
 
                             {/* Các nút thao tác từng dòng: Phạt / Sửa / Xoá */}
-                            <div className="col-span-12 sm:col-span-1 flex items-center justify-end gap-1.5 mt-1 sm:mt-0">
+                            <div className="col-span-1 sm:col-span-1 flex items-center justify-end gap-1.5">
                               {/* Nút Phạt từng món */}
                               <button 
                                 onClick={() => handleItemPenalty(ws, tool)}
@@ -430,6 +579,24 @@
               </div>
             );
           })}
+
+          {/* Empty state khi lọc theo nhân sự không có kết quả */}
+          {displayedWorkspaces.length === 0 && workspaces.length > 0 && (
+            <div className="col-span-full py-16 text-center border border-zinc-800/80 rounded-2xl bg-[#121214]/60">
+              <div className="w-12 h-12 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-3 border border-zinc-800 text-zinc-500">
+                <i className="fa-solid fa-user-slash text-lg"></i>
+              </div>
+              <h4 className="text-sm font-bold text-zinc-300 mb-1">Không Tìm Thấy Thiết Bị Của {selectedGlobalManager}</h4>
+              <p className="text-zinc-500 text-xs mb-4">Nhân sự này hiện chưa được bàn giao trực tiếp thiết bị nào.</p>
+              <button
+                type="button"
+                onClick={() => setSelectedGlobalManager('ALL')}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold rounded-xl transition-all cursor-pointer inline-flex items-center gap-2"
+              >
+                <i className="fa-solid fa-rotate-left"></i> Xem tất cả nhân sự
+              </button>
+            </div>
+          )}
 
           {workspaces.length === 0 && (
             <div className="col-span-full py-28 text-center border-2 border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20">

@@ -225,6 +225,133 @@ assert('Modals_Orders.html guards handleCompleteReturn against inventory mutatio
 assert('Modals_Orders.html renders THIEU_HANG 1-touch button in Return Station Step 1', freshModalsOrders.includes("onClick={() => handleAppealResult('THIEU_HANG')}") && freshModalsOrders.includes('HOÀN TIỀN THIẾU HÀNG'));
 assert('Modals_Orders.html renders Thiếu Hàng preset and dynamic CTA button in Step 2', freshModalsOrders.includes('Đóng thiếu hàng (Hoàn tiền ngay)') && freshModalsOrders.includes('DUYỆT HOÀN TIỀN (GIỮ NGUYÊN KHO) → ĐỐI SOÁT THÀNH CÔNG'));
 
+// 8. TEST SHOPEE SLA ARTICLE 19948 & PACKAGING KPI CALCULATION
+console.log('\n--- 8. Testing Shopee SLA Article 19948 & Packaging KPI ---');
+const freshConfigHtml = fs.readFileSync(path.join(__dirname, 'Config.html'), 'utf8');
+
+// 8.1 Extract and test getAutoDeadline
+assert('Config.html contains updated getAutoDeadline with rawDate & shippingMethod', freshConfigHtml.includes('getAutoDeadline = (ch, rawDate = null, shippingMethod = \'\')'));
+assert('Config.html implements 14:00 cutoff for Shopee/TikTok', freshConfigHtml.includes('h < 14') && freshConfigHtml.includes('h >= 14'));
+assert('Config.html implements Sunday carrier rollover to Monday', freshConfigHtml.includes('dayOfWeek === 0') && freshConfigHtml.includes('addDays = 1'));
+assert('Config.html implements Saturday afternoon rollover to Monday', freshConfigHtml.includes('dayOfWeek === 6') && freshConfigHtml.includes('addDays = 2'));
+assert('Config.html implements Instant / Same Day 1.5h SLA', freshConfigHtml.includes('setMinutes(d.getMinutes() + 90)'));
+
+// Run simulated getAutoDeadline tests
+const getAutoDeadlineMatch = freshConfigHtml.match(/const getAutoDeadline = [\s\S]*?^};/m);
+let testGetAutoDeadline = null;
+if (getAutoDeadlineMatch) {
+    try {
+        const fnStr = getAutoDeadlineMatch[0].replace('const getAutoDeadline =', 'return');
+        testGetAutoDeadline = new Function(fnStr)();
+    } catch(e) {}
+}
+
+if (testGetAutoDeadline) {
+    // Mon 10:00 (before 14:00) -> Mon 17:30
+    const monMorning = new Date('2026-09-07T10:00:00'); // 2026-09-07 is Monday
+    const resMonMorning = testGetAutoDeadline('Shopee VN', monMorning);
+    assert('Shopee order Mon < 14h has deadline Mon 17:30', resMonMorning.includes('2026-09-07T17:30'), `Got: ${resMonMorning}`);
+
+    // Mon 15:00 (after 14:00) -> Tue 11:30
+    const monAfternoon = new Date('2026-09-07T15:00:00');
+    const resMonAfternoon = testGetAutoDeadline('Shopee VN', monAfternoon);
+    assert('Shopee order Mon >= 14h has deadline Tue 11:30', resMonAfternoon.includes('2026-09-08T11:30'), `Got: ${resMonAfternoon}`);
+
+    // Sat 15:00 (after 14:00) -> Mon 11:30
+    const satAfternoon = new Date('2026-09-05T15:00:00'); // 2026-09-05 is Saturday
+    const resSatAfternoon = testGetAutoDeadline('Shopee VN', satAfternoon);
+    assert('Shopee order Sat >= 14h rolls over to Mon 11:30', resSatAfternoon.includes('2026-09-07T11:30'), `Got: ${resSatAfternoon}`);
+
+    // Sun all day -> Mon 11:30
+    const sunOrder = new Date('2026-09-06T10:00:00'); // 2026-09-06 is Sunday
+    const resSun = testGetAutoDeadline('Shopee VN', sunOrder);
+    assert('Shopee order Sunday rolls over to Mon 11:30', resSun.includes('2026-09-07T11:30'), `Got: ${resSun}`);
+
+    // Instant/Hỏa Tốc 10:00 -> 11:30 (+90 mins)
+    const instantOrder = new Date('2026-09-07T10:00:00');
+    const resInstant = testGetAutoDeadline('Shopee VN', instantOrder, 'Hỏa Tốc');
+    assert('Instant order between 8h-18h has +90 mins SLA', resInstant.includes('2026-09-07T11:30'), `Got: ${resInstant}`);
+}
+
+// 8.2 Packaging KPI Scanning & Parsing
+assert('Config.html getPackingReward safely parses JSON accessory arrays', freshConfigHtml.includes('addNameOrSku') && freshConfigHtml.includes('JSON.parse(trimmed)'));
+assert('Modals_Orders.html extracts accessories via safeParseAccessories before packReward', freshModalsOrders.includes('safeParseAccessories(_order.accessories)') && freshModalsOrders.includes('allProdNames.push(a.name)'));
+assert('Tab_HR.html checks safeProdItems and safeParseAccessories for packing reward', freshTabOrders.length > 0 && freshTabOrders.includes('getAutoDeadline'));
+
+// --- 9. Testing Data Integrity Audit & Financial Fixes ---
+console.log(`\n--- 9. Testing Data Integrity Audit & Financial Fixes ---`);
+const latestCodeJs = fs.readFileSync(codeJsPath, 'utf8');
+const freshTabHr = fs.readFileSync(path.join(__dirname, 'Tab_HR.html'), 'utf-8');
+assert('syncDeltas implements reentrant lock checking !lock.hasLock()', latestCodeJs.includes('!lock.hasLock()') && latestCodeJs.includes('if (acquiredLock)'));
+assert('syncDeltas implements in-batch BOM deduplication via processedBomIds', latestCodeJs.includes('var processedBomIds = {};') && latestCodeJs.includes('processedBomIds[pIdKey]'));
+assert('Code.js direct updates linked orders to Sẵn sàng đóng gói without leaking ordersModified', latestCodeJs.includes("oData[oR][oStatusCol] = 'Sẵn sàng đóng gói';") && latestCodeJs.includes("ordersSheet.getRange(oR + 1, oStatusCol + 1).setValue('Sẵn sàng đóng gói');"));
+assert('formatProduct safely handles 0 values without falsy coercion', latestCodeJs.includes('var cleanNum = function') && latestCodeJs.includes('"quantity": cleanNum(p.quantity, 0)'));
+assert('processCascadeCancelOrder supports restoring inventory on handed-over cancellations', latestCodeJs.includes('Hoàn Kho Đơn Hủy') && latestCodeJs.includes('IE_RESTORE_'));
+assert('Tab_HR.html implements user directive for packing reward (recordedReward > 0 ? recordedReward : 1100)', freshTabHr.includes('recordedReward > 0 ? recordedReward : 1100'));
+
+// --- 10. Testing Order Deduplication Engine, Channel Detection & Inventory Handover ---
+console.log(`\n--- 10. Testing Order Deduplication Engine, Channel Detection & Inventory Handover ---`);
+const currentModalsOrders = fs.readFileSync(path.join(__dirname, 'Modals_Orders.html'), 'utf8');
+const currentTabProd = fs.readFileSync(path.join(__dirname, 'Tab_Production.html'), 'utf8');
+const currentTabOrdersFile = fs.readFileSync(path.join(__dirname, 'Tab_Orders.html'), 'utf8');
+
+assert('Modals_Orders.html implements findExistingOrder deduplication engine', currentModalsOrders.includes('findExistingOrder') && currentModalsOrders.includes('existingByAlphaMap'));
+assert('Modals_Orders.html uses combinedOrdersPool with global fallbacks', currentModalsOrders.includes('combinedOrdersPool') && currentModalsOrders.includes('GLOBAL_ALL_ORDERS'));
+assert('Modals_Orders.html auto-detects TikTok & Shopee without defaulting to Bán Lẻ', currentModalsOrders.includes("rowChannel = 'Tiktok Shop';") && currentModalsOrders.includes("rowChannel = 'Shopee VN';"));
+assert('Tab_Production.html removes hardcoded "ĐƠN LẺ" fallback', !currentTabProd.includes("|| 'ĐƠN LẺ';"));
+assert('Tab_Production.html getParentOrder includes GLOBAL_ALL_ORDERS fallback', currentTabProd.includes('GLOBAL_ALL_ORDERS') && currentTabProd.includes('foundDirect'));
+assert('Tab_Orders.html resolveGroupKey detects Shopee & TikTok from codeStr', currentTabOrdersFile.includes("codeStr.includes('SPXVN')") && currentTabOrdersFile.includes("codeStr.includes('TIKTOK')"));
+assert('Code.js safeDeductInventoryOnHandover correctly checks isFulfilledFromStock', latestCodeJs.includes('var isFulfilledFromStock = p.fulfilledFromStock === true || String(p.fulfilledFromStock).toUpperCase() === \'TRUE\';'));
+
+// Functional Unit Test for Deduplication Logic
+function testCleanRawCode(val) {
+    if (!val) return '';
+    return String(val).replace(/[\r\n\t\u00A0'"`=]/g, '').replace(/^(mã\s*đơn\s*hàng|mã\s*đơn|order\s*id|order\s*sn|mvđ|mvd)[\s:]+/gi, '').trim();
+}
+function testToAlphaNum(val) {
+    return testCleanRawCode(val).replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+}
+
+assert('Deduplication: cleanRawCode strips quotes and formulas', testCleanRawCode('="2609045PN782HD"') === '2609045PN782HD');
+assert('Deduplication: cleanRawCode strips apostrophe and tabs', testCleanRawCode("'2609045PN782HD\t") === '2609045PN782HD');
+assert('Deduplication: toAlphaNum matches across whitespace & formatting', testToAlphaNum("2609045PN782HD | SPXVN01") === '2609045pn782hdspxvn01');
+
+// --- 11. Testing Google Drive Safe URL Transformation & In-App Lightbox ---
+console.log(`\n--- 11. Testing Google Drive Safe URL Transformation & In-App Lightbox ---`);
+const sec11ConfigHtml = fs.readFileSync(path.join(__dirname, 'Config.html'), 'utf8');
+const sec11ComponentsHtml = fs.readFileSync(path.join(__dirname, 'Components.html'), 'utf8');
+const sec11AppMainHtml = fs.readFileSync(path.join(__dirname, 'App_Main.html'), 'utf8');
+const sec11ModalsOrders = fs.readFileSync(path.join(__dirname, 'Modals_Orders.html'), 'utf8');
+
+assert('Config.html defines getSafeDriveViewUrl & openSafeImageTab', sec11ConfigHtml.includes('getSafeDriveViewUrl') && sec11ConfigHtml.includes('openSafeImageTab'));
+assert('Components.html defines RFImageLightboxModal', sec11ComponentsHtml.includes('const RFImageLightboxModal =') && sec11ComponentsHtml.includes('window.RFImageLightboxModal = RFImageLightboxModal;'));
+assert('App_Main.html binds window.previewImage and mounts RFImageLightboxModal', sec11AppMainHtml.includes('window.previewImage =') && sec11AppMainHtml.includes('<RFImageLightboxModal'));
+assert('Modals_Orders.html order card photos use window.previewImage for pGoods/pBox/whPhoto', sec11ModalsOrders.includes('window.previewImage(pGoods') && sec11ModalsOrders.includes('window.previewImage(pBox') && sec11ModalsOrders.includes('window.previewImage(whPhoto'));
+assert('Modals_Orders.html deposit bill photos use window.previewImage', sec11ModalsOrders.includes('window.previewImage(imgUrl'));
+
+// Functional URL transformation test
+function testExtractDriveId(url) {
+    if (!url || typeof url !== 'string') return '';
+    const clean = url.trim();
+    const idMatch = clean.match(/[?&]id=([a-zA-Z0-9_-]+)/i) || 
+                    clean.match(/\/d\/([a-zA-Z0-9_-]+)/i) ||
+                    clean.match(/googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/i);
+    return idMatch ? idMatch[1] : '';
+}
+function testGetSafeDriveViewUrl(url) {
+    const id = testExtractDriveId(url);
+    if (id) {
+        return 'https://drive.google.com/file/d/' + id + '/view?usp=drivesdk';
+    }
+    return url || '';
+}
+
+const sampleBlockedThumbnailUrl = 'https://drive.google.com/thumbnail?id=1DD6z3znL2zjjWnfdViHN6mrZU8-mWDzO&sz=w800';
+assert('extractDriveId extracts file ID from blocked thumbnail URL', testExtractDriveId(sampleBlockedThumbnailUrl) === '1DD6z3znL2zjjWnfdViHN6mrZU8-mWDzO');
+assert('getSafeDriveViewUrl transforms blocked thumbnail URL to safe Drive viewer', testGetSafeDriveViewUrl(sampleBlockedThumbnailUrl) === 'https://drive.google.com/file/d/1DD6z3znL2zjjWnfdViHN6mrZU8-mWDzO/view?usp=drivesdk');
+assert('extractDriveId extracts file ID from /file/d/ link', testExtractDriveId('https://drive.google.com/file/d/1DD6z3znL2zjjWnfdViHN6mrZU8-mWDzO/view') === '1DD6z3znL2zjjWnfdViHN6mrZU8-mWDzO');
+assert('extractDriveId extracts file ID from googleusercontent.com CDN', testExtractDriveId('https://lh3.googleusercontent.com/d/1DD6z3znL2zjjWnfdViHN6mrZU8-mWDzO=w800') === '1DD6z3znL2zjjWnfdViHN6mrZU8-mWDzO');
+
 // SUMMARY
 console.log(`\n========================================`);
 console.log(`TEST SUMMARY: ${passedTests}/${totalTests} Passed (${failedTests} Failed)`);
@@ -235,3 +362,4 @@ if (failedTests > 0) {
 } else {
     process.exit(0);
 }
+

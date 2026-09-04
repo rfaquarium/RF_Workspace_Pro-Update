@@ -1259,7 +1259,21 @@
                                 </label>
                                 {receiptPhotoUrl && (
                                     <div className="relative group">
-                                        <img src={receiptPhotoUrl} className="h-14 w-14 object-cover rounded-lg border border-rose-500/40 cursor-pointer" alt="Hoá đơn" onClick={() => window.open(receiptPhotoUrl, '_blank')} />
+                                        <img 
+                                            src={receiptPhotoUrl} 
+                                            className="h-14 w-14 object-cover rounded-lg border border-rose-500/40 cursor-pointer hover:opacity-80 transition-opacity" 
+                                            alt="Hoá đơn" 
+                                            onClick={() => {
+                                                if (typeof window.previewImage === 'function') {
+                                                    window.previewImage(receiptPhotoUrl, 'Ảnh Hoá Đơn / Chứng Từ');
+                                                } else if (typeof openSafeImageTab === 'function') {
+                                                    openSafeImageTab(receiptPhotoUrl);
+                                                } else {
+                                                    window.open(receiptPhotoUrl, '_blank');
+                                                }
+                                            }} 
+                                            title="Bấm xem ảnh phóng to"
+                                        />
                                         <span className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] cursor-pointer shadow" onClick={() => setReceiptPhotoUrl('')}>&times;</span>
                                     </div>
                                 )}
@@ -1279,7 +1293,21 @@
                                 </label>
                                 {qrCodeUrl && (
                                     <div className="relative group">
-                                        <img src={qrCodeUrl} className="h-14 w-14 object-cover rounded-lg border border-yellow-500/40 cursor-pointer" alt="QR Code" onClick={() => window.open(qrCodeUrl, '_blank')} />
+                                        <img 
+                                            src={qrCodeUrl} 
+                                            className="h-14 w-14 object-cover rounded-lg border border-yellow-500/40 cursor-pointer hover:opacity-80 transition-opacity" 
+                                            alt="QR Code" 
+                                            onClick={() => {
+                                                if (typeof window.previewImage === 'function') {
+                                                    window.previewImage(qrCodeUrl, 'Mã QR Nhận Tiền');
+                                                } else if (typeof openSafeImageTab === 'function') {
+                                                    openSafeImageTab(qrCodeUrl);
+                                                } else {
+                                                    window.open(qrCodeUrl, '_blank');
+                                                }
+                                            }} 
+                                            title="Bấm xem ảnh phóng to"
+                                        />
                                         <span className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] cursor-pointer shadow" onClick={() => setQrCodeUrl('')}>&times;</span>
                                     </div>
                                 )}
@@ -1473,10 +1501,34 @@
                                 {requestData.receiptPhotoUrl ? (
                                     <div className="w-full flex flex-col items-center">
                                         <div className="w-full h-36 bg-black/60 rounded-lg overflow-hidden border border-zinc-700/60 flex items-center justify-center relative group">
-                                            <img src={requestData.receiptPhotoUrl} alt="Hoá đơn" className="w-full h-full object-contain cursor-pointer transition-transform group-hover:scale-105" onClick={() => window.open(requestData.receiptPhotoUrl, '_blank')} />
+                                            <img 
+                                                src={requestData.receiptPhotoUrl} 
+                                                alt="Hoá đơn" 
+                                                className="w-full h-full object-contain cursor-pointer transition-transform group-hover:scale-105" 
+                                                onClick={() => {
+                                                    if (typeof window.previewImage === 'function') {
+                                                        window.previewImage(requestData.receiptPhotoUrl, 'Ảnh Hoá Đơn / Chứng Từ');
+                                                    } else if (typeof openSafeImageTab === 'function') {
+                                                        openSafeImageTab(requestData.receiptPhotoUrl);
+                                                    } else {
+                                                        window.open(requestData.receiptPhotoUrl, '_blank');
+                                                    }
+                                                }} 
+                                            />
                                         </div>
-                                        <button onClick={() => window.open(requestData.receiptPhotoUrl, '_blank')} className="mt-2 px-3 py-1 bg-white/5 hover:bg-white/10 text-gray-300 text-[10px] font-bold rounded-lg border border-white/10 transition-colors flex items-center gap-1 cursor-pointer">
-                                            <i className="fas fa-external-link-alt text-[9px]"></i> Xem Ảnh Lớn
+                                        <button 
+                                            onClick={() => {
+                                                if (typeof window.previewImage === 'function') {
+                                                    window.previewImage(requestData.receiptPhotoUrl, 'Ảnh Hoá Đơn / Chứng Từ');
+                                                } else if (typeof openSafeImageTab === 'function') {
+                                                    openSafeImageTab(requestData.receiptPhotoUrl);
+                                                } else {
+                                                    window.open(requestData.receiptPhotoUrl, '_blank');
+                                                }
+                                            }} 
+                                            className="mt-2 px-3 py-1 bg-white/5 hover:bg-white/10 text-gray-300 text-[10px] font-bold rounded-lg border border-white/10 transition-colors flex items-center gap-1 cursor-pointer"
+                                        >
+                                            <i className="fas fa-search-plus text-[9px]"></i> Xem Ảnh Lớn
                                         </button>
                                     </div>
                                 ) : (

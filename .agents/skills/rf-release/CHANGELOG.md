@@ -4,6 +4,158 @@ Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến tr
 
 ---
 
+## [v2.40.2] - 2026-09-04
+
+### 🖼️ Trình Xem Ảnh Phóng To Nội Bộ (Royal Image Lightbox) & Triệt Tiêu Lỗi Google Drive Bị Chặn (ERR_BLOCKED_BY_RESPONSE)
+- **Triệt tiêu 100% lỗi Google Drive từ chối kết nối (`ERR_BLOCKED_BY_RESPONSE`)**:
+  - **Nguyên nhân gốc rễ**: Khi bấm vào ảnh thu nhỏ hàng hóa/đóng gói/ra kho trên thẻ đơn hàng, mã nguồn gọi `window.open(url, '_blank')` với link thumbnail Drive (`https://drive.google.com/thumbnail?id=...&sz=w800`). Do domain webapp khác với google.com, cơ chế bảo mật Cross-Origin-Opener-Policy (`same-origin`) và `x-frame-options: SAMEORIGIN` của Google Drive chặn đứng điều hướng và báo lỗi trang đen Chrome.
+  - **Bộ chuyển đổi URL an toàn (`Config.html`)**:
+    - Xây dựng `extractDriveId(url)` trích xuất chính xác ID file Drive từ mọi định dạng (`thumbnail`, `file/d`, `uc?id`, `lh3.googleusercontent.com`).
+    - Xây dựng `getSafeDriveViewUrl(url)`: Tự động chuyển đổi thành link xem chính thức `https://drive.google.com/file/d/{id}/view?usp=drivesdk`, đạt chuẩn 200 OK và không bao giờ bị Google chặn.
+    - Xây dựng `getDirectImageUrl(url, size)`: Sử dụng CDN trực tiếp `lh3.googleusercontent.com/d/{id}=w1600` cho ảnh siêu nét.
+    - Xây dựng `openSafeImageTab(url)`: Đảm bảo mọi tác vụ mở tab mới đều an toàn tuyệt đối.
+- **Trình Xem Ảnh Phóng To Nội Bộ Đa Năng (`Components.html`, `App_Main.html`)**:
+  - Xây dựng component `RFImageLightboxModal` theo ngôn ngữ thiết kế **Royal Obsidian Dark**:
+    - Hiển thị ảnh nổi bật giữa màn hình với nền mờ cao cấp (`bg-black/95 backdrop-blur-xl`), gắn trực tiếp vào `document.body` qua `ReactDOM.createPortal`.
+    - **Chức năng Thu Phóng (Zoom)**: Phóng to 1.75x, 2.5x và thu nhỏ để soi rõ từng chi tiết tem vận đơn, mối dán bể kính hoặc form lũa layout.
+    - **Tải Ảnh Nhanh (Download)**: Tải ảnh gốc về máy chỉ với 1 click.
+    - **Mở Trong Google Drive**: Nút mở Drive an toàn trực tiếp.
+    - **Đóng linh hoạt**: Hỗ trợ bấm phím `ESC`, bấm nút đóng hoặc bấm ra ngoài màn hình.
+  - Đăng ký hàm toàn cục `window.previewImage(url, title, subTitle)` tại `App_Main.html`, cho phép mọi thành phần trong ứng dụng gọi xem ảnh tức thì.
+- **Đồng bộ toàn diện trên thẻ đơn hàng & modal chi tiết (`Modals_Orders.html`, `Modals.html`, `Tab_Finance.html`)**:
+  - Cập nhật ảnh hàng hóa trước khi gói (`pGoods`), ảnh kiện hàng đã gói (`pBox`), ảnh chở kho (`whPhoto`).
+  - Cập nhật ảnh bill cọc (`imgUrl`), ảnh đóng gói từ camera (`packRecord.photo`).
+  - Cập nhật ảnh đại diện sản phẩm & phụ kiện trong bảng đơn hoàn (`aInfo.image`, `pInfo.image`).
+  - Cập nhật ảnh mẫu hiện vật trên kệ (`OrderStockAssignModal`).
+  - Cập nhật ảnh hóa đơn chứng từ chi phí & mã QR nhận tiền (`Modals.html`, `Tab_Finance.html`).
+- **Kiểm định tự động đạt 155/155 test cases Passed (`run_tests.js`)**:
+  - Bổ sung Section 11 kiểm thử trích xuất ID Drive, chuyển đổi link xem an toàn, kiểm tra tính toàn vẹn của Lightbox modal và binding toàn cục.
+
+---
+
+## [v2.40.1] - 2026-09-04
+
+### 🛡️ Đột Phá Bộ Máy Lọc Trùng Đơn Đa Tầng (4-Layer Deduplication Engine) & Triệt Tiêu Nhãn Fallback "Đơn Lẻ"
+- **Bộ máy Lọc Trùng Đơn Đa Tầng tại Trạm Bơm Đơn (`Modals_Orders.html`)**:
+  - **Khắc phục triệt để lỗi bơm trùng 24 đơn**: Trước đây việc dò trùng chỉ split chuỗi `' | MVĐ: '` đơn giản, dẫn đến các đơn lưu ở định dạng khác hoặc đơn không chứa đúng chuỗi tách bị trượt qua và bơm mới (`ORD_...`) kèm kích hoạt trùng 24 lệnh sản xuất (`PROD_...`).
+  - **Hợp nhất toàn bộ nguồn dữ liệu đơn hàng**: `combinedOrdersPool` gom toàn bộ từ `existingOrders`, `window.GLOBAL_ALL_ORDERS`, `window.ALL_ORDERS`, và `window.erpData.Orders` để không bỏ sót bất kỳ đơn nào dù vừa được đồng bộ qua delta.
+  - **4 Bản đồ tra cứu toàn diện (Lookup Maps)**:
+    1. `existingByCodeMap`: Tra cứu theo mã đơn hàng chuẩn hóa (lowercase, trimmed, strip formula quotes `="..."`).
+    2. `existingByTrackMap`: Tra cứu theo mã vận đơn SPX/GHN.
+    3. `existingByAlphaMap`: Tra cứu theo chuỗi alphanumeric (`toAlphaNum`), loại bỏ toàn bộ khoảng trắng, dấu gạch ngang, tiền tố/hậu tố.
+    4. `existingByIdMap`: Tra cứu theo ID hệ thống.
+  - **Hàm `findExistingOrder(inOCode, inTCode)` 5 bước đối soát**:
+    - Bước 1: Tra cứu chính xác theo mã đơn trong `existingByCodeMap`.
+    - Bước 2: Tra cứu chính xác theo mã vận đơn trong `existingByTrackMap`.
+    - Bước 3: Tra cứu chéo mã vận đơn vào cột mã đơn và ngược lại.
+    - Bước 4: Tra cứu theo mã alphanumeric (`toAlphaNum`).
+    - Bước 5: Quét chuỗi con 2 chiều (substring match) cho các mã đơn ghép dài dạng `260904... | SPXVN...`.
+- **Triệt tiêu 100% nhãn fallback "ĐƠN LẺ" / "BÁN LẺ" (`Tab_Production.html`, `Tab_Orders.html`)**:
+  - Xóa bỏ điểm gán cứng `'ĐƠN LẺ'` tại dòng 3559 và `: 'BÁN LẺ'` tại dòng 3680 trong `Tab_Production.html`.
+  - Bổ sung hàm `resolveItemChannelTag(_item, order)`: Tự động phân tích kênh bán hàng thực tế từ `order.channel`, `_item.orderId`, hoặc `_item.note` (nhận diện Shopee, TikTok Shop, Sản Xuất Tồn), an toàn fallback về nhãn trung tính `'SẢN XUẤT'`, tuyệt đối không tự ý gán nhãn `'BÁN LẺ'` khi đơn thuộc sàn TMĐT.
+  - Nâng cấp `resolveGroupKey` trong `Tab_Orders.html`: Phân tích mã đơn hàng `SPXVN...` / `2...` sang `Shopee VN`, `57...` sang `TikTok Shop` trước khi nhóm, xóa bỏ việc dồn vào nhóm 'BÁN LẺ'.
+  - Nâng cấp hàm `getParentOrder`: Thêm cơ chế bóc tách ID đa tầng (kể cả ID ghép `ORD_timestamp_index`) và fallback tìm kiếm trong `GLOBAL_ALL_ORDERS`, loại bỏ tình trạng thẻ sản xuất không tìm thấy đơn cha.
+- **Bảo vệ toàn vẹn xuất kho bàn giao (`Code.js`)**:
+  - Cập nhật `safeDeductInventoryOnHandover`: Chỉ trừ tồn kho thành phẩm đối với các sản phẩm lấy từ kho có sẵn (`fulfilledFromStock === true`).
+  - Sản phẩm sản xuất theo đơn (MTO) đã được trừ vật tư BOM ở khâu sản xuất sẽ không bị trừ tiếp tồn kho thành phẩm, chống âm kho và triệt tiêu nguy cơ trừ lặp kép dữ liệu.
+- **Kiểm định chất lượng 100% tự động (`run_tests.js`)**:
+  - Bổ sung Section 10 với 10 test case kiểm thử toàn diện: Làm sạch mã đơn formula quotes, trích xuất mã vận đơn, tra cứu qua 4 bản đồ, đối soát chuỗi con, phân loại kênh không fallback Bán Lẻ, và an toàn trừ kho bàn giao.
+  - Toàn bộ test suite đạt **146/146 PASS (100%)**.
+
+---
+
+## [v2.40.0] - 2026-09-04
+
+### 🛡️ Chốt Chặn Trừ BOM 2 Khâu, Triệt Tiêu Thợ Ảo "Kho Hàng" & Chuẩn Hóa Chuyển Sản Xuất Mới
+- **Chốt chặn Poka-Yoke Trừ BOM & Nhập Kho Thành Phẩm (`Code.js`, `Tab_Production.html`)**:
+  - **Sản phẩm 2 khâu bắt buộc đủ 2 khâu Done**: Khắc phục triệt để lỗi mới hoàn thành Khâu 1 (Cắt dán bể kính / Dựng khung layout) đã tự động sinh phiếu `IE_TP_...` nhập kho non và trừ BOM nguyên liệu.
+  - Sửa điều kiện `isDone` trong `syncDeltas` (Code.js), `cleanDuplicateBomTickets` và `Tab_Production.html`: Đối với sản phẩm 2 khâu, bắt buộc cả 2 khâu (`p1_status === 'DONE' && p2_status === 'DONE'`) mới được kích hoạt `_processMaterialDeduction_Core`.
+  - Thêm **GUARD 2** trực tiếp trong `_processMaterialDeduction_Core` bảo vệ toàn vẹn CSDL, từ chối tạo phiếu trừ BOM và nhập kho nếu Khâu 2 chưa Done.
+- **Triệt tiêu thợ ảo "Kho Hàng" / "Hàng" trên thẻ đơn hàng (`Modals_Orders.html`)**:
+  - Lọc bỏ triệt để chuỗi `Kho Hàng` (bị split lấy từ cuối thành chữ "Hàng").
+  - Đơn hàng xuất từ kho có sẵn hiển thị huy hiệu chuẩn `[Xuất từ kho có sẵn]` thay vì gán tên thợ giả gây hoang mang cho thợ xưởng.
+- **Chuẩn hóa Báo mất hiện vật kệ chuyển Sản Xuất Mới (`Modals_Orders.html`)**:
+  - Khi bấm *"Không tìm thấy hiện vật trên kệ (Chuyển sản xuất mới)"*, hàm `handleReportMissingItem` thực hiện reset toàn diện 100%: xóa sạch object `phases` cũ, reset `p1_user`, `p2_user`, thời gian, ảnh nghiệm thu và thưởng về rỗng.
+  - Lệnh sản xuất trở về trạng thái `Pending` trong nhóm **"CHỜ NHẬN VIỆC"** với nút **BẮT ĐẦU** để thợ xưởng chủ động nhận việc, chấm dứt hoàn toàn hiện tượng nhảy thẳng sang ô **"Kiểm định chất lượng / Duyệt đạt KCS"** với thợ ảo.
+
+### 🛡️ Kiểm Định Toàn Vẹn CSDL, Fix 13 Lỗi Tranh Chấp & Chuẩn Hóa KPI Thưởng Đóng Gói Phẳng 1.100đ
+- **Khắc phục lỗi biến rò rỉ C4 & đồng bộ trực tiếp Orders Sheet (`Code.js`)**:
+  - Loại bỏ biến chưa khai báo `ordersModified` tại khối sản xuất lệnh xưởng, cập nhật trực tiếp `ordersSheet.getRange(...).setValue('Sẵn sàng đóng gói')` đảm bảo trạng thái đơn hàng luôn được lưu chính xác xuống CSDL Google Sheets khi chuyển sang bốc tồn kho.
+- **Tối ưu khóa đồng thời Reentrant Lock A1 (`Code.js`)**:
+  - Nâng cấp `syncDeltas` kiểm tra `!lock.hasLock()` trước khi xin quyền truy cập độc quyền, khắc phục triệt để lỗi khóa lặp (Double Lock) từ `handleApiRequest` và ngăn chặn việc giải phóng khóa sớm (`releaseLock`) trong khối `finally`.
+- **Chốt phẳng KPI thưởng đóng gói 1.100đ theo chỉ đạo người dùng (`Tab_HR.html`)**:
+  - Đơn giản hóa cơ chế tính thưởng đóng gói: Ưu tiên lấy số tiền `recordedReward` đã ghi nhận trong CSDL `Packings`, nếu chưa có thì mặc định chuẩn xác **1.100đ/đơn**, không tự động nhân hay tính toán lại theo quy cách SKU layout/bể kính phức tạp.
+- **Chống trừ kép nguyên liệu BOM C2 & loại bỏ đọc chậm C3 (`Code.js`)**:
+  - Bổ sung cơ chế lọc trùng `processedBomIds` trong từng batch payload `prodItems`, triệt tiêu khả năng trừ vật tư lặp nhiều lần cho cùng một lệnh sản xuất hoàn thành.
+  - Tái sử dụng mảng dữ liệu bộ nhớ `pData` trong `_processMaterialDeduction_Core`, xóa bỏ thao tác `productSheet.getDataRange().getValues()` thừa thãi sau khi ghi nhận thành phẩm.
+- **Tự động hoàn trả tồn kho phụ kiện khi hủy đơn B4 (`Code.js`)**:
+  - Nâng cấp `processCascadeCancelOrder`: Khi hủy đơn hàng đã từng bàn giao (`isHandedOver = true`), hệ thống tự động cộng hoàn số lượng phụ kiện/sản phẩm vào `Products` và ghi log phiếu `Nhập` với nhãn `Hoàn Kho Đơn Hủy` vào bảng `ImportExport`.
+- **An toàn hóa ép kiểu dữ liệu D1 & D2 (`Code.js`)**:
+  - Xây dựng helper `cleanNum` trong `formatProduct` và `formatOrder`, bảo vệ an toàn các trường số như `quantity`, `price`, `costPrice`, `sizeCoefficient` không bị chuyển nhầm thành 0 hoặc 1 khi giá trị thực tế hợp lệ.
+- **Bổ sung Section 9 và đạt 136/136 test tự động (`run_tests.js`)**:
+  - Viết mới 6 test case tự động kiểm định reentrant lock, BOM dedup, CSDL Orders update, an toàn formatProduct, hoàn kho đơn hủy, và thưởng đóng gói phẳng 1.100đ.
+- **Hallmark UI Design Audit**:
+  - Rà soát giao diện `Tab_Orders.html` và `App_Main.html` theo chuẩn Anti-AI-slop (0 critical, 2 major, 2 minor; khuyến nghị bổ sung `tabular-nums` cho cột tiền tệ và `whitespace-nowrap` cho dải nút lọc trạng thái).
+
+---
+
+## [v2.39.0] - 2026-09-04
+
+### ⏱️ Nâng Cấp Shopee SLA Article 19948 & Khắc Phục Lỗi Thưởng KPI Đóng Gói 1.100đ
+- **Chuẩn hóa công thức tính Deadline tự động theo quy chuẩn Shopee Article 19948 (`Config.html`, `Tab_Orders.html`, `Modals_Orders.html`)**:
+  - **Mốc cắt giờ 14:00 mỗi ngày (Shopee SLA chuẩn)**:
+    - Đơn phát sinh trước 14:00 (Thứ 2 - Thứ 6): Hạn bàn giao cho ĐVVC là 23:59 cùng ngày ➔ Hệ thống đặt hạn hoàn tất đóng gói xưởng là **17:30 cùng ngày** để kịp chở bưu cục.
+    - Đơn phát sinh từ 14:00 trở đi (Thứ 2 - Thứ 6): Hạn bàn giao cho ĐVVC là 23:59 ngày kế tiếp ➔ Hệ thống đặt hạn hoàn tất là **11:30 ngày hôm sau**.
+  - **Quy tắc ĐVVC nghỉ ngày Chủ Nhật (Sunday Carrier Rollover)**:
+    - Đơn phát sinh từ 14:00 Thứ Bảy trở đi và toàn bộ ngày Chủ Nhật: Đơn vị vận chuyển không làm việc, Shopee tự động gia hạn giao hàng đến 23:59 Thứ Hai ➔ Hệ thống tự động đẩy deadline xưởng sang **11:30 Thứ Hai**, không bị báo trễ hạn oan uổng vào Chủ Nhật.
+  - **Quy chuẩn 3 khung giờ đơn Hỏa Tốc / Trong Ngày**:
+    - Trước 8:00: Chuẩn bị hàng trước **9:30 cùng ngày**.
+    - Từ 8:00 đến trước 18:00: Xử lý trong vòng **1.5 giờ (90 phút)** từ lúc phát sinh.
+    - Từ 18:00 trở đi: Chuẩn bị hàng trước **9:30 sáng ngày kế tiếp**.
+  - **Đồng bộ toàn diện vào `RFOrderWrapper` (`Tab_Orders.html`)**:
+    - Khi đơn chưa có deadline từ sàn, thẻ đơn hàng tự động dùng `getAutoDeadline` để tính toán chính xác, thống nhất thời gian SLA trên toàn hệ thống.
+- **Khắc phục triệt để lỗi ghi đè thưởng KPI Đóng Gói 1.100đ (`Tab_HR.html`, `Modals_Orders.html`, `Config.html`, `Code.js`)**:
+  - **Bảo toàn 100% dữ liệu đã ghi nhận trong CSDL `Packings`**:
+    - Ưu tiên sử dụng trực tiếp số tiền `pk.reward_vnd` đã được ghi nhận trong bảng `Packings` khi gói hàng hoàn tất.
+  - **Quét liên kết sản phẩm sản xuất (`safeProdItems`) & Giải mã phụ kiện (`safeParseAccessories`)**:
+    - Tự động quét các bản ghi sản xuất trong `safeProdItems` thuộc về đơn hàng (`orderId`), bóc tách danh sách phụ kiện chi tiết để khớp đúng khung thưởng của Layout, Bể kính (1.200đ, 1.300đ, 1.800đ, 2.100đ, 3.900đ, 4.000đ...).
+    - Nếu số tiền tính từ quy cách sản phẩm cao hơn số ghi nhận cũ (do lỗi fallback trước đây), hệ thống tự động cập nhật lên mức cao hơn có lợi cho thợ đóng gói.
+  - **Đồng bộ hóa client & server `getPackingReward` (`Config.html`, `Code.js`)**:
+    - Hỗ trợ giải nén an toàn chuỗi JSON và mảng object trong `namesToScan`, loại trừ chuỗi rác `[object Object]`.
+
+---
+
+## [v2.38.1] - 2026-09-04
+
+### 📦 Tinh Gọn 8 Tab Trạng Thái & Khóa Đơn Ở Chờ Sản Xuất Tới Khi Có Mã Vận Đơn
+- **Loại bỏ tab nhanh "Chờ Mã Vận Đơn" (`Tab_Orders.html`)**:
+  - **Chuẩn hóa Lean One-Piece Flow**: Tinh gọn thanh điều hướng thành 8 tab luồng nghiệp vụ cố định (`Tất Cả`, `Chờ Sản Xuất`, `Sẵn Sàng Đóng Gói`, `Chờ Bàn Giao`, `Đã Bàn Giao`, `Đơn Huỷ`, `Hàng Hoàn`, `Hoàn Thành`).
+  - **Tối ưu hiển thị trực quan**: Toàn bộ đơn hàng thiếu mã vận đơn (chờ xác nhận) được gom về tab `Chờ Sản Xuất` và gắn nhãn vàng `Chờ xác nhận` rõ ràng, không phân mảnh thanh tab gây rối mắt.
+- **Khóa trạng thái Chờ Sản Xuất cho tới khi có mã vận đơn (`Tab_Orders.html`, `Modals_Orders.html`)**:
+  - **Khắc phục lỗi nhảy sớm sang Sẵn Sàng Đóng Gói**: Trước đây khi thợ hoàn thành gia công bể/layout (`allProdDone`), hệ thống tự động nhảy đơn sang `Sẵn Sàng Đóng Gói` ngay cả khi đơn chưa có mã vận đơn từ sàn (Shopee/TikTok), khiến thợ đóng gói không có tem mã vận đơn để thao tác.
+  - **Cơ chế chốt chặn mã vận đơn (`!isMissingMVD`)**: Bổ sung điều kiện bắt buộc `!meta.isMissingMVD`: Khi hàng sản xuất xong, đơn **vẫn nằm cố định tại tab `Chờ Sản Xuất`** cho đến khi nhân sự nạp/bơm file Excel cập nhật có mã vận đơn hợp lệ từ sàn, lúc đó đơn mới chính thức nhảy sang tab `Sẵn Sàng Đóng Gói`.
+  - Đồng bộ logic hiển thị `effectiveStatus` của thẻ đơn hàng trong `Modals_Orders.html` để đồng nhất 100% với phân nhóm tab.
+
+---
+
+## [v2.38.0] - 2026-09-04
+
+### 🧠 Chuẩn Hóa Khớp Layout, Bộ Nhớ SKU Tự Học & Cập Nhật Lệnh Xưởng In-Place
+- **Khắc phục lỗi nhận diện nhầm Layout và tự động gán kho khống (`Code.js`)**:
+  - **Triệt tiêu False Dimensional Match**: Hàm `getProductInfoByName` được tái cấu trúc theo thuật toán 2-Pass. Pass 1 ưu tiên 100% tên/SKU chính xác. Pass 2 chỉ fallback theo kích thước duy nhất cho danh mục Bể Kính (`isTargetGlass && isRowGlass`), loại bỏ hoàn toàn khả năng Layout tiểu cảnh bị so khớp chéo theo kích thước $20\times20\times20\text{cm}$.
+  - **Bảo toàn tính trung thực của kho hàng**: Ngăn chặn hoàn toàn việc sản phẩm hết hàng (tồn = 0 như `Nhất Trụ ver.4 - 20x20x20cm`) bị gán nhầm sang sản phẩm khác còn tồn kho và tự kích hoạt trạng thái "Lấy từ tồn kho có sẵn" / yêu cầu chọn số serial.
+- **Tối ưu nhận diện Layout Trăng & Quy cách Cubic (`Modals_Orders.html`)**:
+  - **Tiền tố TRA**: Bổ sung tiền tố `TRA` vào regex nhận diện Layout, tự động map sang SKU `LAY-STD001-202020-ST-02` (Trăng – 20x20x20cm).
+  - **Phân giải Cubic**: Tự động nhận diện từ khóa `Cubic 20`, `Cubic 25`, `Cubic 30`, `Cubic 40` để bóc tách thành kích thước 3 chiều $20\times20\times20\text{cm}$ v.v., kết hợp bonus trọng số tên gia đình `isTraFamily`.
+- **Bộ nhớ tự học SKU Bí Danh (`rf_sku_alias_map`)**:
+  - Khi nhân sự chọn liên kết thủ công mã sản phẩm tại Trạm Bơm Đơn, hệ thống tự động ghi nhớ ánh xạ `rawSku -> selectedItem` vào `localStorage`.
+  - Các lần nhập đơn tiếp theo có cùng mã SKU trên sàn TMĐT sẽ được tự động nhận diện và gán đúng 100%, không cần nhân sự chọn lại thủ công.
+- **Cơ chế cập nhật đè lệnh xưởng In-Place khi bơm lại đơn (`Modals_Orders.html`)**:
+  - Khi người dùng nhập lại file Excel chứa đơn hàng cũ chưa kết thúc (`isUpdate: true`), hệ thống thực hiện tái bóc tách sản phẩm thay vì giữ nguyên lệnh cũ lỗi thời.
+  - Tái sử dụng ID của các bản ghi `Production` cũ để ghi đè dữ liệu mới tại chỗ, dọn dẹp các lệnh dư thừa (`deleteProdIds`), đồng thời cập nhật chính xác cột `Orders.accessories` và kích hoạt đồng bộ qua `pushDeltas`.
+
+---
+
 ## [v2.37.7] - 2026-09-04
 
 ### 📦 Xử Lý Đơn Thiếu Hàng (Hoàn Tiền Ngay): Bảo Toàn 100% Tồn Kho & Chuyển Đối Soát Thành Công

@@ -587,7 +587,21 @@ const TransactionDetailModal = React.memo(function TransactionDetailModal({ tx, 
                         <div className="bg-[#09090b]/60 border border-zinc-800/60 p-3 rounded-2xl">
                             <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider block mb-2">Ảnh Chứng Từ Kèm Theo</span>
                             <div className="w-full max-h-48 rounded-xl overflow-hidden border border-zinc-700 bg-black flex items-center justify-center">
-                                <img src={tx.proofImage} alt="Chứng từ" className="max-h-48 w-full object-contain cursor-pointer hover:opacity-90" onClick={() => window.open(tx.proofImage, '_blank')} />
+                                <img 
+                                    src={tx.proofImage} 
+                                    alt="Chứng từ" 
+                                    className="max-h-48 w-full object-contain cursor-pointer hover:opacity-90 transition-opacity" 
+                                    onClick={() => {
+                                        if (typeof window.previewImage === 'function') {
+                                            window.previewImage(tx.proofImage, 'Chứng Từ: ' + (tx.title || 'Giao Dịch'));
+                                        } else if (typeof openSafeImageTab === 'function') {
+                                            openSafeImageTab(tx.proofImage);
+                                        } else {
+                                            window.open(tx.proofImage, '_blank');
+                                        }
+                                    }} 
+                                    title="Bấm xem ảnh phóng to"
+                                />
                             </div>
                         </div>
                     )}

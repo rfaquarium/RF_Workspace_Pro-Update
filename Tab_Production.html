@@ -2144,8 +2144,8 @@
                     upd.status = 'Kiểm Định';
                 }
 
-                // TỰ ĐỘNG GỌI TRỪ VẬT TƯ BOM KÈM DỮ LIỆU QUYẾT TOÁN THỰC TẾ
-                if (c.k === 'phase2' || configs.length === 1) {
+                // TỰ ĐỘNG GỌI TRỪ VẬT TƯ BOM KÈM DỮ LIỆU QUYẾT TOÁN THỰC TẾ (CHỈ KHI ĐỦ CẢ 2 KHÂU DONE)
+                if ((c.k === 'phase2' || configs.length === 1) && isAllDone) {
                     const finalMatList = customMaterialData || upd.materialUsageData || null;
                     if (typeof window.safeFetchJSON === 'function') {
                         window.safeFetchJSON(window.SCRIPT_URL || '', {
@@ -3556,7 +3556,10 @@
         }
         const realImage = displayCoverImage || productInfo.realImage || productInfo.image;
         const productImage = displayCoverImage || productInfo.image || productInfo.realImage;
-        const oCode = (order.orderCode || '').split(' | MVĐ: ')[0] || 'ĐƠN LẺ';
+        const rawItemOrder = String(_item.orderId || '').trim();
+        const oCode = (order && order.orderCode) 
+            ? (order.orderCode.split(' | MVĐ: ')[0].split(' | ')[0] || order.orderCode) 
+            : (rawItemOrder && rawItemOrder !== 'SẢN XUẤT TỒN' ? rawItemOrder : 'LỆNH SẢN XUẤT');
         const isBuKho = order.channel === 'Sản Xuất Bù Kho' || order.channel === 'Sản Xuất Tồn' || _item.fulfilledFromStock;
 
         const p1Status = _item.phases?.phase1?.status || 'Pending';
@@ -3677,7 +3680,17 @@
                                 )}
 
                                 {(() => {
-                                    const channelTag = order?.channel === 'KHÁC' ? 'XUẤT KHẨU' : (order?.channel || (_item.orderId === 'SẢN XUẤT TỒN' || String(_item.note || '').includes('tự động tạo lệnh bù kho') ? 'SẢN XUẤT TỒN' : 'BÁN LẺ'));
+                                    const resolveItemChannelTag = () => {
+                                        if (order?.channel && order.channel !== 'KHÁC') return order.channel;
+                                        if (order?.channel === 'KHÁC') return 'XUẤT KHẨU';
+                                        const rawOrd = String(_item.orderId || '');
+                                        const rawN = String(_item.note || '').toUpperCase();
+                                        if (rawOrd === 'SẢN XUẤT TỒN' || rawN.includes('TỰ ĐỘNG TẠO LỆNH BÙ KHO') || rawN.includes('SẢN XUẤT TỒN')) return 'SẢN XUẤT TỒN';
+                                        if (rawN.includes('TIKTOK') || rawOrd.includes('TT')) return 'TikTok Shop';
+                                        if (rawN.includes('SHOPEE') || rawN.includes('SPX') || rawOrd.includes('SPX')) return 'Shopee VN';
+                                        return order?.channel || 'SẢN XUẤT';
+                                    };
+                                    const channelTag = resolveItemChannelTag();
                                     const chBadgeClass = typeof getChannelBadge === 'function' ? getChannelBadge(channelTag) : 'bg-[#f97316] text-black font-black border border-[#ea580c] shadow-sm';
                                     return (
                                         <span className={`text-[8.5px] font-black px-2 py-0.5 rounded border uppercase tracking-wider shadow-sm truncate flex items-center gap-1 shrink-0 ${chBadgeClass}`}>
@@ -4482,11 +4495,21 @@
         const getParentOrder = React.useCallback((orderId) => {
             if (!orderId) return {};
             if (orderMap[orderId]) return orderMap[orderId];
-            const clean = String(orderId).split('_')[0].trim();
+            
+            const raw = String(orderId).trim();
+            const clean = raw.split('_')[0].trim();
             if (clean && clean !== 'ORD' && clean !== 'PROD' && clean.length > 3 && orderMap[clean]) {
                 return orderMap[clean];
             }
-            const codeParts = String(orderId).split('|').map(x => x.trim());
+            
+            // Xử lý các tiền tố ORD_timestamp_index: dò theo ORD_timestamp
+            const underParts = raw.split('_');
+            if (underParts.length >= 3 && underParts[0] === 'ORD') {
+                const baseTimestampId = underParts[0] + '_' + underParts[1];
+                if (orderMap[baseTimestampId]) return orderMap[baseTimestampId];
+            }
+
+            const codeParts = raw.split('|').map(x => x.trim());
             for (let part of codeParts) {
                 if (orderMap[part]) return orderMap[part];
                 const sub = part.split('_')[0].trim();
@@ -4494,8 +4517,17 @@
                     return orderMap[sub];
                 }
             }
+
+            // Dò tìm vét cạn trong orders và GLOBAL_ALL_ORDERS
+            const allOrderSources = [
+                ...(orders || []),
+                ...(typeof window !== 'undefined' ? (window.GLOBAL_ALL_ORDERS || window.ALL_ORDERS || []) : [])
+            ];
+            const foundDirect = allOrderSources.find(o => o && (String(o.id).trim() === raw || String(o.orderCode).trim() === raw || (o.orderCode && String(o.orderCode).includes(raw))));
+            if (foundDirect) return foundDirect;
+
             return {};
-        }, [orderMap]);
+        }, [orderMap, orders]);
 
         const baseFiltered = React.useMemo(() => {
             return (prodItems || []).filter(i => {

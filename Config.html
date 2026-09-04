@@ -489,21 +489,64 @@ const getShiftStatus = (inTime, outTime, isMorning, leaveType, recordDate) => {
   return { text: 'Đúng giờ', color: 'text-success bg-green-50 font-bold', mins };
 };
 
-const getAutoDeadline = (ch) => { 
-    const d = new Date();
+const getAutoDeadline = (ch, rawDate = null, shippingMethod = '') => { 
+    const d = rawDate ? new Date(rawDate) : new Date();
     const h = d.getHours(); const m = d.getMinutes(); 
-    let add = 6; let th = 18;
     const chStr = String(ch || '').toUpperCase();
-    if (chStr.includes('SHOPEE') || chStr.includes('TIKTOK')) { 
-        if (h > 17 || (h === 17 && m >= 30)) { add = 1; th = 12; } else if (h < 8) { add = 0; th = 12; } else { add = 1; th = 14; }
-    } else if (chStr.includes('BÁN LẺ') || chStr.includes('CỘNG TÁC VIÊN') || chStr === 'CTV' || chStr.includes('BÁN SỈ') || chStr.includes('NỘI BỘ')) {
-        add = 6; // Đơn Bán Lẻ & Cộng Tác Viên: Đẩy deadline lên trên 5 ngày (6 ngày hoàn thành)
-        th = 18;
-    } else {
-        add = 6;
-        th = 18;
+    const shipStr = String(shippingMethod || '').toUpperCase();
+    const isInstant = shipStr.includes('HỎA TỐC') || shipStr.includes('TRONG NGÀY') || shipStr.includes('INSTANT') || shipStr.includes('NOW') || chStr.includes('HỎA TỐC') || chStr.includes('TRONG NGÀY');
+
+    // 1. ĐƠN HỎA TỐC / TRONG NGÀY (SLA CẤP TỐC 1.5H)
+    if (isInstant) {
+        if (h < 8) {
+            // Trước 8h: Chuẩn bị hàng trước 9:30 cùng ngày
+            d.setHours(9, 30, 0, 0);
+        } else if (h < 18) {
+            // Từ 8h đến trước 18h: Xử lý trong vòng 1.5 giờ (90 phút)
+            d.setMinutes(d.getMinutes() + 90);
+        } else {
+            // Từ 18h trở đi: Chuẩn bị hàng trước 9:30 ngày kế tiếp
+            d.setDate(d.getDate() + 1);
+            d.setHours(9, 30, 0, 0);
+        }
+        return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     }
-    d.setDate(d.getDate() + add); d.setHours(th, 0, 0, 0);
+
+    // 2. ĐƠN SÀN TMĐT (SHOPEE, TIKTOK SHOP, LAZADA) - CHUẨN ĐIỀU KHOẢN SHOPEE 19948
+    if (chStr.includes('SHOPEE') || chStr.includes('TIKTOK') || chStr.includes('LAZADA') || chStr.includes('SÀN')) { 
+        const dayOfWeek = d.getDay(); // 0: Chủ Nhật, 6: Thứ Bảy
+        let addDays = 0;
+        let th = 17; let tm = 30;
+
+        if (dayOfWeek === 0) {
+            // Chủ Nhật: ĐVVC nghỉ lấy/giao ➔ chuyển hạn bàn giao sang Thứ Hai lúc 11:30 (Shopee hạn 23:59 Thứ Hai)
+            addDays = 1; th = 11; tm = 30;
+        } else if (dayOfWeek === 6) {
+            // Thứ Bảy:
+            if (h >= 14) {
+                // Sau 14h Thứ Bảy: Shopee gia hạn đến Thứ Hai 23:59 ➔ Hạn xưởng Thứ Hai lúc 11:30
+                addDays = 2; th = 11; tm = 30;
+            } else {
+                // Trước 14h Thứ Bảy: Bàn giao trước 23:59 Thứ Bảy ➔ Hạn xưởng 17:30 cùng ngày
+                addDays = 0; th = 17; tm = 30;
+            }
+        } else {
+            // Thứ Hai - Thứ Sáu:
+            if (h < 14) {
+                // Phát sinh trước 14h: Bàn giao trước 23:59 cùng ngày ➔ Hạn xưởng 17:30 cùng ngày
+                addDays = 0; th = 17; tm = 30;
+            } else {
+                // Phát sinh từ 14h trở đi: Bàn giao trước 23:59 ngày kế tiếp ➔ Hạn xưởng 11:30 hôm sau
+                addDays = 1; th = 11; tm = 30;
+            }
+        }
+        d.setDate(d.getDate() + addDays); d.setHours(th, tm, 0, 0);
+        return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    }
+
+    // 3. ĐƠN BÁN LẺ, CTV, BÁN SỈ, NỘI BỘ (CHU TRÌNH 6 NGÀY)
+    d.setDate(d.getDate() + 6);
+    d.setHours(18, 0, 0, 0);
     return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); 
 };
 
@@ -630,35 +673,41 @@ function getPackingReward(itemInput, kpiConfig = [], channel = '') {
 
   // 1. Thu thập danh sách tên sản phẩm
   let namesToScan = [];
-  if (Array.isArray(itemInput)) {
-    itemInput.forEach(i => {
-      if (typeof i === 'string' && i.trim()) namesToScan.push(i.trim());
-      else if (i && typeof i === 'object') {
-        if (i.name) namesToScan.push(String(i.name).trim());
-        if (i.sku) namesToScan.push(String(i.sku).trim());
-      }
-    });
-  } else if (itemInput && typeof itemInput === 'object') {
-    if (itemInput.items && Array.isArray(itemInput.items)) {
-      itemInput.items.forEach(i => { if (i?.name) namesToScan.push(String(i.name).trim()); });
-    }
-    if (itemInput.products) {
-      if (Array.isArray(itemInput.products)) {
-        itemInput.products.forEach(i => { if (i?.name) namesToScan.push(String(i.name).trim()); });
-      } else if (typeof itemInput.products === 'string') {
+  const addNameOrSku = (val) => {
+    if (!val) return;
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      if (!trimmed || trimmed === '[object Object]') return;
+      if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
         try {
-          const parsed = JSON.parse(itemInput.products);
-          if (Array.isArray(parsed)) parsed.forEach(i => { if (i?.name) namesToScan.push(String(i.name).trim()); });
-          else namesToScan.push(itemInput.products);
-        } catch (e) {
-          namesToScan.push(itemInput.products);
-        }
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) parsed.forEach(p => addNameOrSku(p));
+          else if (typeof parsed === 'object') { addNameOrSku(parsed.name); addNameOrSku(parsed.sku); }
+          return;
+        } catch (e) {}
       }
+      const splitNames = trimmed.split(/[\n,;+]/).map(s => s.trim()).filter(Boolean);
+      if (splitNames.length > 1) {
+        splitNames.forEach(s => { if (s && s !== '[object Object]') namesToScan.push(s); });
+      } else {
+        namesToScan.push(trimmed);
+      }
+    } else if (typeof val === 'object') {
+      if (val.name) addNameOrSku(String(val.name));
+      if (val.sku) addNameOrSku(String(val.sku));
     }
-    if (itemInput.name) namesToScan.push(String(itemInput.name).trim());
-  } else if (typeof itemInput === 'string' && itemInput.trim()) {
-    const splitNames = itemInput.split(/[\n,;+]/).map(s => s.trim()).filter(Boolean);
-    namesToScan = splitNames.length > 0 ? splitNames : [itemInput.trim()];
+  };
+
+  if (Array.isArray(itemInput)) {
+    itemInput.forEach(i => addNameOrSku(i));
+  } else if (itemInput && typeof itemInput === 'object') {
+    if (itemInput.items && Array.isArray(itemInput.items)) itemInput.items.forEach(i => addNameOrSku(i));
+    if (itemInput.products) addNameOrSku(itemInput.products);
+    if (itemInput.accessories) addNameOrSku(itemInput.accessories);
+    if (itemInput.name) addNameOrSku(itemInput.name);
+    if (itemInput.sku) addNameOrSku(itemInput.sku);
+  } else if (typeof itemInput === 'string') {
+    addNameOrSku(itemInput);
   }
 
   if (namesToScan.length === 0) {
@@ -1259,4 +1308,44 @@ async function sendNtfyUrgentAlert(orderCode, productName, channel) {
     console.warn('⚠️ Lỗi gửi ntfy:', err);
   }
 }
+
+// =========================================================================
+// 🖼️ HỆ THỐNG XỬ LÝ ẢNH AN TOÀN CHỐNG CHẶN GOOGLE DRIVE (CORP/COOP/nosniff)
+// =========================================================================
+function extractDriveId(url) {
+  if (!url || typeof url !== 'string') return '';
+  const clean = url.trim();
+  const idMatch = clean.match(/[?&]id=([a-zA-Z0-9_-]+)/i) || 
+                  clean.match(/\/d\/([a-zA-Z0-9_-]+)/i) ||
+                  clean.match(/googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/i);
+  return idMatch ? idMatch[1] : '';
+}
+
+function getSafeDriveViewUrl(url) {
+  const id = extractDriveId(url);
+  if (id) {
+    return 'https://drive.google.com/file/d/' + id + '/view?usp=drivesdk';
+  }
+  return url || '';
+}
+
+function getDirectImageUrl(url, size) {
+  const id = extractDriveId(url);
+  if (id) {
+    const s = size || 'w1600';
+    return 'https://lh3.googleusercontent.com/d/' + id + '=' + s;
+  }
+  return url || '';
+}
+
+function openSafeImageTab(url) {
+  if (!url) return;
+  const safeUrl = getSafeDriveViewUrl(url);
+  window.open(safeUrl, '_blank', 'noopener,noreferrer');
+}
+
+window.extractDriveId = extractDriveId;
+window.getSafeDriveViewUrl = getSafeDriveViewUrl;
+window.getDirectImageUrl = getDirectImageUrl;
+window.openSafeImageTab = openSafeImageTab;
 </script>

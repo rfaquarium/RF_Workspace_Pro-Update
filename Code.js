@@ -2281,48 +2281,59 @@ function getProductInfoByName(ss, name) {
   var cleanTarget = normalizeProdName(name);
   if (!cleanTarget) return null;
 
-  // Trích xuất kích thước chuẩn (vd: 25x12x14)
-  var targetDimMatch = String(name).match(/(\d+)\s*[xX*×_]\s*(\d+)(?:\s*[xX*×_]\s*(\d+))?/);
-  var targetDims = targetDimMatch ? (targetDimMatch[1] + 'x' + targetDimMatch[2] + (targetDimMatch[3] ? ('x' + targetDimMatch[3]) : '')) : '';
+  function buildProdResult(i) {
+    var cat = String(pData[i][catCol] || '').toUpperCase();
+    var subCat = String(pData[i][subCatCol] || '').toUpperCase();
+    var isEligible = cat === 'LAYOUT' || cat === 'BỂ KÍNH' || subCat === 'LAYOUT' || subCat === 'BỂ KÍNH' || cat.includes('SẢN XUẤT');
+    return {
+      rowIndex: i + 1,
+      id: idCol !== -1 ? pData[i][idCol] : '',
+      qtyColIndex: qtyCol !== -1 ? qtyCol : 9,
+      qty: Number(pData[i][qtyCol]) || 0,
+      minStock: Number(pData[i][minStockCol]) || 0,
+      costPrice: Number(pData[i][costCol]) || 0,
+      category: cat,
+      isEligible: isEligible,
+      sku: pData[i][skuCol],
+      name: pData[i][nameCol]
+    };
+  }
 
+  // PASS 1: ƯU TIÊN TUYỆT ĐỐI 100% EXACT MATCH (SKU HOẶC TÊN CHUẨN HOÁ)
   for (var i = 1; i < pData.length; i++) {
     var rawRowName = String(pData[i][nameCol] || '');
     var rawRowSku = String(pData[i][skuCol] || '');
     var rowName = normalizeProdName(rawRowName);
     var rowSku = normalizeProdName(rawRowSku);
 
-    var isExactMatch = (rowName === cleanTarget || rowSku === cleanTarget);
-    var isDimMatch = false;
-    if (!isExactMatch && targetDims) {
-      var rowDimMatch = rawRowName.match(/(\d+)\s*[xX*×_]\s*(\d+)(?:\s*[xX*×_]\s*(\d+))?/);
-      var rowDims = rowDimMatch ? (rowDimMatch[1] + 'x' + rowDimMatch[2] + (rowDimMatch[3] ? ('x' + rowDimMatch[3]) : '')) : '';
-      if (rowDims && rowDims === targetDims) {
-        var isTargetGlass = /be|kinh/i.test(cleanTarget);
-        var isRowGlass = /be|kinh/i.test(rowName);
-        if (isTargetGlass === isRowGlass) {
-          isDimMatch = true;
+    if (rowName === cleanTarget || (rowSku && rowSku === cleanTarget)) {
+      return buildProdResult(i);
+    }
+  }
+
+  // PASS 2: FALLBACK THEO KÍCH THƯỚC (CHỈ ÁP DỤNG CHO BỂ KÍNH, CẤM TIỆT ĐỐI VỚI LAYOUT)
+  var isTargetGlass = /be|kinh/i.test(cleanTarget);
+  if (isTargetGlass) {
+    var targetDimMatch = String(name).match(/(\d+)\s*[xX*×_]\s*(\d+)(?:\s*[xX*×_]\s*(\d+))?/);
+    var targetDims = targetDimMatch ? (targetDimMatch[1] + 'x' + targetDimMatch[2] + (targetDimMatch[3] ? ('x' + targetDimMatch[3]) : '')) : '';
+
+    if (targetDims) {
+      for (var j = 1; j < pData.length; j++) {
+        var rawNameJ = String(pData[j][nameCol] || '');
+        var rowNameJ = normalizeProdName(rawNameJ);
+        var isRowGlass = /be|kinh/i.test(rowNameJ);
+
+        if (isRowGlass) {
+          var rowDimMatch = rawNameJ.match(/(\d+)\s*[xX*×_]\s*(\d+)(?:\s*[xX*×_]\s*(\d+))?/);
+          var rowDims = rowDimMatch ? (rowDimMatch[1] + 'x' + rowDimMatch[2] + (rowDimMatch[3] ? ('x' + rowDimMatch[3]) : '')) : '';
+          if (rowDims && rowDims === targetDims) {
+            return buildProdResult(j);
+          }
         }
       }
     }
-
-    if (isExactMatch || isDimMatch) {
-      var cat = String(pData[i][catCol] || '').toUpperCase();
-      var subCat = String(pData[i][subCatCol] || '').toUpperCase();
-      var isEligible = cat === 'LAYOUT' || cat === 'BỂ KÍNH' || subCat === 'LAYOUT' || subCat === 'BỂ KÍNH' || cat.includes('SẢN XUẤT');
-      return {
-        rowIndex: i + 1,
-        id: idCol !== -1 ? pData[i][idCol] : '',
-        qtyColIndex: qtyCol !== -1 ? qtyCol : 9,
-        qty: Number(pData[i][qtyCol]) || 0,
-        minStock: Number(pData[i][minStockCol]) || 0,
-        costPrice: Number(pData[i][costCol]) || 0,
-        category: cat,
-        isEligible: isEligible,
-        sku: pData[i][skuCol],
-        name: pData[i][nameCol]
-      };
-    }
   }
+
   return null;
 }
 
@@ -2388,7 +2399,7 @@ function formatOrder(o) {
     "responsibleUser": o.responsibleUser || '', 
     "discount": Number(o.discount) || 0, 
     "shippingMethod": o.shippingMethod || ((String(o.channel).includes('Bán Lẻ') || String(o.channel).includes('Cộng Tác Viên')) ? 'Gửi GHN' : ''), 
-    "sizeCoefficient": Number(o.sizeCoefficient || 1), 
+    "sizeCoefficient": Number(o.sizeCoefficient !== undefined && o.sizeCoefficient !== null && o.sizeCoefficient !== '' ? o.sizeCoefficient : 1), 
     "cogs": Number(o.cogs || 0), 
     "feeFixed": Number(o.feeFixed || 0), 
     "feeService": Number(o.feeService || 0), 
@@ -2484,12 +2495,17 @@ function formatAtt(a) {
 }
 
 function formatProduct(p) {
+  var cleanNum = function(val, fallback) {
+    if (val === undefined || val === null || val === '') return fallback;
+    var n = Number(val);
+    return isNaN(n) ? fallback : n;
+  };
   return {
     "id": p.id, "sku": p.sku || '', "name": p.name || '', "unit": p.unit || '', "image": p.image || '',
     "category": p.category || '', "sub_category": p.sub_category || '',
-    "costPrice": p.costPrice || 0, "price": p.price || 0, "quantity": p.quantity || 0,
-    "minStock": p.minStock || 0, "maxStock": p.maxStock || 0, "realImage": p.realImage || '',
-    "importUnit": p.importUnit || '', "conversionRate": p.conversionRate || 1, "model3D": p.model3D || ''
+    "costPrice": cleanNum(p.costPrice, 0), "price": cleanNum(p.price, 0), "quantity": cleanNum(p.quantity, 0),
+    "minStock": cleanNum(p.minStock, 0), "maxStock": cleanNum(p.maxStock, 0), "realImage": p.realImage || '',
+    "importUnit": p.importUnit || '', "conversionRate": cleanNum(p.conversionRate, 1), "model3D": p.model3D || ''
   };
 }
 
@@ -2699,8 +2715,12 @@ function syncDeltas(payload, pin) {
   }
 
   var lock = LockService.getScriptLock();
+  var acquiredLock = false;
   try {
-    lock.waitLock(30000);
+    if (!lock.hasLock()) {
+      lock.waitLock(30000);
+      acquiredLock = true;
+    }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
     // 1. Hoàn trả số dư khi XOÁ giao dịch (Batch Account Balance Optimization)
@@ -3162,7 +3182,7 @@ function syncDeltas(payload, pin) {
                           var isTerm = isTerminalStatus(oData[oR][oStatusCol]);
                           if (!isTerm) {
                             oData[oR][oStatusCol] = 'Sẵn sàng đóng gói';
-                            ordersModified = true;
+                            ordersSheet.getRange(oR + 1, oStatusCol + 1).setValue('Sẵn sàng đóng gói');
                           }
                           break;
                         }
@@ -3278,8 +3298,12 @@ function syncDeltas(payload, pin) {
     if (payload.prodItems && payload.prodItems.length > 0) {
       applyDeltasToSheet('Production', payload.prodItems, formatProd, ss);
       // Tự động kiểm tra và cấn trừ nguyên liệu BOM cho các lệnh sản xuất hoàn thành
+      var processedBomIds = {};
       payload.prodItems.forEach(function (p) {
         if (!p || !p.id) return;
+        var pIdKey = String(p.id).trim();
+        if (processedBomIds[pIdKey]) return;
+
         var isFromStock = p.fulfilledFromStock === true || 
                           String(p.fulfilledFromStock).toUpperCase() === 'TRUE' ||
                           String(p.status).trim() === 'Hoàn Kho Đạt' ||
@@ -3288,10 +3312,16 @@ function syncDeltas(payload, pin) {
 
         var pStatus = String(p.status || '').toUpperCase().trim();
         var p1Status = String(p.p1_status || (p.phases && p.phases.phase1 && p.phases.phase1.status) || '').toUpperCase().trim();
+        var p2Status = String(p.p2_status || (p.phases && p.phases.phase2 && p.phases.phase2.status) || '').toUpperCase().trim();
         var qcStatus = String(p.qc_status || '').toUpperCase().trim();
+        // CHỐT CHẶN: Sản phẩm 2 khâu BẮT BUỘC cả 2 khâu Done mới được nhập kho & trừ BOM
+        var hasTwoPhases = !!(p.p2_name || p.p2_status || (p.phases && p.phases.phase2 && p.phases.phase2.name));
+        var isBothPhasesDone = p1Status === 'DONE' && p2Status === 'DONE';
         var isDone = pStatus === 'DONE' || pStatus === 'ĐÃ XONG' || pStatus === 'HOÀN THÀNH' ||
-                     p1Status === 'DONE' || qcStatus.indexOf('DUYỆT') !== -1 || qcStatus.indexOf('PASS') !== -1;
+                     (hasTwoPhases ? isBothPhasesDone : p1Status === 'DONE') ||
+                     qcStatus.indexOf('DUYỆT') !== -1 || qcStatus.indexOf('PASS') !== -1;
         if (isDone) {
+          processedBomIds[pIdKey] = true;
           try {
             _processMaterialDeduction_Core(p.id, null, ss);
           } catch (e) {
@@ -3502,8 +3532,11 @@ function syncDeltas(payload, pin) {
 
   } catch (err) {
     Logger.log('Lỗi syncDeltas: ' + err.toString());
-    return { success: false, message: 'Lỗi đồng bộ dữ liệu: ' + err.toString() };
-  } finally { lock.releaseLock(); }
+  } finally {
+    if (acquiredLock) {
+      try { lock.releaseLock(); } catch (e) { }
+    }
+  }
 
   // Để đảm bảo tốc độ phản hồi siêu tốc "Bấm là nhận luôn" và không làm giao diện
   // nhảy loạn lên, chúng ta chỉ trả về tín hiệu thành công thay vì bắt Frontend tải lại toàn bộ 23 bảng.
@@ -4319,35 +4352,49 @@ function getPackingReward(itemInput, kpiConfig, channel) {
   if (!kpiConfig || kpiConfig.length === 0) return 0;
 
   var namesToScan = [];
-  if (Array.isArray(itemInput)) {
-    itemInput.forEach(function (i) {
-      if (typeof i === 'string' && i.trim()) namesToScan.push(i.trim());
-      else if (i && typeof i === 'object') {
-        if (i.name) namesToScan.push(String(i.name).trim());
-        if (i.sku) namesToScan.push(String(i.sku).trim());
+  function addNameOrSku(val) {
+    if (!val) return;
+    if (typeof val === 'string') {
+      var trimmed = val.trim();
+      if (!trimmed || trimmed === '[object Object]') return;
+      if (trimmed.indexOf('[') === 0 || trimmed.indexOf('{') === 0) {
+        try {
+          var parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            for (var p = 0; p < parsed.length; p++) addNameOrSku(parsed[p]);
+          } else if (typeof parsed === 'object') {
+            addNameOrSku(parsed.name);
+            addNameOrSku(parsed.sku);
+          }
+          return;
+        } catch (e) {}
       }
-    });
+      var splitNames = trimmed.split(/[\n,;+]/).map(function (s) { return s.trim(); }).filter(Boolean);
+      if (splitNames.length > 1) {
+        for (var sn = 0; sn < splitNames.length; sn++) {
+          if (splitNames[sn] && splitNames[sn] !== '[object Object]') namesToScan.push(splitNames[sn]);
+        }
+      } else {
+        namesToScan.push(trimmed);
+      }
+    } else if (typeof val === 'object') {
+      if (val.name) addNameOrSku(String(val.name));
+      if (val.sku) addNameOrSku(String(val.sku));
+    }
+  }
+
+  if (Array.isArray(itemInput)) {
+    for (var ii = 0; ii < itemInput.length; ii++) addNameOrSku(itemInput[ii]);
   } else if (itemInput && typeof itemInput === 'object') {
     if (itemInput.items && Array.isArray(itemInput.items)) {
-      itemInput.items.forEach(function (i) { if (i && i.name) namesToScan.push(String(i.name).trim()); });
+      for (var it = 0; it < itemInput.items.length; it++) addNameOrSku(itemInput.items[it]);
     }
-    if (itemInput.products) {
-      if (Array.isArray(itemInput.products)) {
-        itemInput.products.forEach(function (i) { if (i && i.name) namesToScan.push(String(i.name).trim()); });
-      } else if (typeof itemInput.products === 'string') {
-        try {
-          var parsed = JSON.parse(itemInput.products);
-          if (Array.isArray(parsed)) parsed.forEach(function (i) { if (i && i.name) namesToScan.push(String(i.name).trim()); });
-          else namesToScan.push(itemInput.products);
-        } catch (e) {
-          namesToScan.push(itemInput.products);
-        }
-      }
-    }
-    if (itemInput.name) namesToScan.push(String(itemInput.name).trim());
-  } else if (typeof itemInput === 'string' && itemInput.trim()) {
-    var splitNames = itemInput.split(/[\n,;+]/).map(function (s) { return s.trim(); }).filter(Boolean);
-    namesToScan = splitNames.length > 0 ? splitNames : [itemInput.trim()];
+    if (itemInput.products) addNameOrSku(itemInput.products);
+    if (itemInput.accessories) addNameOrSku(itemInput.accessories);
+    if (itemInput.name) addNameOrSku(itemInput.name);
+    if (itemInput.sku) addNameOrSku(itemInput.sku);
+  } else if (typeof itemInput === 'string') {
+    addNameOrSku(itemInput);
   }
 
   if (namesToScan.length === 0) {
@@ -6663,13 +6710,13 @@ function safeDeductInventoryOnHandover(ordersToHandover, ss) {
       var oCode = (order.orderCode || '').split(' | ')[0] || (order.id ? String(order.id).substring(0, 5) : '');
       if (oCode) orderCodes.push(oCode);
 
-      // 1. Sản phẩm từ Production (Bể Kính / Layout): Trừ kho cho các món có lệnh sản xuất
+      // 1. Sản phẩm từ Production (Bể Kính / Layout): Chỉ trừ kho thành phẩm cho các món LẤY TỪ TỒN KHO CÓ SẴN (fulfilledFromStock = true). Hàng sản xuất mới (MTO) đã khấu trừ phôi BOM trước đó nên không trừ kho thành phẩm nữa để chống trừ kép.
       var orderProds = prodData.filter(function (p) {
         if (!p || String(p.orderId) !== String(order.id)) return false;
         var status = String(p.status).trim().toUpperCase();
         if (normalizeStatus(status) === 'Đơn Huỷ') return false;
-        if (p.fulfilledFromStock === true || String(p.fulfilledFromStock).toUpperCase() === 'TRUE') return false;
-        return true;
+        var isFulfilledFromStock = p.fulfilledFromStock === true || String(p.fulfilledFromStock).toUpperCase() === 'TRUE';
+        return isFulfilledFromStock;
       });
       var prodNamesAdded = {};
       orderProds.forEach(function (rp) {
@@ -8382,8 +8429,8 @@ function onEdit(e) {
 
       var newVal = String(e.value || '').trim().toUpperCase();
 
-      // Nghiệp vụ A: Trừ Kho BOM khi p1_status = 'Done' hoặc status = 'Done'
-      if ((col === p1StatusCol || col === statusCol) && (newVal === 'DONE' || newVal === 'ĐÃ XONG')) {
+      // Nghiệp vụ A: Trừ Kho BOM CHỈ KHI status tổng = 'Done' (đủ 2 khâu). p1_status riêng lẻ KHÔNG kích hoạt.
+      if (col === statusCol && (newVal === 'DONE' || newVal === 'ĐÃ XONG')) {
         var prodId = sheet.getRange(row, idCol).getValue();
         if (prodId) {
           processMaterialDeduction(prodId, null);
@@ -8570,11 +8617,93 @@ function processCascadeCancelOrder(orderId, isHandedOver) {
       prodRange.setValues(prodData);
     }
 
+    // 3. Nếu đơn đã từng bàn giao (isHandedOver) -> Hoàn trả tồn kho phụ kiện / hàng hóa vào Products
+    var restoredItems = [];
+    if (isHandedOver) {
+      try {
+        var canceledOrderRow = null;
+        for (var o2 = 1; o2 < ordData.length; o2++) {
+          if (String(ordData[o2][oIdIdx]).trim() === String(orderId).trim()) {
+            canceledOrderRow = ordData[o2];
+            break;
+          }
+        }
+        var oAccIdx = oHeaders.indexOf('accessories');
+        if (canceledOrderRow && oAccIdx !== -1) {
+          var accsRaw = canceledOrderRow[oAccIdx];
+          var accsList = [];
+          if (typeof accsRaw === 'string') {
+            try { accsList = JSON.parse(accsRaw); } catch (e) { }
+          } else if (Array.isArray(accsRaw)) {
+            accsList = accsRaw;
+          }
+
+          if (Array.isArray(accsList) && accsList.length > 0) {
+            var prodStockSheet = ss.getSheetByName('Products');
+            if (prodStockSheet) {
+              var psData = prodStockSheet.getDataRange().getValues();
+              var psHeaders = psData[0];
+              var psNameCol = psHeaders.indexOf('name');
+              var psSkuCol = psHeaders.indexOf('sku');
+              var psQtyCol = psHeaders.indexOf('quantity');
+              var psPriceCol = psHeaders.indexOf('price');
+              var psCostCol = psHeaders.indexOf('costPrice');
+              var psChanged = false;
+              var totalRestoreValue = 0;
+
+              accsList.forEach(function (item) {
+                if (!item) return;
+                var itName = typeof item === 'string' ? item : (item.name || item.Name || '');
+                var itQty = typeof item === 'object' ? (Number(item.quantity || item.qty) || 1) : 1;
+                if (!itName || itQty <= 0) return;
+
+                var itKey = String(itName).trim().toLowerCase();
+                for (var pr = 1; pr < psData.length; pr++) {
+                  var pName = String(psData[pr][psNameCol] || '').trim().toLowerCase();
+                  var pSku = String(psData[pr][psSkuCol] || '').trim().toLowerCase();
+                  if (pName === itKey || pSku === itKey) {
+                    var curQty = Number(psData[pr][psQtyCol]) || 0;
+                    psData[pr][psQtyCol] = curQty + itQty;
+                    var itemCost = Number(psData[pr][psCostCol] || psData[pr][psPriceCol]) || 0;
+                    totalRestoreValue += itQty * itemCost;
+                    restoredItems.push({ name: psData[pr][psNameCol], qty: itQty, costPrice: itemCost });
+                    psChanged = true;
+                    break;
+                  }
+                }
+              });
+
+              if (psChanged) {
+                prodStockSheet.getRange(1, 1, psData.length, psHeaders.length).setValues(psData);
+                var ieSheet = ss.getSheetByName('ImportExport');
+                if (ieSheet && restoredItems.length > 0) {
+                  var ieLogId = 'IE_RESTORE_' + String(orderId).replace(/[^a-zA-Z0-9]/g, '') + '_' + Date.now();
+                  var safeDateNow = Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "yyyy-MM-dd HH:mm:ss");
+                  ieSheet.appendRow([
+                    ieLogId,
+                    'Nhập',
+                    'Hoàn Kho Đơn Hủy',
+                    Math.round(totalRestoreValue),
+                    safeDateNow,
+                    'Hoàn kho phụ kiện tự động do hủy đơn đã bàn giao: ' + orderId,
+                    JSON.stringify(restoredItems)
+                  ]);
+                }
+              }
+            }
+          }
+        }
+      } catch (restoreErr) {
+        Logger.log('Lỗi hoàn kho đơn hủy: ' + restoreErr.toString());
+      }
+    }
+
     return {
       success: true,
-      message: 'Đã hủy ' + canceledCount + ' lệnh chưa làm và chuyển ' + stockConvertedCount + ' lệnh hoàn thành thành tài sản bù kho!',
+      message: 'Đã hủy ' + canceledCount + ' lệnh chưa làm, chuyển ' + stockConvertedCount + ' lệnh thành tài sản bù kho' + (restoredItems.length > 0 ? (', và hoàn ' + restoredItems.length + ' món vào kho Products!') : '!'),
       canceledCount: canceledCount,
-      stockConvertedCount: stockConvertedCount
+      stockConvertedCount: stockConvertedCount,
+      restoredCount: restoredItems.length
     };
 
   } catch (e) {
@@ -8862,6 +8991,29 @@ function _processMaterialDeduction_Core(prodId, materialUsageData, ss) {
         message: 'Lệnh sản xuất ' + targetProdIdStr + ' lấy từ tồn kho có sẵn, không trừ vật tư BOM.',
         isStockFulfillment: true 
       };
+    }
+
+    // GUARD 2: SẢN PHẨM 2 KHÂU - BẮT BUỘC CẢ 2 KHÂU DONE MỚI ĐƯỢC TRỪ BOM & NHẬP KHO!
+    var p2NameIdx = prodHeaders.indexOf('p2_name');
+    var p1StatusGuardIdx = prodHeaders.indexOf('p1_status');
+    var p2StatusGuardIdx = prodHeaders.indexOf('p2_status');
+    if (p2NameIdx >= 0 && p2StatusGuardIdx >= 0) {
+      for (var g = 1; g < prodData.length; g++) {
+        if (String(prodData[g][pIdIdx]).trim() === targetProdIdStr) {
+          var g_p2Name = String(prodData[g][p2NameIdx] || '').trim();
+          var g_p1St = String(prodData[g][p1StatusGuardIdx] || '').trim().toUpperCase();
+          var g_p2St = String(prodData[g][p2StatusGuardIdx] || '').trim().toUpperCase();
+          if (g_p2Name && g_p2St !== 'DONE' && g_p2St !== 'ĐÃ XONG') {
+            Logger.log('GUARD 2 chặn BOM: Lệnh ' + targetProdIdStr + ' có 2 khâu nhưng Khâu 2 chưa Done (p2_status=' + g_p2St + ')');
+            return {
+              success: false,
+              message: 'Lệnh ' + targetProdIdStr + ' chưa hoàn thành đủ 2 khâu sản xuất. Khâu 2 đang: ' + (g_p2St || 'Pending') + '. Chờ thợ hoàn thành khâu 2 trước khi trừ BOM!',
+              isGuard2Block: true
+            };
+          }
+          break;
+        }
+      }
     }
 
     // 0. Kiểm tra chống trùng lặp (Idempotency check)
@@ -9276,18 +9428,14 @@ function _processMaterialDeduction_Core(prodId, materialUsageData, ss) {
       // 6.3. Nếu là sản xuất lưu kho / bù kho (không gắn mã đơn khách), tự động cộng tồn kho thành phẩm trong Products
       if (!targetProd.orderId || String(targetProd.orderId).toUpperCase().indexOf('INTERNAL') !== -1 || String(targetProd.orderId).toUpperCase().indexOf('KHO') !== -1) {
         try {
-          var pData2 = productSheet.getDataRange().getValues();
-          var pHeaders2 = pData2[0];
-          var pNameCol2 = pHeaders2.indexOf('name');
-          var pSkuCol2 = pHeaders2.indexOf('sku');
-          var pQtyCol2 = pHeaders2.indexOf('quantity');
-          if (pQtyCol2 >= 0) {
-            for (var r = 1; r < pData2.length; r++) {
-              var rowName2 = String(pData2[r][pNameCol2] || '').trim();
-              var rowSku2 = String(pData2[r][pSkuCol2] || '').trim();
+          if (prQtyIdx >= 0) {
+            for (var r = 1; r < pData.length; r++) {
+              var rowName2 = String(pData[r][prNameIdx] || '').trim();
+              var rowSku2 = String(pData[r][prSkuIdx] || '').trim();
               if (rowName2 === prodName || rowSku2 === prodName) {
-                var currentStock = Number(pData2[r][pQtyCol2] || 0);
-                productSheet.getRange(r + 1, pQtyCol2 + 1).setValue(currentStock + 1);
+                var currentStock = Number(pData[r][prQtyIdx] || 0);
+                pData[r][prQtyIdx] = currentStock + 1;
+                productSheet.getRange(r + 1, prQtyIdx + 1).setValue(currentStock + 1);
                 break;
               }
             }
@@ -9637,8 +9785,14 @@ function cleanupPhantomBomTickets() {
       if (isFromStock) {
         inStockProdIds[id] = true;
       } else {
+        var p2StIdx = prodHeaders.indexOf('p2_status');
+        var p2StVal = p2StIdx >= 0 ? String(prodData[i][p2StIdx] || '').trim().toUpperCase() : '';
+        var p2NameCleanIdx = prodHeaders.indexOf('p2_name');
+        var hasP2Phase = p2NameCleanIdx >= 0 && String(prodData[i][p2NameCleanIdx] || '').trim() !== '';
+        // Sản phẩm 2 khâu: BẮT BUỘC cả 2 khâu Done. Sản phẩm 1 khâu: p1 Done là đủ.
         var isDone = st.toUpperCase() === 'DONE' || st.toUpperCase() === 'ĐÃ XONG' || st.toUpperCase() === 'HOÀN THÀNH' ||
-                     p1St === 'DONE' || qcSt.indexOf('DUYỆT') !== -1 || qcSt.indexOf('PASS') !== -1;
+                     (hasP2Phase ? (p1St === 'DONE' && p2StVal === 'DONE') : p1St === 'DONE') ||
+                     qcSt.indexOf('DUYỆT') !== -1 || qcSt.indexOf('PASS') !== -1;
         if (isDone && id) {
           realDoneProdIds.push(id);
         }

@@ -145,6 +145,23 @@
         const matchProductFromCatalog = React.useCallback((targetSku, rawFullName, pName, pVar, parentSku) => {
             if (!products || !Array.isArray(products) || products.length === 0) return null;
 
+            // 0. TRA CỨU NHANH TỪ BẢNG NHỚ ÁNH XẠ SKU (SKU ALIAS MEMORY)
+            try {
+                const rawAliases = localStorage.getItem('rf_sku_alias_map');
+                if (rawAliases) {
+                    const aliasMap = JSON.parse(rawAliases);
+                    const searchKeys = [targetSku, parentSku, pVar, pName, rawFullName].filter(Boolean);
+                    for (const k of searchKeys) {
+                        const cleanK = String(k).trim();
+                        const mappedSkuOrName = aliasMap[cleanK] || aliasMap[cleanK.toUpperCase()];
+                        if (mappedSkuOrName) {
+                            const found = (products || []).find(p => p.sku === mappedSkuOrName || p.name === mappedSkuOrName || (p.sku && p.sku.toUpperCase() === String(mappedSkuOrName).toUpperCase()));
+                            if (found) return found;
+                        }
+                    }
+                }
+            } catch (e) { }
+
             // 1. TẬP HỢP TẤT CẢ SKU ỨNG VIÊN THEO THỨ TỰ ƯU TIÊN CAO ĐẾN THẤP
             const candidateSkus = [];
 
@@ -164,8 +181,8 @@
                 // TỰ ĐỘNG CHUẨN HOÁ SANG HỆ SKU MỚI CỦA XƯỞNG (KHÔNG ĐỆ QUY)
                 const normUpper = s.toUpperCase().replace(/\s+/g, '');
                 
-                // A. Nhóm Layout: RUN020-402325, BON01, NAT-011, CV202020... -> LAY-RUN020-402325, LAY-BON001-302020
-                const layMatch = normUpper.match(/^(?:LAY[-_]?)?(BON|RUN|CAU|HAN|VAC|DAO|NAT|TRU|HEM|VOM|CV)[-_]?0*(\d{1,3})?[-_]?(\d{5,6})?$/i);
+                // A. Nhóm Layout: RUN020-402325, BON01, NAT-011, CV202020, TRA-001... -> LAY-RUN020-402325, LAY-BON001-302020, LAY-STD001-202020-ST-02
+                const layMatch = normUpper.match(/^(?:LAY[-_]?)?(BON|RUN|CAU|HAN|VAC|DAO|NAT|TRU|HEM|VOM|CV|TRA|STD)[-_]?0*(\d{1,3})?[-_]?(\d{5,6})?$/i);
                 if (layMatch) {
                     const code = layMatch[1];
                     const ver = layMatch[2] ? ('000' + parseInt(layMatch[2], 10)).slice(-3) : '';
@@ -173,6 +190,11 @@
                     if (code === 'CV') {
                         if (size) pushCandidate(`LAY-CV-${size}`);
                         pushCandidate(`LAY-CV`);
+                    } else if (code === 'TRA') {
+                        if (ver && size) pushCandidate(`LAY-TRA${ver}-${size}`);
+                        if (ver) pushCandidate(`LAY-TRA${ver}`);
+                        if (size) pushCandidate(`LAY-STD001-${size}-ST-02`);
+                        pushCandidate(`LAY-STD001-202020-ST-02`);
                     } else {
                         if (ver && size) pushCandidate(`LAY-${code}${ver}-${size}`);
                         if (ver) pushCandidate(`LAY-${code}${ver}`);
@@ -298,7 +320,7 @@
             const varText = (pVar || '').trim().toLowerCase();
             const comboText = `${fullText} ${varText}`;
 
-            // Bóc tách kích thước 3 chiều D x R x C (VD: 20x20x8cm, 20x20x8, 30x20x20, 40x23x25)
+            // Bóc tách kích thước 3 chiều D x R x C (VD: 20x20x8cm, 20x20x8, 30x20x20, 40x23x25) hoặc Cubic (Cubic 20, Cubic 30...)
             let targetDimVariants = [];
             const dimMatch = comboText.match(/(\d{1,3})\s*[*xX×_]\s*(\d{1,3})\s*[*xX×_]\s*(\d{1,3})/);
             if (dimMatch) {
@@ -315,6 +337,19 @@
                     `${dPad}x${rPad}x${cPad}`,     // 20x20x08
                     `${d}*${r}*${c}`
                 ];
+            } else {
+                const cubicMatch = comboText.match(/\bcubic\s*(\d{1,3})\b/i);
+                if (cubicMatch) {
+                    const cVal = cubicMatch[1];
+                    const cPad = cVal.padStart(2, '0');
+                    targetDimVariants = [
+                        `${cPad}${cPad}${cPad}`,       // 202020 / 303030
+                        `${cVal}${cVal}${cVal}`,
+                        `${cVal}x${cVal}x${cVal}`,
+                        `${cPad}x${cPad}x${cPad}`,
+                        `${cVal}*${cVal}*${cVal}`
+                    ];
+                }
             }
 
             const detectSizeClass = (str) => {
@@ -322,7 +357,7 @@
                 // Chỉ nhận diện Size M/S/L/XL khi KHÔNG có 3 chiều kích thước dị biệt đi kèm (như 20x20x8)
                 if (/\b(402325|40x23x25|40\s*23\s*25|size\s*l|ไซส์\s*l|ขนาด\s*l|[\-_]l\b)/i.test(s) || (/\b40x23\b/i.test(s) && !/40x23x/i.test(s))) return 'L';
                 if (/\b(302020|30x20x20|30\s*20\s*20|size\s*m|ไซส์\s*m|ขนาด\s*m|[\-_]m\b)/i.test(s) || (/\b30x20\b/i.test(s) && !/30x20x/i.test(s))) return 'M';
-                if (/\b(202020|20x20x20|20\s*20\s*20|size\s*s|ไซส์\s*s|ขนาด\s*s|[\-_]s\b)/i.test(s) || (/\b20x20\b/i.test(s) && !/20x20x/i.test(s))) return 'S';
+                if (/\b(202020|20x20x20|20\s*20\s*20|cubic\s*20|size\s*s|ไซส์\s*s|ขนาด\s*s|[\-_]s\b)/i.test(s) || (/\b20x20\b/i.test(s) && !/20x20x/i.test(s))) return 'S';
                 if (/\b(503030|50x30x30|50\s*30\s*30|size\s*xl|ไซส์\s*xl|ขนาด\s*xl|[\-_]xl\b)/i.test(s) || (/\b50x30\b/i.test(s) && !/50x30x/i.test(s))) return 'XL';
                 if (/\b(603036|60x30x36|60\s*30\s*36)\b/i.test(s)) return '603036';
                 if (/\b(604040|60x40x40|60\s*40\s*40)\b/i.test(s)) return '604040';
@@ -333,16 +368,17 @@
                 return null;
             };
 
-            const targetSizeClass = (!dimMatch) ? detectSizeClass(comboText) : null;
+            const targetSizeClass = (!dimMatch && targetDimVariants.length === 0) ? detectSizeClass(comboText) : null;
 
             // Bóc tách Version và Model (VD: "RUN-020-402325" hoặc "Ver.20" -> Code: RUN, Ver: 20)
             let detectedVer = null;
             const verMatch = (candidateSkus.join(' ') + ' ' + comboText).match(/(?:ver\.?|v|run[-_]?|nat[-_]?|cv[-_]?)\s*0*(\d+)/i);
             if (verMatch) detectedVer = parseInt(verMatch[1], 10);
 
-            // Bóc tách Category / Family (Rừng, Nature, Bể kính, Nâng đáy, Bán cạn...)
+            // Bóc tách Category / Family (Rừng, Nature, Bể kính, Nâng đáy, Bán cạn, Trăng...)
             const isRunFamily = /(run|rừng|rung|เค้าโครงป่า)/i.test(candidateSkus.join(' ') + ' ' + comboText);
             const isNatFamily = /(nat|nature|tự nhiên)/i.test(candidateSkus.join(' ') + ' ' + comboText);
+            const isTraFamily = /(trang|trăng|tra[-_]|layout\s*trăng)/i.test(candidateSkus.join(' ') + ' ' + comboText);
             const isBkFamily = /(bk|be|bể|kính|hồ kính|hồ cá|tู้ปลา)/i.test(candidateSkus.join(' ') + ' ' + comboText);
             const isNdFamily = /(nâng\s*đáy|nang\s*day|[\-_]nd\b|nd)/i.test(candidateSkus.join(' ') + ' ' + comboText);
             const isBettaFamily = /(betta|xiêm|chọi)/i.test(candidateSkus.join(' ') + ' ' + comboText);
@@ -368,6 +404,7 @@
                 // Match family
                 if (isRunFamily && (item.pFull.includes('rừng') || item.pFull.includes('run'))) score += 30;
                 if (isNatFamily && (item.pFull.includes('nature') || item.pFull.includes('nat'))) score += 30;
+                if (isTraFamily && (item.pFull.includes('trăng') || item.pFull.includes('trang') || item.pFull.includes('tra'))) score += 45;
                 if (isBkFamily && (item.pFull.includes('bể') || item.pFull.includes('kính') || item.pFull.includes('bk') || item.pFull.includes('be'))) score += 30;
                 if (isNdFamily && (item.pFull.includes('nâng đáy') || item.pFull.includes('nd'))) score += 40;
                 if (isBettaFamily && (item.pFull.includes('betta'))) score += 40;
@@ -408,11 +445,15 @@
 
             // 4. NẾU KHÔNG CÓ SKU NÀO KHỚP -> DÙNG THUẬT TOÁN TÊN SẢN PHẨM (FALLBACK)
             let augmentedText = fullText;
-            if (!dimMatch) {
+            if (!dimMatch && targetDimVariants.length === 0) {
                 if (/\bsize\s*s\b|\bs\b|ไซส์\s*s/i.test(fullText) && !fullText.includes('20x20x20')) augmentedText += ' 20x20x20 20x20x20cm';
                 if (/\bsize\s*m\b|\bm\b|ไซส์\s*m/i.test(fullText) && !fullText.includes('30x20x20')) augmentedText += ' 30x20x20 30x20x20cm';
                 if (/\bsize\s*l\b|\bl\b|ไซส์\s*l/i.test(fullText) && !fullText.includes('40x23x25')) augmentedText += ' 40x23x25 40x23x25cm';
             }
+            if (comboText.match(/\bcubic\s*20\b/i) && !augmentedText.includes('20x20x20')) augmentedText += ' 20x20x20 20x20x20cm';
+            if (comboText.match(/\bcubic\s*25\b/i) && !augmentedText.includes('25x25x25')) augmentedText += ' 25x25x25 25x25x25cm';
+            if (comboText.match(/\bcubic\s*30\b/i) && !augmentedText.includes('30x30x30')) augmentedText += ' 30x30x30 30x30x30cm';
+            if (comboText.match(/\bcubic\s*40\b/i) && !augmentedText.includes('40x40x40')) augmentedText += ' 40x40x40 40x40x40cm';
 
             // Khớp chính xác tên 100% (qua nameExactMap)
             const cleanFullUpper = fullText.toUpperCase();
@@ -478,14 +519,31 @@
                 const targetOrder = { ...next[orderIdx] };
                 const targetItems = [...targetOrder.items];
                 const matched = (products || []).find(p => p.name === prodName);
+                const currentItem = targetItems[itemIdx];
                 targetItems[itemIdx] = {
-                    ...targetItems[itemIdx],
+                    ...currentItem,
                     name: prodName,
                     matchedProd: matched || null,
                     sku: matched && matched.sku ? matched.sku : targetItems[itemIdx].sku
                 };
                 targetOrder.items = targetItems;
                 next[orderIdx] = targetOrder;
+
+                // GHI NHỚ ÁNH XẠ VĨNH VIỄN (SKU Alias Memory)
+                if (matched) {
+                    try {
+                        const aliasMap = JSON.parse(localStorage.getItem('rf_sku_alias_map') || '{}');
+                        if (currentItem.sku) {
+                            aliasMap[currentItem.sku] = matched.sku || matched.name;
+                            aliasMap[String(currentItem.sku).toUpperCase()] = matched.sku || matched.name;
+                        }
+                        if (currentItem.name && currentItem.name !== prodName) {
+                            aliasMap[currentItem.name] = matched.sku || matched.name;
+                        }
+                        localStorage.setItem('rf_sku_alias_map', JSON.stringify(aliasMap));
+                    } catch (err) { }
+                }
+
                 return next;
             });
         };
@@ -675,11 +733,16 @@
                 }
                 return idx;
             };
+            // --- BỘ NHẬN DIỆN SÀN & KÊNH BÁN TỰ ĐỘNG CHỐNG GÁN BÁN LẺ ---
             let detectedChannel = 'Shopee VN';
             const hStr = headers.join(' ');
-            if (hStr.includes('id người dùng') || hStr.includes('tiktok') || hStr.includes('buyer username')) detectedChannel = 'Tiktok Shop';
-            else if (hStr.includes('หมายเลขคำสั่งซื้อ')) detectedChannel = 'Shopee TH';
-            else if (hStr.includes('username (buyer)') || hStr.includes('tracking number')) detectedChannel = 'Shopee VN';
+            if (hStr.includes('id người dùng') || hStr.includes('tiktok') || hStr.includes('buyer username') || hStr.includes('seller sku') || hStr.includes('shipping provider')) {
+                detectedChannel = 'Tiktok Shop';
+            } else if (hStr.includes('หมายเลขคำสั่งซื้อ')) {
+                detectedChannel = 'Shopee TH';
+            } else if (hStr.includes('username (buyer)') || hStr.includes('tracking number') || hStr.includes('mã đơn hàng') || hStr.includes('mã vận đơn') || hStr.includes('order sn')) {
+                detectedChannel = 'Shopee VN';
+            }
 
             let iCode = findCol(['mã đơn hàng', 'mã đơn', 'order id', 'order sn', 'order_sn', 'order_id', 'order no', 'order no.', 'order number', 'หมายเลขคำสั่งซื้อ', 'no. pesanan', 'id pesanan']);
             let iTrack = findCol(['mã vận đơn', 'mã bưu gửi', 'tracking number', 'tracking id', 'tracking no', 'tracking no.', 'tracking_number', 'tracking_no', 'หมายเลขติดตามพัสดุ', 'no. penjejakan']);
@@ -716,13 +779,118 @@
                 'buyer note', 'buyer message', 'customer note', 'ghi chú đơn hàng', 'lưu ý', 
                 'ghi chú của shop', 'ghi chú người bán', 'seller note', 'ghi chú', 'note', 'ข้อความจากผู้ซื้อ'
             ]);
-            const existingOrdersMap = new Map();
-            (existingOrders || []).forEach(o => {
-                const baseCode = (o.orderCode || '').split(' | MVĐ: ')[0].trim().toLowerCase();
-                if (baseCode) {
-                    existingOrdersMap.set(baseCode, o);
+
+            // --- HỆ THỐNG TRA CỨU ĐƠN CŨ ĐA TẦNG (MULTI-TIER DEDUPLICATION POOL) ---
+            const cleanRawCode = (val) => {
+                if (!val) return '';
+                return String(val)
+                    .replace(/[\r\n\t\u00A0'"`=]/g, '')
+                    .replace(/^(mã\s*đơn\s*hàng|mã\s*đơn|order\s*id|order\s*sn|mvđ|mvd)[\s:]+/gi, '')
+                    .trim();
+            };
+            const toAlphaNum = (val) => cleanRawCode(val).replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+
+            // Tổng hợp toàn bộ nguồn đơn hàng trong hệ thống (chống sót do lệch prop)
+            const combinedOrdersPool = [];
+            const seenPoolIds = new Set();
+            const addOrderToPool = (ord) => {
+                if (!ord) return;
+                const ordId = ord.id ? String(ord.id) : (ord.orderCode ? String(ord.orderCode) : null);
+                if (ordId && !seenPoolIds.has(ordId)) {
+                    seenPoolIds.add(ordId);
+                    combinedOrdersPool.push(ord);
                 }
+            };
+            (existingOrders || []).forEach(addOrderToPool);
+            if (typeof window !== 'undefined') {
+                (window.GLOBAL_ALL_ORDERS || []).forEach(addOrderToPool);
+                (window.ALL_ORDERS || []).forEach(addOrderToPool);
+                if (window.erpData && window.erpData.Orders) (window.erpData.Orders || []).forEach(addOrderToPool);
+            }
+
+            const existingByCodeMap = new Map();
+            const existingByTrackMap = new Map();
+            const existingByIdMap = new Map();
+            const existingByAlphaMap = new Map();
+
+            combinedOrdersPool.forEach(o => {
+                if (!o) return;
+                const rawCode = String(o.orderCode || '').trim();
+                const rawId = String(o.id || '').trim();
+                
+                // Tách phần mã đơn và mã vận đơn nếu có dấu gạch đứng '|'
+                let basePart = rawCode;
+                let trackPart = '';
+                if (rawCode.includes('|')) {
+                    const splitParts = rawCode.split('|');
+                    basePart = splitParts[0].trim();
+                    trackPart = splitParts.slice(1).join('|').replace(/^(?:MVĐ|MVD|Tracking)[\s:]*/i, '').trim();
+                } else if (rawCode.includes(' - ')) {
+                    const splitParts = rawCode.split(' - ');
+                    basePart = splitParts[0].trim();
+                }
+
+                const cBase = cleanRawCode(basePart);
+                const cTrack = cleanRawCode(trackPart);
+                const cFull = cleanRawCode(rawCode);
+                const cId = cleanRawCode(rawId);
+
+                if (cBase) existingByCodeMap.set(cBase.toLowerCase(), o);
+                if (cFull) existingByCodeMap.set(cFull.toLowerCase(), o);
+                if (cTrack) existingByTrackMap.set(cTrack.toLowerCase(), o);
+                if (cId) existingByIdMap.set(cId.toLowerCase(), o);
+
+                const aBase = toAlphaNum(cBase);
+                const aTrack = toAlphaNum(cTrack);
+                const aFull = toAlphaNum(cFull);
+                const aId = toAlphaNum(cId);
+
+                if (aBase) existingByAlphaMap.set(aBase, o);
+                if (aTrack) existingByAlphaMap.set(aTrack, o);
+                if (aFull) existingByAlphaMap.set(aFull, o);
+                if (aId) existingByAlphaMap.set(aId, o);
             });
+
+            // Hàm tra cứu so khớp đơn hàng cũ tuyệt đối (Exact + Alphanumeric + Substring)
+            const findExistingOrder = (inOCode, inTCode) => {
+                const cO = cleanRawCode(inOCode);
+                const cT = cleanRawCode(inTCode);
+                const aO = toAlphaNum(cO);
+                const aT = toAlphaNum(cT);
+
+                // 1. So khớp chính xác mã đơn gốc
+                if (cO && existingByCodeMap.has(cO.toLowerCase())) return existingByCodeMap.get(cO.toLowerCase());
+                if (aO && existingByAlphaMap.has(aO)) return existingByAlphaMap.get(aO);
+
+                // 2. So khớp theo mã vận đơn
+                if (cT && existingByTrackMap.has(cT.toLowerCase())) return existingByTrackMap.get(cT.toLowerCase());
+                if (aT && existingByAlphaMap.has(aT)) return existingByAlphaMap.get(aT);
+
+                // 3. So khớp chéo: oCode gửi lên thực chất là mã vận đơn hoặc ngược lại
+                if (cO && existingByTrackMap.has(cO.toLowerCase())) return existingByTrackMap.get(cO.toLowerCase());
+                if (cT && existingByCodeMap.has(cT.toLowerCase())) return existingByCodeMap.get(cT.toLowerCase());
+
+                // 4. So khớp theo ID đơn hàng
+                if (cO && existingByIdMap.has(cO.toLowerCase())) return existingByIdMap.get(cO.toLowerCase());
+
+                // 5. So khớp chuỗi con an toàn cho mã đơn dài (>= 12 ký tự)
+                if (aO && aO.length >= 12) {
+                    for (const [key, ord] of existingByAlphaMap.entries()) {
+                        if (key.length >= 12 && (key === aO || key.includes(aO) || aO.includes(key))) {
+                            return ord;
+                        }
+                    }
+                }
+                if (aT && aT.length >= 10) {
+                    for (const [key, ord] of existingByAlphaMap.entries()) {
+                        if (key.length >= 10 && (key === aT || key.includes(aT) || aT.includes(key))) {
+                            return ord;
+                        }
+                    }
+                }
+                return null;
+            };
+
             const orderMap = {};
             const totalRows = rows.length; const BATCH_SIZE = 300; let currentIndex = headerIdx + 1;
 
@@ -807,7 +975,11 @@
 
                     const upperOCode = oCode.toUpperCase();
                     const upperTCode = tCode.toUpperCase();
-                    if (upperOCode.includes('VN') || upperTCode.startsWith('SPXVN') || upperTCode.includes('VN')) {
+                    if (upperOCode.includes('VN') || upperTCode.startsWith('SPXVN') || upperTCode.includes('VN') || /^2\d{13,15}/.test(upperOCode)) {
+                        rowChannel = 'Shopee VN';
+                    } else if (/^57\d{16,18}/.test(oCode) || upperTCode.startsWith('TT') || upperOCode.includes('TIKTOK')) {
+                        rowChannel = 'Tiktok Shop';
+                    } else if (!rowChannel || rowChannel === 'Bán Lẻ') {
                         rowChannel = 'Shopee VN';
                     }
 
@@ -961,13 +1133,21 @@
                 if (currentIndex < totalRows) { setTimeout(processBatch, 10); }
                 else {
                     const result = Object.values(orderMap).map(o => {
-                        const parts = o.orderCode.split(' | MVĐ: ');
-                        const baseCode = parts[0].trim();
-                        const tCode = parts.length > 1 ? parts[1].trim() : '';
+                        let baseCode = o.orderCode;
+                        let tCode = '';
+                        if (o.orderCode.includes(' | MVĐ: ')) {
+                            const parts = o.orderCode.split(' | MVĐ: ');
+                            baseCode = parts[0].trim();
+                            tCode = parts[1].trim();
+                        } else if (o.orderCode.includes('|')) {
+                            const parts = o.orderCode.split('|');
+                            baseCode = parts[0].trim();
+                            tCode = parts[1].replace(/^(?:MVĐ|MVD|Tracking)[\s:]*/i, '').trim();
+                        }
 
-                        const existing = existingOrdersMap.get(baseCode.toLowerCase());
+                        const existing = findExistingOrder(baseCode, tCode);
                         if (existing) {
-                            const existingTrack = (existing.orderCode || '').split(' | MVĐ: ')[1] || '';
+                            const existingTrack = (existing.orderCode || '').includes('|') ? (existing.orderCode || '').split('|')[1].replace(/^(?:MVĐ|MVD|Tracking)[\s:]*/i, '').trim() : '';
                             const existingCustomer = existing.customer || '';
                             const existingRevenue = Number(existing.revenue || 0);
 
@@ -1092,6 +1272,7 @@
             try {
                 let newOrders = [];
                 let newProdItems = [];
+                let deleteProdIds = [];
                 let d = new Date(); d.setDate(d.getDate() + 2); d.setHours(12, 0, 0, 0);
                 const defaultDeadline = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 
@@ -1104,24 +1285,20 @@
                     let targetOrderId = o.isUpdate ? o.existingId : ('ORD_' + Date.now() + '_' + oIdx);
                     let accessories = [];
                     let orderStatus = calculatedStatus || (o.isUpdate ? (o.existingRecord.status || 'Chờ Sản Xuất') : 'Chờ Sản Xuất');
-                    let orderHasProductionNeeded = o.isUpdate ? (o.existingRecord.hasProduction !== undefined ? o.existingRecord.hasProduction : true) : false;
+                    let orderHasProductionNeeded = false;
 
-                    const hasExistingProds = o.isUpdate && existingProdItems && existingProdItems.some(p => {
-                        if (!p.orderId) return false;
+                    const existingOrderProds = (existingProdItems || []).filter(p => {
+                        if (!p || !p.orderId) return false;
                         const pOrd = String(p.orderId).trim();
-                        if (pOrd === targetOrderId) return true;
-                        if (pOrd.startsWith(targetOrderId + '_')) return true;
-                        const parts = pOrd.split('|').map(x => x.trim());
-                        return parts.includes(targetOrderId) || parts.some(part => part.startsWith(targetOrderId + '_'));
+                        return pOrd === targetOrderId || pOrd.startsWith(targetOrderId + '_') || pOrd.split('|').map(x => x.trim()).includes(targetOrderId);
                     });
+                    const hasExistingProds = o.isUpdate && existingOrderProds.length > 0;
+                    const isExistingTerminal = o.isUpdate && o.existingRecord && ['Đã Bàn Giao', 'Đối Soát Thành Công', 'Hoàn Thành', 'Hàng Hoàn', 'Đơn Huỷ'].includes(o.existingRecord.status);
 
-                    // Nếu là đơn mới, hoặc đơn cập nhật nhưng chưa có sản phẩm
-                    if (!o.isUpdate || !hasExistingProds) {
-                        if (o.isUpdate) {
-                            // Nếu cập nhật mà chưa có sản phẩm, reset flag để tính toán lại
-                            orderHasProductionNeeded = false;
-                        }
+                    let currentOrderProdItems = [];
 
+                    // Nếu là đơn mới HOẶC đơn cập nhật chưa hoàn thành: Cho phép phân tích lại sản phẩm và cập nhật lệnh sản xuất
+                    if (!isExistingTerminal) {
                         o.items.forEach((item, itemIdx) => {
                             const prodInfo = checkProductionItemType(item, products);
                             let matchedItem = prodInfo.matchedProd;
@@ -1138,7 +1315,7 @@
                                 if (isPastOrder) {
                                     for (let q = 0; q < orderQty; q++) {
                                         const prodId = 'PROD_' + Date.now() + Math.random().toString(36).substr(2, 5) + '_' + oIdx + '_' + itemIdx + '_' + q;
-                                        newProdItems.push({
+                                        currentOrderProdItems.push({
                                             id: prodId, orderId: targetOrderId,
                                             type: isGlass ? 'Bể Kính' : 'Layout',
                                             name: item.name,
@@ -1171,7 +1348,7 @@
                                     if (prodInfo.isBeLeSize) {
                                         const prodId = 'PROD_' + Date.now() + Math.random().toString(36).substr(2, 5) + '_' + oIdx + '_' + itemIdx + '_0';
                                         if (currentAvailable >= orderQty && !isExportChan) {
-                                            newProdItems.push({
+                                            currentOrderProdItems.push({
                                                 id: prodId, orderId: targetOrderId,
                                                 type: 'Bể Kính',
                                                 name: item.name,
@@ -1184,7 +1361,7 @@
                                             currentAvailable -= orderQty;
                                         } else {
                                             orderHasProductionNeeded = true;
-                                            newProdItems.push({
+                                            currentOrderProdItems.push({
                                                 id: prodId, orderId: targetOrderId,
                                                 type: 'Bể Kính',
                                                 name: item.name,
@@ -1200,7 +1377,7 @@
                                             const prodId = 'PROD_' + Date.now() + Math.random().toString(36).substr(2, 5) + '_' + oIdx + '_' + itemIdx + '_' + q;
 
                                             if (currentAvailable > 0 && !isExportChan) {
-                                                newProdItems.push({
+                                                currentOrderProdItems.push({
                                                     id: prodId, orderId: targetOrderId,
                                                     type: isGlass ? 'Bể Kính' : 'Layout',
                                                     name: item.name,
@@ -1213,7 +1390,7 @@
                                                 currentAvailable--;
                                             } else {
                                                 orderHasProductionNeeded = true;
-                                                newProdItems.push({
+                                                currentOrderProdItems.push({
                                                     id: prodId, orderId: targetOrderId,
                                                     type: isGlass ? 'Bể Kính' : 'Layout',
                                                     name: item.name,
@@ -1230,29 +1407,47 @@
                             }
                         });
 
+                        // NẾU CẬP NHẬT ĐƠN CŨ: TÁI SỬ DỤNG ID LỆNH SẢN XUẤT CŨ ĐỂ GHI ĐÈ THAY THẾ CHÍNH XÁC
+                        if (o.isUpdate && hasExistingProds) {
+                            for (let k = 0; k < currentOrderProdItems.length; k++) {
+                                if (existingOrderProds[k]) {
+                                    currentOrderProdItems[k].id = existingOrderProds[k].id;
+                                }
+                            }
+                            if (existingOrderProds.length > currentOrderProdItems.length) {
+                                for (let k = currentOrderProdItems.length; k < existingOrderProds.length; k++) {
+                                    deleteProdIds.push(existingOrderProds[k].id);
+                                }
+                            }
+                        }
+
+                        currentOrderProdItems.forEach(p => newProdItems.push(p));
+
                         if (!calculatedStatus && orderHasProductionNeeded && !o.isUpdate) {
                             orderStatus = 'Chờ Sản Xuất';
+                        }
+                    } else {
+                        // Đơn đã hoàn tất trong quá khứ -> Giữ nguyên phụ kiện cũ
+                        accessories = [];
+                        if (o.existingRecord && o.existingRecord.accessories) {
+                            try { accessories = JSON.parse(o.existingRecord.accessories); } catch (e) { }
                         }
                     }
 
                     const finalOrderCustomerNote = String(o.note || (o.existingRecord ? o.existingRecord.note : '') || '').trim();
 
                     if (o.isUpdate && o.existingRecord) {
-                        let mergedAccessories = accessories;
-                        if (o.existingRecord.accessories) {
+                        let finalAccessories = accessories.length > 0 ? accessories : [];
+                        if (finalAccessories.length === 0 && o.existingRecord.accessories) {
                             try {
                                 const oldAcc = JSON.parse(o.existingRecord.accessories);
-                                if (Array.isArray(oldAcc)) {
-                                    mergedAccessories = [...oldAcc, ...accessories];
-                                } else if (typeof o.existingRecord.accessories === 'string') {
-                                    mergedAccessories = o.existingRecord.accessories; // Fallback string
-                                }
+                                if (Array.isArray(oldAcc)) finalAccessories = oldAcc;
                             } catch (e) {
-                                mergedAccessories = o.existingRecord.accessories;
+                                finalAccessories = o.existingRecord.accessories;
                             }
                         }
 
-                        const finalHasProduction = orderHasProductionNeeded || newProdItems.some(p => p.orderId === targetOrderId);
+                        const finalHasProduction = currentOrderProdItems.length > 0 || orderHasProductionNeeded || (hasExistingProds && isExistingTerminal);
                         let finalStatus = calculatedStatus;
                         if (!finalStatus) {
                             const hasTracking = o.orderCode && o.orderCode.includes(' | MVĐ: ') && o.orderCode.split(' | MVĐ: ')[1].trim() !== '';
@@ -1269,14 +1464,14 @@
                         newOrders.push({
                             id: targetOrderId,
                             orderCode: o.orderCode,
-                            channel: o.channel,
+                            channel: o.channel || (o.existingRecord && o.existingRecord.channel) || 'Shopee VN',
                             customer: (o.customer && o.customer !== 'Khách') ? o.customer : (o.existingRecord.customer || 'Khách'),
                             note: finalOrderCustomerNote,
                             createdAt: o.existingRecord.createdAt || safeDateFull,
                             deadline: o.existingRecord.deadline || defaultDeadline,
                             date: o.existingRecord.date || safeDateFull.split(' ')[0],
                             status: finalStatus,
-                            accessories: typeof mergedAccessories === 'string' ? mergedAccessories : JSON.stringify(mergedAccessories),
+                            accessories: typeof finalAccessories === 'string' ? finalAccessories : JSON.stringify(finalAccessories),
                             hasProduction: finalHasProduction,
                             updatedBy: activeUser,
                             revenue: Number(o.revenue || 0) > 0 ? Number(o.revenue) : Number(o.existingRecord.revenue || 0),
@@ -1304,7 +1499,7 @@
                         }
 
                         newOrders.push({
-                            id: targetOrderId, orderCode: o.orderCode, channel: o.channel, customer: o.customer,
+                            id: targetOrderId, orderCode: o.orderCode, channel: o.channel || 'Shopee VN', customer: o.customer,
                             note: finalOrderCustomerNote,
                             createdAt: orderDateFormatted, deadline: defaultDeadline, date: dateOnly,
                             status: finalStatus, accessories: JSON.stringify(accessories),
@@ -1333,7 +1528,11 @@
                     msg = `Đã cập nhật thông tin cho ${updateCount} đơn hàng!`;
                 }
 
-                await pushDeltas({ orders: newOrders, prodItems: newProdItems }, msg, 'fa-rocket');
+                await pushDeltas({
+                    orders: newOrders,
+                    prodItems: newProdItems,
+                    ...(deleteProdIds.length > 0 ? { deletes: { Production: deleteProdIds } } : {})
+                }, msg, 'fa-rocket');
                 setIsSubmitting(false);
                 onClose();
             } catch (e) {
@@ -3957,6 +4156,7 @@
                     note: currentNote ? `${missingNote} | ${currentNote}` : missingNote
                 };
 
+                const isGlassItem = /bể|hồ|tank|be |ho /i.test(String(targetItem.name || ''));
                 const updatedTargetProd = {
                     ...targetItem,
                     status: 'Pending',
@@ -3965,9 +4165,25 @@
                     p2_status: 'Pending',
                     p1_user: '',
                     p2_user: '',
+                    p1_start: '',
+                    p1_endTime: '',
+                    p1_photo: '',
+                    p1_reward_vnd: 0,
+                    p2_start: '',
+                    p2_endTime: '',
+                    p2_photo: '',
+                    p2_reward_vnd: 0,
+                    phases: {
+                        phase1: { name: (isGlassItem ? 'Cắt Dán' : 'Dựng Khung'), status: 'Pending', user: '', start: '', endTime: '', photo: '', reward_vnd: 0 },
+                        phase2: { name: (isGlassItem ? 'Gọt Keo' : 'Gia Cố'), status: 'Pending', user: '', start: '', endTime: '', photo: '', reward_vnd: 0 }
+                    },
                     qc_status: '',
+                    qc_front_photo: '',
+                    qc_side_photo: '',
+                    qc_note: '',
                     serialCode: '',
                     usedByOrderCode: '',
+                    usedAt: '',
                     note: `Yêu cầu làm mới do hiện vật kệ thất lạc/hỏng`
                 };
 
@@ -4137,7 +4353,16 @@
                                                         {img && (
                                                             <button
                                                                 type="button"
-                                                                onClick={(e) => { e.stopPropagation(); window.open(img, '_blank'); }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (typeof window.previewImage === 'function') {
+                                                                        window.previewImage(img, 'Ảnh Hiện Vật Trên Kệ');
+                                                                    } else if (typeof openSafeImageTab === 'function') {
+                                                                        openSafeImageTab(img);
+                                                                    } else {
+                                                                        window.open(img, '_blank');
+                                                                    }
+                                                                }}
                                                                 className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-lg bg-black/60 text-white hover:bg-emerald-600 flex items-center justify-center text-[10px] transition-colors"
                                                                 title="Xem ảnh phóng to"
                                                             >
@@ -4623,6 +4848,9 @@
                 effectiveStatus = 'Chờ Bàn Giao';
             } else if (orderRequiresProd && !prodsReady) {
                 // Đơn cần sản xuất nhưng chưa xong sản xuất hoặc thiếu lệnh -> Giữ ở Chờ Sản Xuất
+                effectiveStatus = 'Chờ Sản Xuất';
+            } else if (_order._isMissingMVD || _order._computedStatus === 'CHỜ SẢN XUẤT' || _order._computedStatus === 'Chờ Sản Xuất') {
+                // Đơn chưa có mã vận đơn từ sàn (chờ xác nhận): Giữ cố định ở Chờ Sản Xuất
                 effectiveStatus = 'Chờ Sản Xuất';
             } else if (_order._computedStatus === 'SẴN SÀNG ĐÓNG GÓI' || _order._computedStatus === 'Sẵn Sàng Đóng Gói' || filterStatus === 'Sẵn Sàng Đóng Gói') {
                 effectiveStatus = 'Sẵn sàng đóng gói';
@@ -5141,18 +5369,28 @@
                     } else if (_order.products) {
                         allProdNames.push(String(_order.products));
                     }
-                    if (_order.accessories) allProdNames.push(String(_order.accessories));
+                    if (_order.accessories) {
+                        const parsedAcc = typeof safeParseAccessories === 'function' ? safeParseAccessories(_order.accessories) : [];
+                        if (parsedAcc && parsedAcc.length > 0) {
+                            parsedAcc.forEach(a => {
+                                if (a?.name) allProdNames.push(a.name);
+                                if (a?.sku) allProdNames.push(a.sku);
+                            });
+                        } else if (typeof _order.accessories === 'string') {
+                            allProdNames.push(_order.accessories);
+                        }
+                    }
                     if (_order.note) allProdNames.push(String(_order.note));
 
                     try {
-                        const kpiCfg = kpiConfig || window.kpiConfig || [];
+                        const kpiCfg = (kpiConfig && kpiConfig.length > 0) ? kpiConfig : (window.kpiConfig || erpData?.Config_KPI || []);
                         if (typeof getPackingReward === 'function' && kpiCfg.length > 0) {
                             packReward = getPackingReward(allProdNames.length > 0 ? allProdNames : (_order.orderCode || ''), kpiCfg, (_order.channel || '') + ' ' + (_order.orderCode || ''));
                         } else {
-                            packReward = 0;
+                            packReward = 1100;
                         }
                     } catch (e) {
-                        packReward = 0;
+                        packReward = 1100;
                     }
 
                     setProcessing(true); let bUrl = '';
@@ -5600,25 +5838,70 @@
                                         </div>
                                         <div className="grid grid-cols-3 gap-2">
                                             {pGoods && (
-                                                <div className="text-center space-y-1 cursor-pointer group" onClick={() => window.open(pGoods, '_blank')}>
+                                                <div 
+                                                    className="text-center space-y-1 cursor-pointer group" 
+                                                    onClick={() => {
+                                                        if (typeof window.previewImage === 'function') {
+                                                            window.previewImage(pGoods, 'Ảnh Hàng Hóa Trước Khi Gói', _order.orderCode);
+                                                        } else if (typeof openSafeImageTab === 'function') {
+                                                            openSafeImageTab(pGoods);
+                                                        } else {
+                                                            window.open(pGoods, '_blank');
+                                                        }
+                                                    }}
+                                                >
                                                     <img src={pGoods} alt="Hàng hóa" className="w-full h-20 object-cover rounded-xl border border-slate-700 group-hover:scale-105 transition-transform" />
                                                     <span className="text-[9px] text-slate-400 font-bold block">Trước gói</span>
                                                 </div>
                                             )}
                                             {pBox && (
-                                                <div className="text-center space-y-1 cursor-pointer group" onClick={() => window.open(pBox, '_blank')}>
+                                                <div 
+                                                    className="text-center space-y-1 cursor-pointer group" 
+                                                    onClick={() => {
+                                                        if (typeof window.previewImage === 'function') {
+                                                            window.previewImage(pBox, 'Ảnh Kiện Hàng Đã Gói', _order.orderCode);
+                                                        } else if (typeof openSafeImageTab === 'function') {
+                                                            openSafeImageTab(pBox);
+                                                        } else {
+                                                            window.open(pBox, '_blank');
+                                                        }
+                                                    }}
+                                                >
                                                     <img src={pBox} alt="Đóng gói" className="w-full h-20 object-cover rounded-xl border border-slate-700 group-hover:scale-105 transition-transform" />
                                                     <span className="text-[9px] text-slate-400 font-bold block">Kiện đóng</span>
                                                 </div>
                                             )}
                                             {whPhoto && (
-                                                <div className="text-center space-y-1 cursor-pointer group" onClick={() => window.open(whPhoto, '_blank')}>
+                                                <div 
+                                                    className="text-center space-y-1 cursor-pointer group" 
+                                                    onClick={() => {
+                                                        if (typeof window.previewImage === 'function') {
+                                                            window.previewImage(whPhoto, 'Ảnh Bàn Giao Ra Kho', _order.orderCode);
+                                                        } else if (typeof openSafeImageTab === 'function') {
+                                                            openSafeImageTab(whPhoto);
+                                                        } else {
+                                                            window.open(whPhoto, '_blank');
+                                                        }
+                                                    }}
+                                                >
                                                     <img src={whPhoto} alt="Ra kho" className="w-full h-20 object-cover rounded-xl border border-slate-700 group-hover:scale-105 transition-transform" />
                                                     <span className="text-[9px] text-slate-400 font-bold block">Ra kho</span>
                                                 </div>
                                             )}
                                             {parsedNote.images.map((imgUrl, imgIdx) => (
-                                                <div key={imgIdx} className="text-center space-y-1 cursor-pointer group" onClick={() => window.open(imgUrl, '_blank')}>
+                                                <div 
+                                                    key={imgIdx} 
+                                                    className="text-center space-y-1 cursor-pointer group" 
+                                                    onClick={() => {
+                                                        if (typeof window.previewImage === 'function') {
+                                                            window.previewImage(imgUrl, 'Bill cọc #' + (imgIdx + 1), _order.orderCode);
+                                                        } else if (typeof openSafeImageTab === 'function') {
+                                                            openSafeImageTab(imgUrl);
+                                                        } else {
+                                                            window.open(imgUrl, '_blank');
+                                                        }
+                                                    }}
+                                                >
                                                     <img src={imgUrl} alt="Bill cọc" className="w-full h-20 object-cover rounded-xl border border-blue-500/40 group-hover:scale-105 transition-transform" />
                                                     <span className="text-[9px] text-blue-400 font-bold block">Bill cọc #{imgIdx + 1}</span>
                                                 </div>
@@ -5780,9 +6063,66 @@
 
                 {(isDone || isPendingHandover) && (pGoods || pBox || whPhoto) && (
                     <div className={`absolute right-2 flex gap-1.5 z-20 ${isAdmin ? 'top-11' : 'top-2'}`}>
-                        {pGoods && <div className="flex flex-col items-end"><img src={pGoods} alt="Hàng hóa" onClick={() => window.open(pGoods, '_blank')} className="w-10 h-10 object-cover rounded-lg border border-[#444] cursor-pointer hover:opacity-80 transition-opacity shadow-sm" title="Ảnh Hàng Hóa Trước Khi Gói" /></div>}
-                        {pBox && <div className="flex flex-col items-end"><img src={pBox} alt="Đóng gói" onClick={() => window.open(pBox, '_blank')} className="w-10 h-10 object-cover rounded-lg border border-[#444] cursor-pointer hover:opacity-80 transition-opacity shadow-sm" title="Ảnh Kiện Hàng Đã Gói" /></div>}
-                        {whPhoto && <div className="flex flex-col items-end"><img src={whPhoto} alt="Chở kho" onClick={() => window.open(whPhoto, '_blank')} className="w-10 h-10 object-cover rounded-lg border border-[#444] cursor-pointer hover:opacity-80 transition-opacity shadow-sm" title="Ảnh Ra Kho" /></div>}
+                        {pGoods && (
+                            <div className="flex flex-col items-end">
+                                <img 
+                                    src={pGoods} 
+                                    alt="Hàng hóa" 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (typeof window.previewImage === 'function') {
+                                            window.previewImage(pGoods, 'Ảnh Hàng Hóa Trước Khi Gói', fullOrderCode);
+                                        } else if (typeof openSafeImageTab === 'function') {
+                                            openSafeImageTab(pGoods);
+                                        } else {
+                                            window.open(pGoods, '_blank');
+                                        }
+                                    }} 
+                                    className="w-10 h-10 object-cover rounded-lg border border-[#444] cursor-pointer hover:opacity-80 transition-opacity shadow-sm active:scale-95" 
+                                    title="Bấm xem ảnh phóng to: Hàng Hóa Trước Khi Gói" 
+                                />
+                            </div>
+                        )}
+                        {pBox && (
+                            <div className="flex flex-col items-end">
+                                <img 
+                                    src={pBox} 
+                                    alt="Đóng gói" 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (typeof window.previewImage === 'function') {
+                                            window.previewImage(pBox, 'Ảnh Kiện Hàng Đã Gói', fullOrderCode);
+                                        } else if (typeof openSafeImageTab === 'function') {
+                                            openSafeImageTab(pBox);
+                                        } else {
+                                            window.open(pBox, '_blank');
+                                        }
+                                    }} 
+                                    className="w-10 h-10 object-cover rounded-lg border border-[#444] cursor-pointer hover:opacity-80 transition-opacity shadow-sm active:scale-95" 
+                                    title="Bấm xem ảnh phóng to: Kiện Hàng Đã Gói" 
+                                />
+                            </div>
+                        )}
+                        {whPhoto && (
+                            <div className="flex flex-col items-end">
+                                <img 
+                                    src={whPhoto} 
+                                    alt="Chở kho" 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (typeof window.previewImage === 'function') {
+                                            window.previewImage(whPhoto, 'Ảnh Bàn Giao Ra Kho', fullOrderCode);
+                                        } else if (typeof openSafeImageTab === 'function') {
+                                            openSafeImageTab(whPhoto);
+                                        } else {
+                                            window.open(whPhoto, '_blank');
+                                        }
+                                    }} 
+                                    className="w-10 h-10 object-cover rounded-lg border border-[#444] cursor-pointer hover:opacity-80 transition-opacity shadow-sm active:scale-95" 
+                                    title="Bấm xem ảnh phóng to: Bàn Giao Ra Kho" 
+                                />
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -5902,7 +6242,21 @@
                     {parsedNote.images.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-1.5" onClick={e => e.stopPropagation()}>
                             {parsedNote.images.map((imgUrl, idx) => (
-                                <div key={idx} className="relative group cursor-pointer" onClick={() => window.open(imgUrl, '_blank')} title="Xem ảnh cọc">
+                                <div 
+                                    key={idx} 
+                                    className="relative group cursor-pointer" 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (typeof window.previewImage === 'function') {
+                                            window.previewImage(imgUrl, 'Ảnh Bill Cọc / Thanh Toán', fullOrderCode);
+                                        } else if (typeof openSafeImageTab === 'function') {
+                                            openSafeImageTab(imgUrl);
+                                        } else {
+                                            window.open(imgUrl, '_blank');
+                                        }
+                                    }} 
+                                    title="Xem ảnh cọc"
+                                >
                                     <img src={imgUrl} alt="Bill cọc" className="w-10 h-10 object-cover rounded-lg border border-[#3b82f6]/40 shadow-sm transition-transform group-hover:scale-105 hover:shadow-md hover:border-[#3b82f6]" />
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                                         <i className="fas fa-search-plus text-white text-[10px]"></i>
@@ -5987,7 +6341,16 @@
                                                     src={packRecord.photo} 
                                                     alt="Ảnh đóng hàng" 
                                                     className="w-14 h-14 object-cover rounded-lg border border-white/20 cursor-pointer shadow-md hover:scale-105 transition-transform shrink-0" 
-                                                    onClick={() => window.open(packRecord.photo, '_blank')} 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (typeof window.previewImage === 'function') {
+                                                            window.previewImage(packRecord.photo, 'Ảnh Camera Đóng Gói', fullOrderCode);
+                                                        } else if (typeof openSafeImageTab === 'function') {
+                                                            openSafeImageTab(packRecord.photo);
+                                                        } else {
+                                                            window.open(packRecord.photo, '_blank');
+                                                        }
+                                                    }} 
                                                     title="Click phóng to ảnh camera đóng hàng" 
                                                 />
                                             ) : (
@@ -6157,7 +6520,25 @@
                                                             <div key={`ret_acc_${i}`} className="flex items-center justify-between py-1.5 border-b border-[#222] last:border-0">
                                                                 <div className="flex items-center min-w-0 pr-2 gap-2">
                                                                     {(aInfo?.image || aInfo?.realImage) ? (
-                                                                        <img src={aInfo.image || aInfo.realImage} className="w-7 h-7 rounded shrink-0 object-cover border border-[#444] cursor-pointer" alt="img" loading="lazy" decoding="async" onClick={() => window.open(aInfo.image || aInfo.realImage, '_blank')} title="Xem ảnh gốc" />
+                                                                        <img 
+                                                                            src={aInfo.image || aInfo.realImage} 
+                                                                            className="w-7 h-7 rounded shrink-0 object-cover border border-[#444] cursor-pointer hover:opacity-80 transition-opacity" 
+                                                                            alt="img" 
+                                                                            loading="lazy" 
+                                                                            decoding="async" 
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                const u = aInfo.image || aInfo.realImage;
+                                                                                if (typeof window.previewImage === 'function') {
+                                                                                    window.previewImage(u, a.name);
+                                                                                } else if (typeof openSafeImageTab === 'function') {
+                                                                                    openSafeImageTab(u);
+                                                                                } else {
+                                                                                    window.open(u, '_blank');
+                                                                                }
+                                                                            }} 
+                                                                            title="Xem ảnh phóng to" 
+                                                                        />
                                                                     ) : (
                                                                         <div className="w-7 h-7 shrink-0 rounded bg-[#1a1a1a] border border-[#333] flex items-center justify-center"><i className="fas fa-box text-gray-600 text-[9px]"></i></div>
                                                                     )}
@@ -6192,7 +6573,25 @@
                                                         <div key={`ret_prod_${i}`} className="flex items-center justify-between py-1.5 border-b border-[#222] last:border-0">
                                                             <div className="flex items-center min-w-0 pr-2 gap-2">
                                                                 {(pInfo?.image || pInfo?.realImage) ? (
-                                                                    <img src={pInfo.image || pInfo.realImage} className="w-7 h-7 rounded shrink-0 object-cover border border-[#444] cursor-pointer" alt="img" loading="lazy" decoding="async" onClick={() => window.open(pInfo.image || pInfo.realImage, '_blank')} title="Xem ảnh gốc" />
+                                                                    <img 
+                                                                        src={pInfo.image || pInfo.realImage} 
+                                                                        className="w-7 h-7 rounded shrink-0 object-cover border border-[#444] cursor-pointer hover:opacity-80 transition-opacity" 
+                                                                        alt="img" 
+                                                                        loading="lazy" 
+                                                                        decoding="async" 
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const u = pInfo.image || pInfo.realImage;
+                                                                            if (typeof window.previewImage === 'function') {
+                                                                                window.previewImage(u, p.name);
+                                                                            } else if (typeof openSafeImageTab === 'function') {
+                                                                                openSafeImageTab(u);
+                                                                            } else {
+                                                                                window.open(u, '_blank');
+                                                                            }
+                                                                        }} 
+                                                                        title="Xem ảnh phóng to" 
+                                                                    />
                                                                 ) : (
                                                                     <div className="w-7 h-7 shrink-0 rounded bg-[#1a1a1a] border border-[#333] flex items-center justify-center"><i className="fas fa-hammer text-gray-600 text-[9px]"></i></div>
                                                                 )}
@@ -6293,7 +6692,25 @@
                                         <div key={accId} className="flex items-center justify-between py-2.5 px-1 group hover:bg-white/[0.02] rounded-lg transition-colors">
                                             <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                                 {(aInfo?.image || aInfo?.realImage) ? (
-                                                    <img src={aInfo.image || aInfo.realImage} className="w-8 h-8 rounded-lg shrink-0 object-cover border border-white/[0.08] cursor-pointer hover:opacity-80 transition-opacity" alt="img" loading="lazy" decoding="async" onClick={() => window.open(aInfo.image || aInfo.realImage, '_blank')} title="Xem ảnh gốc" />
+                                                    <img 
+                                                        src={aInfo.image || aInfo.realImage} 
+                                                        className="w-8 h-8 rounded-lg shrink-0 object-cover border border-white/[0.08] cursor-pointer hover:opacity-80 transition-opacity" 
+                                                        alt="img" 
+                                                        loading="lazy" 
+                                                        decoding="async" 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const u = aInfo.image || aInfo.realImage;
+                                                            if (typeof window.previewImage === 'function') {
+                                                                window.previewImage(u, a.name);
+                                                            } else if (typeof openSafeImageTab === 'function') {
+                                                                openSafeImageTab(u);
+                                                            } else {
+                                                                window.open(u, '_blank');
+                                                            }
+                                                        }} 
+                                                        title="Xem ảnh phóng to" 
+                                                    />
                                                 ) : (
                                                     <div className="w-8 h-8 shrink-0 rounded-lg bg-zinc-900 border border-white/[0.08] flex items-center justify-center"><i className="fas fa-box text-zinc-500 text-[10px]"></i></div>
                                                 )}
@@ -6358,7 +6775,23 @@
                                         >
                                             <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                                 {(pInfo?.image || pInfo?.realImage) ? (
-                                                    <img src={pInfo.image || pInfo.realImage} className="w-8 h-8 rounded-lg shrink-0 object-cover border border-white/[0.08] cursor-pointer hover:opacity-80 transition-opacity" alt="img" onClick={() => window.open(pInfo.image || pInfo.realImage, '_blank')} title="Xem ảnh gốc" />
+                                                    <img 
+                                                        src={pInfo.image || pInfo.realImage} 
+                                                        className="w-8 h-8 rounded-lg shrink-0 object-cover border border-white/[0.08] cursor-pointer hover:opacity-80 transition-opacity" 
+                                                        alt="img" 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const u = pInfo.image || pInfo.realImage;
+                                                            if (typeof window.previewImage === 'function') {
+                                                                window.previewImage(u, p.name);
+                                                            } else if (typeof openSafeImageTab === 'function') {
+                                                                openSafeImageTab(u);
+                                                            } else {
+                                                                window.open(u, '_blank');
+                                                            }
+                                                        }} 
+                                                        title="Xem ảnh phóng to" 
+                                                    />
                                                 ) : (
                                                     <div className="w-8 h-8 shrink-0 rounded-lg bg-zinc-900 border border-white/[0.08] flex items-center justify-center"><i className="fas fa-cube text-zinc-500 text-[10px]"></i></div>
                                                 )}
@@ -6468,16 +6901,30 @@
                         return (
                             <div className="border-t border-white/[0.08] pt-2.5 mb-2 flex flex-col gap-1 text-[10.5px]">
                                 {allProdsWithOrigin.map((p, pIdx) => {
-                                    const p1User = p._p1User?.split(' ').pop();
-                                    const p2User = p._p2User?.split(' ').pop();
+                                    const rawP1 = p._p1User || '';
+                                    const rawP2 = p._p2User || '';
+                                    // TRIỆT TIÊU NHÃN THỢ ẢO 'Kho Hàng' (bị cắt thành 'Hàng')
+                                    const isP1Real = rawP1 && !rawP1.includes('Kho Hàng') && rawP1 !== 'Hàng';
+                                    const isP2Real = rawP2 && !rawP2.includes('Kho Hàng') && rawP2 !== 'Hàng';
+                                    const p1User = isP1Real ? rawP1.split(' ').pop() : null;
+                                    const p2User = isP2Real ? rawP2.split(' ').pop() : null;
+                                    const isStockItem = p._origin?.fulfilledFromStock === true || String(p._origin?.fulfilledFromStock).toUpperCase() === 'TRUE';
 
-                                    if (!p1User && !p2User) return null;
+                                    if (!p1User && !p2User && !isStockItem) return null;
 
                                     return (
                                         <div key={'staff_' + pIdx} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-zinc-300">
-                                            <span className="text-zinc-400 font-bold">Sản Xuất:</span>
-                                            {p1User && <span>{p._p1Name}: <b className="text-[#f59e0b] font-black">{p1User}</b></span>}
-                                            {p2User && <span>{p._p2Name}: <b className="text-[#3b82f6] font-black">{p2User}</b></span>}
+                                            {isStockItem && !p1User && !p2User ? (
+                                                <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-lg">
+                                                    <i className="fas fa-warehouse mr-1"></i>Xuất từ kho có sẵn
+                                                </span>
+                                            ) : (
+                                                <>
+                                                    <span className="text-zinc-400 font-bold">Sản Xuất:</span>
+                                                    {p1User && <span>{p._p1Name}: <b className="text-[#f59e0b] font-black">{p1User}</b></span>}
+                                                    {p2User && <span>{p._p2Name}: <b className="text-[#3b82f6] font-black">{p2User}</b></span>}
+                                                </>
+                                            )}
                                             {p._origin?.serialCode && (
                                                 <span className="font-mono text-amber-300 font-bold bg-amber-400/15 px-1.5 py-0.2 rounded border border-amber-400/30 text-[9px]">
                                                     {p._origin.serialCode}

@@ -2747,6 +2747,11 @@
                         if (amt > 0) kpiDongGoiDetails.push({ name: 'Chở ra kho', amount: amt, time: pk.endTime || pk.date });
                     } else {
                         const candidateItems = [];
+
+                        // Quét sản phẩm sản xuất (Production) thuộc đơn này
+                        const matchedProds = (safeProdItems || []).filter(p => p.orderId === pk.orderId || (orderMatch?.id && p.orderId === orderMatch.id));
+                        matchedProds.forEach(p => { if (p?.name) candidateItems.push(p.name); });
+
                         if (orderMatch?.items && Array.isArray(orderMatch.items)) {
                             orderMatch.items.forEach(i => { if (i?.name) candidateItems.push(i.name); });
                         }
@@ -2761,21 +2766,23 @@
                                 candidateItems.push(String(orderMatch.products));
                             }
                         }
-                        if (orderMatch?.accessories) candidateItems.push(String(orderMatch.accessories));
-                        if (orderMatch?.note) candidateItems.push(String(orderMatch.note));
-
-                        if (typeof getPackingReward === 'function' && kpiList.length > 0) {
-                            amt = cleanNumber(getPackingReward(candidateItems.length > 0 ? candidateItems : (orderMatch?.orderCode || pk.orderId || ''), kpiList, channel));
-                            if (amt > 0) isAppliedX3 = isIntl;
-                        }
-
-                        if (amt === 0) {
-                            amt = cleanNumber(pk.reward_vnd);
-                            if (isIntl && amt > 0) {
-                                amt = amt * 3;
-                                isAppliedX3 = true;
+                        if (orderMatch?.accessories) {
+                            const parsedAcc = typeof safeParseAccessories === 'function' ? safeParseAccessories(orderMatch.accessories) : [];
+                            if (parsedAcc && parsedAcc.length > 0) {
+                                parsedAcc.forEach(a => {
+                                    if (a?.name) candidateItems.push(a.name);
+                                    if (a?.sku) candidateItems.push(a.sku);
+                                });
+                            } else if (typeof orderMatch.accessories === 'string') {
+                                candidateItems.push(orderMatch.accessories);
                             }
                         }
+                        if (orderMatch?.note) candidateItems.push(String(orderMatch.note));
+
+                        const recordedReward = cleanNumber(pk.reward_vnd);
+                        // Cố định 1.100đ/đơn: Ưu tiên recordedReward trong Packings, nếu chưa có thì mặc định 1.100đ
+                        amt = recordedReward > 0 ? recordedReward : 1100;
+                        if (isIntl) isAppliedX3 = true;
 
                         prodSalary += amt;
                         const pkgLabel = orderMatch?.orderCode ? `Đóng gói (${orderMatch.orderCode})` : 'Đóng gói';

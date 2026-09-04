@@ -1234,17 +1234,18 @@
         if (order?.deadline) {
             deadline = new Date(order.deadline);
         } else {
-            const createdDate = new Date(order?.createdAt || order?.date || Date.now());
-            deadline = new Date(createdDate);
-            if (isEcom) {
-                deadline.setDate(deadline.getDate() + 1);
-                deadline.setHours(14, 0, 0, 0); // Deadline 14:00 hôm sau
-            } else if (isCTVOrRetail) {
-                deadline.setDate(deadline.getDate() + 6); // Đơn bán lẻ và CTV: đẩy deadline lên trên 5 ngày (6 ngày hoàn thành)
-                deadline.setHours(18, 0, 0, 0);
+            if (typeof getAutoDeadline === 'function') {
+                deadline = new Date(getAutoDeadline(order?.channel, order?.createdAt || order?.date, order?.shippingMethod));
             } else {
-                deadline.setDate(deadline.getDate() + 6); // Mặc định trên 5 ngày
-                deadline.setHours(18, 0, 0, 0);
+                const createdDate = new Date(order?.createdAt || order?.date || Date.now());
+                deadline = new Date(createdDate);
+                if (isEcom) {
+                    deadline.setDate(deadline.getDate() + 1);
+                    deadline.setHours(11, 30, 0, 0);
+                } else {
+                    deadline.setDate(deadline.getDate() + 6);
+                    deadline.setHours(18, 0, 0, 0);
+                }
             }
         }
 
@@ -1652,8 +1653,8 @@
             const hasShippingCode = Boolean(pureShippingCode && pureShippingCode.length >= 3);
             const requiresShippingCode = isTMDT || isGHNShipping || isGuiXeShipping;
             
-            // CHỈ XÉT THIẾU MVĐ KHI ĐƠN ĐÃ XONG SẢN XUẤT (allProdDone) VÀ CHƯA ĐÓNG GÓI/CHƯA GIAO
-            const isMissingMVD = !isOrderClosedOrPacked && allProdDone && requiresShippingCode && !hasShippingCode;
+            // Đơn thiếu mã vận đơn (chưa có mã vận đơn hợp lệ từ sàn/nhà xe/GHN)
+            const isMissingMVD = !isOrderClosedOrPacked && requiresShippingCode && !hasShippingCode;
 
             // PHỤ KIỆN CHO PHÉP ÂM KHO: Không chặn đơn, đơn luôn sẵn sàng đóng gói
             const isMissingAccessories = false;
@@ -1767,10 +1768,11 @@
                 }
                 const meta = computeOrderMetadata(o);
                 
-                if (meta.allProdDone && (eff === 'CHỜ SẢN XUẤT' || eff === 'QUÉT TỰ ĐỘNG' || eff === 'ĐANG SẢN XUẤT' || eff === 'CHỜ PHỤ KIỆN')) {
+                // Hàng sản xuất xong vẫn nằm ở Chờ Sản Xuất cho đến khi có mã vận đơn mới nhảy sang Sẵn Sàng Đóng Gói
+                if (meta.allProdDone && !meta.isMissingMVD && (eff === 'CHỜ SẢN XUẤT' || eff === 'QUÉT TỰ ĐỘNG' || eff === 'ĐANG SẢN XUẤT' || eff === 'CHỜ PHỤ KIỆN')) {
                     eff = 'SẴN SÀNG ĐÓNG GÓI';
-                } else if (!meta.allProdDone && eff === 'SẴN SÀNG ĐÓNG GÓI' && !meta.hasDonePack) {
-                    // Nếu đơn cần sản xuất nhưng phôi/bể chưa xong hoặc lệnh đã bị xoá, bắt buộc giữ ở Chờ Sản Xuất
+                } else if ((!meta.allProdDone && eff === 'SẴN SÀNG ĐÓNG GÓI' && !meta.hasDonePack) || (meta.isMissingMVD && eff === 'SẴN SÀNG ĐÓNG GÓI' && !meta.hasDonePack)) {
+                    // Nếu đơn cần sản xuất nhưng phôi/bể chưa xong hoặc lệnh đã bị xoá hoặc chưa có mã vận đơn (chờ xác nhận), bắt buộc giữ ở Chờ Sản Xuất
                     eff = 'CHỜ SẢN XUẤT';
                 }
 
@@ -1826,7 +1828,7 @@
             if (st === 'SẴN SÀNG ĐÓNG GÓI' || st === 'CHỜ PHỤ KIỆN') {
                 return 'Sẵn Sàng Đóng Gói';
             }
-            if (st === 'CHỜ MÃ VẬN ĐƠN') return 'Chờ Mã Vận Đơn';
+            if (st === 'CHỜ MÃ VẬN ĐƠN') return 'Chờ Sản Xuất';
             return 'Chờ Sản Xuất';
         }, []);
 
@@ -1861,10 +1863,6 @@
             return channelFiltered.filter(o => {
                 if (!filterStatus || filterStatus === 'ALL') return true;
                 const group = getOrderTabGroup(o);
-                if (filterStatus === 'Chờ Mã Vận Đơn') {
-                    if (group === 'Đơn Huỷ' || group === 'Hàng Hoàn' || group === 'Hoàn Thành' || group === 'Đã Bàn Giao' || group === 'Chờ Sản Xuất') return false;
-                    return Boolean(o._isMissingMVD);
-                }
                 return group === filterStatus;
             });
         }, [channelFiltered, filterStatus, getOrderTabGroup]);
@@ -1893,13 +1891,9 @@
         }, [packings, erpData?.Packings]);
 
         const stats = React.useMemo(() => {
-            let pending = 0; let waitMVD = 0; let ready = 0; let shipping = 0; let done = 0; let cancel = 0; let returns = 0; let completed = 0;
+            let pending = 0; let ready = 0; let shipping = 0; let done = 0; let cancel = 0; let returns = 0; let completed = 0;
             (channelFiltered || []).forEach(o => {
                 const group = getOrderTabGroup(o);
-                if (group === 'Sẵn Sàng Đóng Gói') {
-                    if (o._isMissingMVD) waitMVD++;
-                }
-
                 if (group === 'Chờ Sản Xuất') pending++;
                 else if (group === 'Sẵn Sàng Đóng Gói') ready++;
                 else if (group === 'Chờ Bàn Giao') shipping++;
@@ -1908,7 +1902,7 @@
                 else if (group === 'Hàng Hoàn') returns++;
                 else if (group === 'Hoàn Thành') completed++;
             });
-            return { pending, waitMVD, ready, shipping, done, cancel, returns, completed };
+            return { pending, ready, shipping, done, cancel, returns, completed };
         }, [channelFiltered, getOrderTabGroup]);
 
         const tabs = React.useMemo(() => [
@@ -1931,16 +1925,6 @@
                 inactiveClass: 'bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 hover:text-amber-300',
                 activeBadgeClass: 'bg-black text-amber-400 font-black',
                 inactiveBadgeClass: 'bg-amber-500/20 text-amber-300 font-bold'
-            },
-            {
-                id: 'Chờ Mã Vận Đơn',
-                label: 'Chờ Mã Vận Đơn',
-                count: stats.waitMVD || 0,
-                icon: 'fa-barcode',
-                activeClass: 'bg-orange-500 text-white shadow-md font-black',
-                inactiveClass: 'bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 hover:text-orange-300',
-                activeBadgeClass: 'bg-black/30 text-white font-black',
-                inactiveBadgeClass: 'bg-orange-500/20 text-orange-300 font-bold'
             },
             {
                 id: 'Sẵn Sàng Đóng Gói',
@@ -3204,6 +3188,11 @@
                                     if (upperChan.includes('BÁN SỈ') || upperChan.includes('BAN SI') || upperChan.includes('WHOLESALE')) return 'BÁN SỈ';
                                     if (upperChan.includes('SẢN XUẤT TỒN') || upperChan.includes('SẢN XUẤT BÙ KHO') || upperChan.includes('TỒN XƯỞNG')) return 'SẢN XUẤT TỒN';
                                     if (upperChan.includes('BẢO HÀNH') || upperChan.includes('SỬA CHỮA')) return 'BẢO HÀNH';
+
+                                    // Nhận diện thông minh theo cấu trúc mã đơn nếu channel rỗng
+                                    if (codeStr.includes('SPXVN') || codeStr.includes('SHOPEE') || /^2\d{13,15}/.test(codeStr)) return 'SHOPEE VN';
+                                    if (codeStr.includes('TIKTOK') || /^57\d{16,18}/.test(codeStr)) return 'TIKTOK SHOP';
+
                                     return 'BÁN LẺ';
                                 };
 

@@ -3,6 +3,31 @@
 Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến trúc, tối ưu nghiệp vụ và sửa lỗi của hệ điều hành `RF_Workspace_Pro`.
 ---
 
+## [v2.41.1] - 2026-09-04
+
+### 💎 Chuẩn Hóa SKU & Tên Sản Phẩm Shopee Theo Đúng Quy Cách Xưởng Rich Fish
+- **Bối cảnh & Phản hồi thực tế từ Chủ Xưởng**:
+  - Khi dán văn bản sản phẩm từ Shopee, mã SKU thô (như `RUN-021-202020`) và tên thô (như `Layout Rừng Ver.21 - Size S`) chưa khớp với quy chuẩn hiện hành của xưởng:
+    - SKU chuẩn xưởng: Phải có tiền tố `LAY-`, mã danh mục và version liền nhau (không có gạch nối giữa chữ và số: `RUN021`), sau đó là gạch nối kích thước: `LAY-RUN021-202020`, `LAY-RUN021-302020`, `LAY-RUN021-402325`.
+    - Tên nhóm cha: Loại bỏ chữ "Layout " phía trước và viết thường "ver.X" (như `Rừng ver.1`, `Rừng ver.2`, `Rừng ver.21`).
+    - Tên phân loại: Thợ sản xuất và module BOM vật tư sử dụng kích thước thực tế tính bằng cm (`20x20x20cm`, `30x20x20cm`, `40x23x25cm`) thay vì kích thước tượng trưng (Size S/M/L).
+- **Nâng Cấp Kiến Trúc & Engine Xử Lý (`Tab_Inventory.html`)**:
+  - **Hàm `standardizeWarehouseSku(rawSku, category, baseName)`**:
+    - Layout: Tự động phát hiện mã `BON`, `RUN`, `CAU`, `HAN`, `VAC`, `DAO`, `NAT`, `TRU`, `HEM`, `VOM`, `CV`, `TRA`, pad version 3 số và ghép kích thước: `LAY-RUN021-202020`.
+    - Bể kính: Chuyển đổi mã kích thước sang chuẩn `BE-STD-302020` / `BE-MINI-202020`.
+    - Phụ kiện & Vật tư: Giữ nguyên các tiền tố chuẩn `PK-`, `NL-`, `DG-`, `VT-`.
+  - **Hàm `standardizeWarehouseName(baseName, varLabel, rawSku)`**:
+    - Lọc bỏ `Layout ` ở đầu tên, chuẩn hóa `Ver.21` ➔ `ver.21`.
+    - Bóc tách kích thước 6 số từ SKU (`202020` ➔ `20x20x20cm`, `402325` ➔ `40x23x25cm`).
+    - Tạo tên hoàn chỉnh: `Rừng ver.21 - 20x20x20cm`.
+    - Tự động gán thư mục `sub_category`: `RỪNG` (thay vì `LAYOUT RỪNG`) để khớp 100% với các tab nhóm có sẵn trên giao diện.
+  - **Giao Diện Bảng Tương Tác**:
+    - Bổ sung nút chuyển đổi: `[⚡ Chuẩn Hóa Xưởng: BẬT / TẮT]` (Mặc định: **BẬT**).
+    - Cột Mã SKU hiển thị SKU chuẩn xưởng (`LAY-RUN021-202020`), đồng thời có dòng chữ nhỏ hiển thị mã gốc Shopee (`Shopee: RUN-021-202020`) để đối chiếu.
+- **Kiểm Định Tự Động**: 193/193 test cases đạt chuẩn (`run_tests.js`).
+
+---
+
 ## [v2.41.0] - 2026-09-04
 
 ### 🛍️ Trạm Nhập Nhanh Sản Phẩm Shopee Vào Kho Hàng (Chỉ Dành Cho TỐI CAO)

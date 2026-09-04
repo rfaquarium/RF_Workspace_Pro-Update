@@ -447,17 +447,79 @@ assert('Tab_Inventory.html gates Nhập Shopee button with TỐI CAO role', tabI
 assert('Tab_Inventory.html gates ShopeeProductImportModal mounting with TỐI CAO role', tabInventoryContent.includes("<ShopeeProductImportModal"));
 
 // 13.2 Smart Parse Algorithm Simulation
-function testParseShopee(text, defaultCategory = 'KHO LAYOUT', defaultUnit = 'Bộ') {
+function standardizeWarehouseSku(rawSku, category = '', baseName = '') {
+    if (!rawSku) return '';
+    const s = String(rawSku).trim().toUpperCase().replace(/\s+/g, '');
+    if (s.startsWith('PK-') || s.startsWith('NL-') || s.startsWith('DG-') || s.startsWith('VT-')) return s;
+
+    const beMatch = s.match(/^(?:BE[-_]?)?(ND|BETTA|TERA|BC|MINI|STD|DUC)?[-_]?(\d{5,6})$/i);
+    if (beMatch || category === 'KHO BỂ KÍNH' || (baseName && baseName.toUpperCase().includes('BỂ'))) {
+        if (beMatch) {
+            const sub = (beMatch[1] || 'STD').toUpperCase();
+            const size = beMatch[2];
+            return `BE-${sub}-${size}`;
+        }
+        const mSize = s.match(/(\d{5,6})/);
+        if (mSize) return `BE-STD-${mSize[1]}`;
+    }
+
+    const layMatch = s.match(/^(?:LAY[-_]?)?(BON|RUN|CAU|HAN|VAC|DAO|NAT|TRU|HEM|VOM|CV|TRA|STD)[-_]?0*(\d{1,3})?[-_]?(\d{5,6})?$/i);
+    if (layMatch) {
+        const code = layMatch[1].toUpperCase();
+        const verNum = layMatch[2] ? parseInt(layMatch[2], 10) : null;
+        const ver = verNum !== null ? ('000' + verNum).slice(-3) : '';
+        const size = layMatch[3] || '';
+        if (code === 'CV') return size ? `LAY-CV-${size}` : 'LAY-CV';
+        return `LAY-${code}${ver}` + (size ? `-${size}` : '');
+    }
+
+    const upperBase = (baseName || '').toUpperCase();
+    if (upperBase.includes('LAYOUT') || upperBase.includes('RỪNG') || upperBase.includes('LŨA') || upperBase.includes('ĐÁ') || category === 'KHO LAYOUT') {
+        const mCode = s.match(/^(?:LAY[-_]?)?([A-Z]{3,4})[-_]?0*(\d{1,3})?[-_]?(\d{5,6})?$/i);
+        if (mCode) {
+            const code = mCode[1].toUpperCase();
+            const verNum = mCode[2] ? parseInt(mCode[2], 10) : null;
+            const ver = verNum !== null ? ('000' + verNum).slice(-3) : '';
+            const size = mCode[3] || '';
+            return `LAY-${code}${ver}` + (size ? `-${size}` : '');
+        }
+        if (!s.startsWith('LAY-')) return `LAY-${s}`;
+    }
+    return s;
+}
+
+function standardizeWarehouseName(baseName, varLabel = '', rawSku = '') {
+    let cleanBase = String(baseName || '').trim().replace(/^(?:LAYOUT|Layout|layout)\s+/i, '').trim();
+    cleanBase = cleanBase.replace(/(?:Ver\.?|ver\.?|V)\s*(\d+)/i, (m, g1) => 'ver.' + g1);
+
+    let dimStr = '';
+    const cleanSku = String(rawSku || '').replace(/\s+/g, '');
+    const dimMatch = cleanSku.match(/(\d{2})(\d{2})(\d{2})/);
+    if (dimMatch) {
+        dimStr = `${dimMatch[1]}x${dimMatch[2]}x${dimMatch[3]}cm`;
+    } else if (varLabel) {
+        const vlMatch = String(varLabel).match(/(\d{2,3})\s*[xX*×]\s*(\d{2,3})\s*[xX*×]\s*(\d{2,3})/);
+        if (vlMatch) dimStr = `${vlMatch[1]}x${vlMatch[2]}x${vlMatch[3]}cm`;
+    }
+
+    let variantName = dimStr || (varLabel ? String(varLabel).trim() : '');
+    const fullName = variantName ? `${cleanBase} - ${variantName}` : cleanBase;
+    return { cleanBase, variantName, fullName };
+}
+
+function testParseShopee(text, defaultCategory = 'KHO LAYOUT', defaultUnit = 'Bộ', autoStandardize = true) {
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     if (!lines.length) return [];
     
     let baseName = lines[0].includes('|') ? lines[0].split('|')[0].trim() : lines[0];
     const upperBase = baseName.toUpperCase();
     let detectedCat = defaultCategory;
+    let detectedSub = 'KHÁC';
     let detectedUnit = defaultUnit;
     if (upperBase.includes('LAYOUT') || upperBase.includes('RỪNG')) {
         detectedCat = 'KHO LAYOUT';
         detectedUnit = 'Bộ';
+        if (upperBase.includes('RỪNG') || upperBase.includes('RUN')) detectedSub = 'RỪNG';
     } else if (upperBase.includes('BỂ') || upperBase.includes('KÍNH')) {
         detectedCat = 'KHO BỂ KÍNH';
         detectedUnit = 'Cái';
@@ -489,12 +551,22 @@ function testParseShopee(text, defaultCategory = 'KHO LAYOUT', defaultUnit = 'B�
                 }
                 j++;
             }
+            
+            let finalSku = vSku.toUpperCase();
+            let finalName = vLabel ? `${baseName} - ${vLabel}` : baseName;
+            if (autoStandardize) {
+                finalSku = standardizeWarehouseSku(vSku, detectedCat, baseName);
+                finalName = standardizeWarehouseName(baseName, vLabel, vSku).fullName;
+            }
+
             variations.push({
-                sku: vSku.toUpperCase(),
-                name: vLabel ? `${baseName} - ${vLabel}` : baseName,
+                sku: finalSku,
+                rawShopeeSku: vSku,
+                name: finalName,
                 price: price,
                 quantity: stock,
                 category: detectedCat,
+                sub_category: detectedSub,
                 unit: detectedUnit
             });
             i = j - 1;
@@ -527,15 +599,19 @@ Model ID: 287936773312
 
 const parsedVars = testParseShopee(sampleShopeeMultiVar);
 assert('Smart Shopee Parse: Extracts exact 3 variations', parsedVars.length === 3);
-assert('Smart Shopee Parse: Variation 1 SKU is RUN-021-202020', parsedVars[0].sku === 'RUN-021-202020');
+assert('Smart Shopee Parse: Standardized Var 1 SKU is LAY-RUN021-202020', parsedVars[0].sku === 'LAY-RUN021-202020');
+assert('Smart Shopee Parse: Preserves raw Shopee SKU RUN-021-202020', parsedVars[0].rawShopeeSku === 'RUN-021-202020');
+assert('Smart Shopee Parse: Standardized Var 1 Name is Rừng ver.21 - 20x20x20cm', parsedVars[0].name === 'Rừng ver.21 - 20x20x20cm');
 assert('Smart Shopee Parse: Variation 1 Price is 505.000', parsedVars[0].price === 505000);
 assert('Smart Shopee Parse: Variation 1 Stock is 898', parsedVars[0].quantity === 898);
-assert('Smart Shopee Parse: Variation 1 Name has base + size', parsedVars[0].name === 'Layout Rừng Ver.21 - Size S');
-assert('Smart Shopee Parse: Variation 2 SKU is RUN-021-302020', parsedVars[1].sku === 'RUN-021-302020');
+assert('Smart Shopee Parse: Standardized Var 2 SKU is LAY-RUN021-302020', parsedVars[1].sku === 'LAY-RUN021-302020');
+assert('Smart Shopee Parse: Standardized Var 2 Name is Rừng ver.21 - 30x20x20cm', parsedVars[1].name === 'Rừng ver.21 - 30x20x20cm');
 assert('Smart Shopee Parse: Variation 2 Price is 640.000', parsedVars[1].price === 640000);
-assert('Smart Shopee Parse: Variation 3 SKU is RUN-021-402325', parsedVars[2].sku === 'RUN-021-402325');
+assert('Smart Shopee Parse: Standardized Var 3 SKU is LAY-RUN021-402325', parsedVars[2].sku === 'LAY-RUN021-402325');
+assert('Smart Shopee Parse: Standardized Var 3 Name is Rừng ver.21 - 40x23x25cm', parsedVars[2].name === 'Rừng ver.21 - 40x23x25cm');
 assert('Smart Shopee Parse: Variation 3 Price is 795.000', parsedVars[2].price === 795000);
 assert('Smart Shopee Parse: Auto-categorizes to KHO LAYOUT', parsedVars[0].category === 'KHO LAYOUT');
+assert('Smart Shopee Parse: Auto-subcategorizes to RỪNG', parsedVars[0].sub_category === 'RỪNG');
 assert('Smart Shopee Parse: Auto-assigns Bộ unit for Layout', parsedVars[0].unit === 'Bộ');
 
 // SUMMARY

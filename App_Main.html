@@ -781,9 +781,39 @@
 
         const RELEASES = [
             {
-                version: 'Royal v2.41.0',
+                version: 'Royal v2.41.1',
                 date: '04/09/2026',
                 isLatest: true,
+                badge: 'CHUẨN HÓA SKU XƯỞNG',
+                badgeColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                title: 'Chuẩn Hóa Mã SKU & Tên Sản Phẩm Shopee Theo Quy Chuẩn Xưởng Rich Fish',
+                summary: 'Nâng cấp bộ phân giải Smart Shopee Importer: Tự động chuyển đổi mã Shopee (VD: RUN-021-202020) sang mã chuẩn xưởng (LAY-RUN021-202020), lọc bỏ tiền tố "Layout " và quy chuẩn Tên phân loại theo kích thước cm (Rừng ver.21 - 20x20x20cm). Bổ sung toggle BẬT/TẮT Chuẩn Hóa Xưởng và hiển thị mã Shopee gốc.',
+                categories: ['Kho Hàng', 'Shopee', 'Chuẩn Hóa SKU', 'Layout', 'Bể Kính'],
+                items: [
+                    {
+                        icon: 'fa-wand-magic-sparkles',
+                        color: 'text-amber-400',
+                        title: 'Tự Động Sinh Mã SKU Chuẩn Xưởng (LAY-...)',
+                        desc: 'Tự động ghép tiền tố LAY-, mã danh mục 3 chữ cái, số version liền nhau (RUN021) và quy cách kích thước (-202020, -302020, -402325), tương thích 100% với hệ thống.'
+                    },
+                    {
+                        icon: 'fa-ruler-combined',
+                        color: 'text-cyan-400',
+                        title: 'Quy Chuẩn Tên Nhóm & Kích Thước Thực Tế',
+                        desc: 'Tự động lược bỏ tiền tố "Layout ", viết thường "ver.X" và chuyển đổi phân loại (Size S/M/L) sang kích thước cm (20x20x20cm), khớp chính xác với định mức BOM vật tư.'
+                    },
+                    {
+                        icon: 'fa-toggle-on',
+                        color: 'text-emerald-400',
+                        title: 'Nút Chuyển Đổi [Chuẩn Hóa Xưởng: BẬT/TẮT] & Giữ Mã Gốc',
+                        desc: 'Cho phép Boss linh hoạt bật/tắt chuẩn hóa tự động; bảng xem trước hiển thị phụ đề mã Shopee gốc để dễ dàng tra cứu chéo.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.41.0',
+                date: '04/09/2026',
+                isLatest: false,
                 badge: 'SMART SHOPEE IMPORTER (TỐI CAO)',
                 badgeColor: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
                 title: 'Trạm Nhập Nhanh Sản Phẩm Shopee Vào Kho Hàng (Chỉ Dành Cho TỐI CAO)',
@@ -6192,7 +6222,7 @@
                                     <div className="w-5 flex justify-center text-[#d4af37] text-[13px]"><i className="fas fa-rocket"></i></div>
                                     <span>Bản Cập Nhật</span>
                                 </div>
-                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.41.0</span>
+                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.41.1</span>
                             </button>
                         </div>
                     </div>

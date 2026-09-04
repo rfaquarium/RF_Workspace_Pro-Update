@@ -781,9 +781,39 @@
 
         const RELEASES = [
             {
-                version: 'Royal v2.40.5',
+                version: 'Royal v2.41.0',
                 date: '04/09/2026',
                 isLatest: true,
+                badge: 'SMART SHOPEE IMPORTER (TỐI CAO)',
+                badgeColor: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+                title: 'Trạm Nhập Nhanh Sản Phẩm Shopee Vào Kho Hàng (Chỉ Dành Cho TỐI CAO)',
+                summary: 'Tích hợp hộp thoại ShopeeProductImportModal hỗ trợ Smart Paste (dán văn bản sao chép từ Kênh Người Bán) và nạp file Excel hàng loạt. Tự động bóc tách tên gốc, mã SKU, danh sách phân loại (Size S/M/L), giá bán và tồn kho, sinh chuẩn 16 cột schema Products chỉ trong 3 giây. Phân quyền độc quyền cho TỐI CAO.',
+                categories: ['Kho Hàng', 'Shopee', 'Smart Paste', 'Phân Quyền', 'TỐI CAO'],
+                items: [
+                    {
+                        icon: 'fa-bag-shopping',
+                        color: 'text-orange-400',
+                        title: 'Bộ Phân Giải Thông Minh Smart Paste (Dán Văn Bản Shopee)',
+                        desc: 'Bôi đen copy toàn bộ thông tin sản phẩm trên Shopee dán vào là hệ thống tự bóc tách Tên, SKU cha, từng phân loại con kèm giá và tồn kho chính xác 100%.'
+                    },
+                    {
+                        icon: 'fa-file-excel',
+                        color: 'text-emerald-400',
+                        title: 'Nạp Hàng Loạt Qua File Excel Shopee',
+                        desc: 'Kéo thả file xuất từ "Công cụ xử lý hàng loạt" của Shopee để đồng bộ hàng chục sản phẩm mới vào kho hàng trong một thao tác.'
+                    },
+                    {
+                        icon: 'fa-crown',
+                        color: 'text-[#d4af37]',
+                        title: 'Phân Quyền Độc Quyền TỐI CAO',
+                        desc: 'Nút bấm và Modal được bảo vệ 2 lớp nghiêm ngặt, chỉ hiển thị và cho phép thực thi đối với cấp bậc TỐI CAO (isBoss || role === TỐI CAO).'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.40.5',
+                date: '04/09/2026',
+                isLatest: false,
                 badge: 'CHUẨN HÓA ĐỊNH MỨC & GIÁ KEO 502',
                 badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
                 title: 'Chuẩn Hóa Trọng Lượng Tịnh & Đơn Giá Keo 502 (1 Chai = 100g Keo, 220đ/gam)',
@@ -6162,7 +6192,7 @@
                                     <div className="w-5 flex justify-center text-[#d4af37] text-[13px]"><i className="fas fa-rocket"></i></div>
                                     <span>Bản Cập Nhật</span>
                                 </div>
-                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.40.5</span>
+                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.41.0</span>
                             </button>
                         </div>
                     </div>

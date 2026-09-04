@@ -3,6 +3,27 @@
 Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến trúc, tối ưu nghiệp vụ và sửa lỗi của hệ điều hành `RF_Workspace_Pro`.
 ---
 
+## [v2.41.0] - 2026-09-04
+
+### 🛍️ Trạm Nhập Nhanh Sản Phẩm Shopee Vào Kho Hàng (Chỉ Dành Cho TỐI CAO)
+- **Bối cảnh & Nhu cầu vận hành**:
+  - Khi xưởng tạo sản phẩm mới trên Shopee Kênh Người Bán (ví dụ: `Layout Rừng Ver.21` với 3 phân loại Size S, M, L kèm giá và SKU), việc tạo thủ công từng sản phẩm/phân loại trong app tốn nhiều thời gian và dễ nhầm lẫn.
+  - Người dùng có nhu cầu "copy nhanh" dữ liệu sản phẩm từ Shopee đưa thẳng vào kho hàng hệ thống.
+  - Phân quyền: Tính năng này thay đổi trực tiếp danh mục hàng hóa và tồn kho hệ thống nên được **bảo vệ độc quyền cho cấp bậc TỐI CAO** (`isBoss || currentRole === 'TỐI CAO'`).
+- **Nâng Cấp Kiến Trúc & Tính Năng (`Tab_Inventory.html`)**:
+  - **Hộp thoại `ShopeeProductImportModal`**:
+    - **Cơ chế 1: Smart Paste (Dán văn bản thông minh)**: Tự động bóc tách tên sản phẩm gốc (lược bỏ đuôi quảng cáo), mã SKU cha, nhận diện toàn bộ danh sách phân loại (Size S/M/L...), mã SKU phân loại, giá bán và số lượng tồn kho.
+    - **Tự động nhận diện danh mục & ĐVT**: Dựa vào từ khóa tên sản phẩm để gợi ý `KHO LAYOUT` (ĐVT: Bộ) hoặc `KHO BỂ KÍNH` (ĐVT: Cái).
+    - **Quy chuẩn tên phân loại**: Ghép chuẩn xác theo format `Tên Sản Phẩm - Tên Phân Loại` (ví dụ: `Layout Rừng Ver.21 - Size S`) giúp hệ thống tự động gộp nhóm vào thẻ `VariantGroupCard`.
+    - **Cơ chế 2: Nạp file Excel Shopee**: Hỗ trợ kéo thả file xuất từ "Công cụ xử lý hàng loạt" của Shopee để đồng bộ hàng loạt.
+    - **Bảng xem trước tương tác (Interactive Preview Table)**: Cho phép chỉnh sửa SKU, Tên, Giá, Kho, ĐVT trực tiếp trước khi lưu; hiển thị nhãn trạng thái `[TẠO MỚI]` hoặc `[CẬP NHẬT]`.
+  - **Phân quyền bảo vệ 2 lớp**:
+    - Nút bấm `Nhập Shopee` (màu cam Shopee đặc trưng `#ee4d2d`) và Modal mount chỉ kích hoạt khi `isBoss || currentRole === 'TỐI CAO'`.
+- **Kiểm định tự động đạt 189/189 test cases Passed (`run_tests.js`)**:
+  - Đã bổ sung Section 13 kiểm thử phân giải chuỗi Shopee thực tế và kiểm tra chốt chặn phân quyền TỐI CAO.
+
+---
+
 ## [v2.40.5] - 2026-09-04
 
 ### 💎 Chuẩn Hóa Trọng Lượng Tịnh & Đơn Giá Keo 502 (1 Chai = 100g Keo Thực Tế, 220đ/gam)

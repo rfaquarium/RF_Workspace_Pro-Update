@@ -1052,6 +1052,770 @@ function BulkEditPriceModal({ data, pushData, onClose }) {
 }
 
 // =========================================================================
+// 4.5 COMPONENT: MODAL NHẬP NHANH SẢN PHẨM SHOPEE (ShopeeProductImportModal)
+// CHỈ DÀNH ĐỘC QUYỀN CHO PHÂN QUYỀN TỐI CAO (isBoss || currentRole === 'TỐI CAO')
+// =========================================================================
+function ShopeeProductImportModal({ onClose, pushData, pushDeltas, data, currentCat, triggerToast }) {
+  const [mode, setMode] = React.useState('PASTE'); // 'PASTE' | 'EXCEL'
+  const [rawText, setRawText] = React.useState('');
+  const [category, setCategory] = React.useState(currentCat || 'KHO LAYOUT');
+  const [subCategory, setSubCategory] = React.useState('');
+  const [defaultUnit, setDefaultUnit] = React.useState('Bộ');
+  const [items, setItems] = React.useState([]);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [isDragging, setIsDragging] = React.useState(false);
+
+  const existingProductsMap = React.useMemo(() => {
+    const map = new Map();
+    (data?.Products || []).forEach(p => {
+      if (p.sku) map.set(String(p.sku).trim().toUpperCase(), p);
+    });
+    return map;
+  }, [data?.Products]);
+
+  // Bộ phân giải thông minh văn bản sao chép từ Shopee Kênh Người Bán
+  const parseShopeeText = React.useCallback((text) => {
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      setItems([]);
+      return;
+    }
+
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) {
+      setItems([]);
+      return;
+    }
+
+    // Kiểm tra nếu là dạng bảng Tab-separated (copy từ Excel/bảng)
+    const isTsv = lines.some(l => l.includes('\t'));
+    if (isTsv) {
+      const parsedTsv = [];
+      lines.forEach((line, idx) => {
+        const cols = line.split('\t').map(c => c.trim());
+        if (cols.length >= 2) {
+          if (idx === 0 && (cols[0].toLowerCase().includes('sku') || cols[0].toLowerCase().includes('mã'))) return;
+          const sku = cols[0] || '';
+          const name = cols[1] || '';
+          const price = Number(String(cols[2] || '').replace(/[^\d]/g, '')) || 0;
+          const stock = Number(String(cols[3] || '').replace(/[^\d]/g, '')) || 0;
+          if (sku || name) {
+            parsedTsv.push({
+              id: 'PROD_' + Date.now() + '_' + idx,
+              sku: String(sku).trim().toUpperCase(),
+              name: name || sku,
+              price: price,
+              quantity: stock,
+              unit: defaultUnit,
+              category: category,
+              sub_category: subCategory || (category === 'KHO LAYOUT' ? 'LAYOUT KHÁC' : 'KHÁC')
+            });
+          }
+        }
+      });
+      if (parsedTsv.length > 0) {
+        setItems(parsedTsv);
+        return;
+      }
+    }
+
+    // Bóc tách theo giao diện Shopee Kênh Người Bán
+    let baseName = '';
+    const firstLine = lines[0];
+    if (firstLine.includes('|')) {
+      baseName = firstLine.split('|')[0].trim();
+    } else {
+      baseName = firstLine;
+    }
+
+    // Tự động gợi ý danh mục và ĐVT theo tên
+    const upperBase = baseName.toUpperCase();
+    let detectedCat = category;
+    let detectedSub = subCategory;
+    let detectedUnit = defaultUnit;
+
+    if (upperBase.includes('LAYOUT') || upperBase.includes('RỪNG') || upperBase.includes('LŨA') || upperBase.includes('ĐÁ') || upperBase.includes('NATURE') || upperBase.includes('VER.')) {
+      detectedCat = 'KHO LAYOUT';
+      detectedUnit = 'Bộ';
+      if (upperBase.includes('RỪNG')) detectedSub = 'LAYOUT RỪNG';
+      else if (upperBase.includes('VÁCH SUỐI') || upperBase.includes('SUỐI')) detectedSub = 'LAYOUT VÁCH SUỐI';
+      else if (upperBase.includes('HẺM NÚI') || upperBase.includes('NÚI')) detectedSub = 'LAYOUT HẺM NÚI';
+      else if (upperBase.includes('TRĂNG')) detectedSub = 'LAYOUT TRĂNG';
+      else if (upperBase.includes('NHẤT TRỤ')) detectedSub = 'LAYOUT NHẤT TRỤ';
+      else detectedSub = 'LAYOUT KHÁC';
+    } else if (upperBase.includes('BỂ') || upperBase.includes('KÍNH') || upperBase.includes('HỒ')) {
+      detectedCat = 'KHO BỂ KÍNH';
+      detectedUnit = 'Cái';
+      detectedSub = upperBase.includes('CUBIC') ? 'BỂ CUBIC' : 'BỂ LẺ SIZE';
+    }
+
+    setCategory(detectedCat);
+    if (detectedSub) setSubCategory(detectedSub);
+    if (detectedUnit) setDefaultUnit(detectedUnit);
+
+    // 2. Tìm SKU sản phẩm cha nếu có
+    let parentSku = '';
+    for (let i = 0; i < lines.length; i++) {
+      const matchParent = lines[i].match(/SKU sản phẩm:\s*([A-Za-z0-9_\-\.]+)/i);
+      if (matchParent) {
+        parentSku = matchParent[1].trim();
+        break;
+      }
+    }
+
+    // 3. Quét các phân loại con
+    const parsedVariations = [];
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      const matchVarSku = line.match(/SKU phân loại:\s*([A-Za-z0-9_\-\.]+)/i);
+      if (matchVarSku) {
+        const vSku = matchVarSku[1].trim();
+        let vLabel = '';
+        if (i > 0) {
+          const prev = lines[i - 1];
+          if (!prev.includes('SKU') && !prev.includes('ID') && !prev.startsWith('₫') && !prev.includes('Model') && !prev.includes('k')) {
+            vLabel = prev;
+          }
+        }
+
+        let price = 0;
+        let stock = 0;
+        let j = i + 1;
+        while (j < Math.min(lines.length, i + 7)) {
+          const next = lines[j];
+          if (next.includes('SKU phân loại:')) break;
+          
+          const cleanNum = next.replace(/[^\d]/g, '');
+          if ((next.startsWith('₫') || next.includes('₫')) && cleanNum) {
+            const numVal = parseInt(cleanNum, 10);
+            if (numVal >= 1000 && price === 0) price = numVal;
+          } else if (cleanNum && !next.includes('Model') && !next.includes('ID')) {
+            const numVal = parseInt(cleanNum, 10);
+            if (numVal >= 1000 && price === 0) {
+              price = numVal;
+            } else if (numVal >= 0 && stock === 0 && price > 0) {
+              stock = numVal;
+            }
+          }
+          j++;
+        }
+
+        const fullName = vLabel ? `${baseName} - ${vLabel}` : baseName;
+        parsedVariations.push({
+          id: 'PROD_' + Date.now() + '_' + parsedVariations.length,
+          sku: vSku.toUpperCase(),
+          name: fullName,
+          price: price,
+          quantity: stock,
+          unit: detectedUnit,
+          category: detectedCat,
+          sub_category: detectedSub || 'KHÁC'
+        });
+        i = j - 1;
+      }
+      i++;
+    }
+
+    // 4. Nếu không có 'SKU phân loại:' (sản phẩm đơn không có biến thể)
+    if (parsedVariations.length === 0 && parentSku) {
+      let price = 0;
+      let stock = 0;
+      lines.forEach(l => {
+        const cleanNum = l.replace(/[^\d]/g, '');
+        if ((l.startsWith('₫') || l.includes('₫')) && cleanNum) {
+          const numVal = parseInt(cleanNum, 10);
+          if (numVal >= 1000 && price === 0) price = numVal;
+        } else if (cleanNum && !l.includes('ID') && !l.includes('Model') && !l.includes('SKU')) {
+          const numVal = parseInt(cleanNum, 10);
+          if (numVal >= 1000 && price === 0) {
+            price = numVal;
+          } else if (numVal >= 0 && price > 0 && stock === 0) {
+            stock = numVal;
+          }
+        }
+      });
+
+      parsedVariations.push({
+        id: 'PROD_' + Date.now() + '_0',
+        sku: parentSku.toUpperCase(),
+        name: baseName,
+        price: price,
+        quantity: stock,
+        unit: detectedUnit,
+        category: detectedCat,
+        sub_category: detectedSub || 'KHÁC'
+      });
+    }
+
+    setItems(parsedVariations);
+  }, [category, subCategory, defaultUnit]);
+
+  // Xử lý nạp file Excel Shopee
+  const handleExcelUpload = React.useCallback((file) => {
+    if (!file) return;
+    if (typeof window.XLSX === 'undefined') {
+      alert('Thư viện đọc Excel chưa được tải, vui lòng thử lại sau giây lát!');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const dataArr = new Uint8Array(e.target.result);
+        const workbook = window.XLSX.read(dataArr, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonRows = window.XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        if (!jsonRows || jsonRows.length < 2) {
+          alert('File Excel không có dữ liệu hợp lệ!');
+          return;
+        }
+
+        let headerRowIdx = -1;
+        let colSku = -1, colName = -1, colPrice = -1, colStock = -1, colParentSku = -1, colVarName = -1;
+
+        for (let r = 0; r < Math.min(10, jsonRows.length); r++) {
+          const row = jsonRows[r];
+          if (!row || !Array.isArray(row)) continue;
+          row.forEach((cell, c) => {
+            const str = String(cell || '').toLowerCase().trim();
+            if (str.includes('sku phân loại') || (str.includes('sku') && colSku === -1)) colSku = c;
+            if (str.includes('sku sản phẩm') || str.includes('mã sản phẩm')) colParentSku = c;
+            if (str.includes('tên sản phẩm') || str.includes('tên hàng')) colName = c;
+            if (str.includes('tên phân loại') || str.includes('phân loại')) colVarName = c;
+            if (str.includes('giá') || str.includes('price')) colPrice = c;
+            if (str.includes('kho hàng') || str.includes('tồn kho') || str.includes('số lượng') || str.includes('stock')) colStock = c;
+          });
+          if (colSku !== -1 && (colName !== -1 || colPrice !== -1)) {
+            headerRowIdx = r;
+            break;
+          }
+        }
+
+        if (headerRowIdx === -1) headerRowIdx = 0;
+
+        const parsedRows = [];
+        for (let r = headerRowIdx + 1; r < jsonRows.length; r++) {
+          const row = jsonRows[r];
+          if (!row || row.length === 0) continue;
+          const sku = String(row[colSku] || row[colParentSku] || '').trim();
+          if (!sku) continue;
+
+          const pName = String(row[colName] || '').trim();
+          const vName = colVarName !== -1 ? String(row[colVarName] || '').trim() : '';
+          const fullName = vName ? `${pName} - ${vName}` : pName;
+          const price = Number(String(row[colPrice] || '').replace(/[^\d]/g, '')) || 0;
+          const stock = Number(String(row[colStock] || '').replace(/[^\d]/g, '')) || 0;
+
+          parsedRows.push({
+            id: 'PROD_' + Date.now() + '_' + parsedRows.length,
+            sku: sku.toUpperCase(),
+            name: fullName || sku,
+            price: price,
+            quantity: stock,
+            unit: defaultUnit,
+            category: category,
+            sub_category: subCategory || 'KHÁC'
+          });
+        }
+
+        if (parsedRows.length > 0) {
+          setItems(parsedRows);
+          if (typeof triggerToast === 'function') triggerToast(`Đã đọc ${parsedRows.length} phân loại từ file Excel!`, 'fa-file-excel', 'success');
+        } else {
+          alert('Không tìm thấy dòng sản phẩm nào có SKU hợp lệ trong file!');
+        }
+      } catch (err) {
+        alert('Lỗi khi đọc file Excel: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }, [category, subCategory, defaultUnit, triggerToast]);
+
+  const updateItemField = (idx, field, val) => {
+    setItems(prev => {
+      const copy = [...prev];
+      copy[idx] = { ...copy[idx], [field]: val };
+      return copy;
+    });
+  };
+
+  const removeItem = (idx) => {
+    setItems(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const addNewRow = () => {
+    setItems(prev => [
+      ...prev,
+      {
+        id: 'PROD_' + Date.now() + '_' + prev.length,
+        sku: '',
+        name: '',
+        price: 0,
+        quantity: 0,
+        unit: defaultUnit,
+        category: category,
+        sub_category: subCategory || 'KHÁC'
+      }
+    ]);
+  };
+
+  const loadSample = () => {
+    const sample = `Layout Rừng Ver.21 | Nghệ Thuật Tái Tạo Cảnh Quan Tự Nhiên | Đ...
+SKU sản phẩm: RUN-021
+ID Sản phẩm: 57767368836
+₫505.000 - ₫795.000
+1.8k
+Size S
+SKU phân loại: RUN-021-202020
+Model ID: 287936773310
+₫505.000
+898
+Size M
+SKU phân loại: RUN-021-302020
+Model ID: 287936773311
+₫640.000
+666
+Size L
+SKU phân loại: RUN-021-402325
+Model ID: 287936773312
+₫795.000
+222`;
+    setRawText(sample);
+    parseShopeeText(sample);
+  };
+
+  const handleSave = async () => {
+    if (items.length === 0) {
+      alert('Chưa có sản phẩm nào để lưu!');
+      return;
+    }
+
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (!it.sku || !String(it.sku).trim()) {
+        alert(`Dòng thứ ${i + 1} đang để trống Mã SKU!`);
+        return;
+      }
+      if (!it.name || !String(it.name).trim()) {
+        alert(`Dòng thứ ${i + 1} đang để trống Tên Sản Phẩm!`);
+        return;
+      }
+    }
+
+    setIsSaving(true);
+    try {
+      const preparedProducts = items.map((it, idx) => {
+        const cleanSku = String(it.sku).trim().toUpperCase();
+        const existing = existingProductsMap.get(cleanSku);
+
+        return {
+          id: existing?.id || it.id || ('PROD_' + Date.now() + '_' + idx),
+          sku: cleanSku,
+          name: String(it.name).trim(),
+          unit: it.unit || defaultUnit || 'Bộ',
+          image: existing?.image || '',
+          category: it.category || category || 'KHO LAYOUT',
+          sub_category: it.sub_category || subCategory || 'KHÁC',
+          costPrice: existing?.costPrice || 0,
+          price: Number(it.price) || 0,
+          quantity: Number(it.quantity) || 0,
+          minStock: existing?.minStock || 0,
+          maxStock: existing?.maxStock || 0,
+          realImage: existing?.realImage || '',
+          importUnit: existing?.importUnit || '',
+          conversionRate: existing?.conversionRate || 1,
+          model3D: existing?.model3D || ''
+        };
+      });
+
+      if (typeof pushData === 'function') {
+        await pushData({ Products: preparedProducts });
+      } else if (typeof pushDeltas === 'function') {
+        await pushDeltas({ Products: preparedProducts });
+      }
+
+      if (typeof triggerToast === 'function') {
+        triggerToast(`Đã lưu thành công ${preparedProducts.length} sản phẩm từ Shopee vào kho!`, 'fa-check-circle', 'success');
+      } else {
+        alert(`Đã lưu thành công ${preparedProducts.length} sản phẩm vào kho hàng!`);
+      }
+
+      onClose();
+    } catch (err) {
+      alert('Lỗi khi lưu sản phẩm: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const totalValue = items.reduce((acc, it) => acc + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
+  const totalQty = items.reduce((acc, it) => acc + Number(it.quantity || 0), 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-fade-in">
+      <div className="bg-[#0e0e12] border border-orange-500/30 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden">
+        
+        {/* HEADER MODAL */}
+        <div className="p-4 sm:px-5 sm:py-3.5 border-b border-white/[0.08] bg-[#141419] flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-[#ee4d2d] shadow-inner shrink-0">
+              <i className="fas fa-bag-shopping text-lg"></i>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-black text-sm sm:text-base text-white uppercase tracking-wider">
+                  Nhập Nhanh Sản Phẩm Shopee
+                </h3>
+                <span className="text-[9.5px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30 flex items-center gap-1">
+                  <i className="fas fa-crown text-[#d4af37]"></i> TỐI CAO
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-400 mt-0.5">
+                Tự động bóc tách tên, phân loại (Size S/M/L), SKU, giá bán & tồn kho chỉ trong 3 giây
+              </p>
+            </div>
+          </div>
+          <button 
+            type="button"
+            onClick={onClose} 
+            className="w-8 h-8 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] text-zinc-400 hover:text-white flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+          >
+            <i className="fas fa-times"></i>
+          </button>
+        </div>
+
+        {/* SUBHEADER: CHUYỂN ĐỔI CHẾ ĐỘ & CẤU HÌNH NHANH */}
+        <div className="px-4 sm:px-5 py-2.5 bg-[#121217] border-b border-white/[0.06] flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center bg-[#09090b] p-1 rounded-xl border border-white/[0.08]">
+            <button
+              type="button"
+              onClick={() => setMode('PASTE')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                mode === 'PASTE' 
+                  ? 'bg-gradient-to-r from-[#ee4d2d] to-[#ff5722] text-white shadow-sm' 
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <i className="fas fa-paste"></i>
+              <span>Smart Paste (Dán Text)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('EXCEL')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                mode === 'EXCEL' 
+                  ? 'bg-gradient-to-r from-[#ee4d2d] to-[#ff5722] text-white shadow-sm' 
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <i className="fas fa-file-excel"></i>
+              <span>File Excel Shopee</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            <div className="flex items-center gap-1.5 bg-[#09090b] px-2.5 py-1 rounded-lg border border-white/[0.08]">
+              <span className="text-zinc-500 font-bold">Kho:</span>
+              <select 
+                value={category} 
+                onChange={e => {
+                  setCategory(e.target.value);
+                  setItems(prev => prev.map(it => ({ ...it, category: e.target.value })));
+                }}
+                className="bg-transparent text-[#d4af37] font-bold outline-none cursor-pointer"
+              >
+                <option value="KHO LAYOUT" className="bg-[#121217]">KHO LAYOUT</option>
+                <option value="KHO BỂ KÍNH" className="bg-[#121217]">KHO BỂ KÍNH</option>
+                <option value="DANH MỤC SẢN XUẤT" className="bg-[#121217]">DANH MỤC SẢN XUẤT</option>
+                <option value="PHỤ KIỆN" className="bg-[#121217]">PHỤ KIỆN</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-[#09090b] px-2.5 py-1 rounded-lg border border-white/[0.08]">
+              <span className="text-zinc-500 font-bold">ĐVT:</span>
+              <select 
+                value={defaultUnit} 
+                onChange={e => {
+                  setDefaultUnit(e.target.value);
+                  setItems(prev => prev.map(it => ({ ...it, unit: e.target.value })));
+                }}
+                className="bg-transparent text-cyan-400 font-bold outline-none cursor-pointer"
+              >
+                <option value="Bộ" className="bg-[#121217]">Bộ</option>
+                <option value="Cái" className="bg-[#121217]">Cái</option>
+                <option value="Thùng" className="bg-[#121217]">Thùng</option>
+                <option value="Hộp" className="bg-[#121217]">Hộp</option>
+                <option value="Chai" className="bg-[#121217]">Chai</option>
+                <option value="gam" className="bg-[#121217]">gam</option>
+                <option value="kg" className="bg-[#121217]">kg</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* MODAL BODY */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 custom-scrollbar space-y-4">
+          
+          {mode === 'PASTE' ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                  <i className="fas fa-clipboard-check text-orange-400"></i>
+                  <span>Dán dữ liệu sao chép từ Shopee Kênh Người Bán:</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={loadSample}
+                    className="text-[11px] font-bold text-[#ee4d2d] hover:text-orange-300 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <i className="fas fa-wand-magic-sparkles"></i> Dán Mẫu Thử Nghiệm
+                  </button>
+                  {rawText && (
+                    <button
+                      type="button"
+                      onClick={() => { setRawText(''); setItems([]); }}
+                      className="text-[11px] text-zinc-500 hover:text-rose-400 cursor-pointer"
+                    >
+                      Xóa
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <textarea
+                value={rawText}
+                onChange={e => {
+                  setRawText(e.target.value);
+                  parseShopeeText(e.target.value);
+                }}
+                rows={4}
+                placeholder="Bôi đen toàn bộ thông tin sản phẩm trên Shopee (Tên, SKU, các dòng Size S, M, L, Giá, Kho) và bấm Ctrl+V dán vào đây..."
+                className="w-full bg-[#09090b] border border-white/[0.08] focus:border-orange-500/60 rounded-xl p-3 text-xs text-white font-mono outline-none transition-all placeholder:text-zinc-600 focus:ring-1 focus:ring-orange-500/30"
+              />
+            </div>
+          ) : (
+            <div 
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                  handleExcelUpload(e.dataTransfer.files[0]);
+                }
+              }}
+              className={`p-6 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center text-center transition-all ${
+                isDragging ? 'border-orange-500 bg-orange-500/10' : 'border-white/[0.1] bg-[#09090b] hover:border-orange-500/40'
+              }`}
+            >
+              <div className="w-12 h-12 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400 mb-2">
+                <i className="fas fa-file-excel text-2xl"></i>
+              </div>
+              <div className="text-xs font-bold text-zinc-200 mb-1">
+                Kéo thả file Excel xuất từ Shopee vào đây, hoặc bấm chọn file
+              </div>
+              <div className="text-[11px] text-zinc-500 mb-3">
+                Hỗ trợ file "Cập nhật hàng loạt" (.xlsx, .xls) xuất từ Shopee Kênh Người Bán
+              </div>
+              <label className="px-4 py-2 bg-white/[0.06] hover:bg-white/[0.1] text-white rounded-xl text-xs font-bold border border-white/[0.08] cursor-pointer transition-all active:scale-95">
+                <i className="fas fa-folder-open mr-1.5 text-orange-400"></i> Chọn File Excel
+                <input 
+                  type="file" 
+                  accept=".xlsx,.xls,.csv" 
+                  className="hidden" 
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleExcelUpload(e.target.files[0]);
+                    }
+                  }} 
+                />
+              </label>
+            </div>
+          )}
+
+          {/* BẢNG XEM TRƯỚC SẢN PHẨM SẼ TẠO */}
+          <div className="border border-white/[0.08] rounded-xl bg-[#09090b] overflow-hidden">
+            <div className="px-4 py-2.5 bg-[#141419] border-b border-white/[0.08] flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase text-zinc-300 tracking-wider">
+                  Danh Sách Phân Loại ({items.length})
+                </span>
+                {items.length > 0 && (
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    Sẵn sàng lưu
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={addNewRow}
+                  className="px-2.5 py-1 bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-lg text-[10.5px] font-bold border border-white/[0.08] flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                >
+                  <i className="fas fa-plus text-emerald-400"></i> Thêm Dòng
+                </button>
+                {items.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setItems([])}
+                    className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg text-[10.5px] font-bold border border-rose-500/20 cursor-pointer transition-all"
+                  >
+                    Xóa Hết
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="overflow-x-auto max-h-[360px] custom-scrollbar">
+              <table className="w-full text-left border-collapse min-w-[650px]">
+                <thead className="sticky top-0 bg-[#16161d] border-b border-white/[0.08] z-10 text-[10px] font-black uppercase text-zinc-400 tracking-wider">
+                  <tr>
+                    <th className="p-2.5 w-[160px]">Mã SKU</th>
+                    <th className="p-2.5">Tên Sản Phẩm & Phân Loại</th>
+                    <th className="p-2.5 w-[120px]">Giá Bán (đ)</th>
+                    <th className="p-2.5 w-[85px]">Tồn Kho</th>
+                    <th className="p-2.5 w-[80px]">ĐVT</th>
+                    <th className="p-2.5 w-[100px] text-center">Trạng Thái</th>
+                    <th className="p-2.5 w-[40px] text-center"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.04] text-xs">
+                  {items.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="p-8 text-center text-zinc-500 font-bold">
+                        <i className="fas fa-arrow-up block text-xl mb-2 text-zinc-600"></i>
+                        Dán văn bản hoặc nạp file Excel ở trên để hệ thống tự động bóc tách danh sách sản phẩm!
+                      </td>
+                    </tr>
+                  ) : (
+                    items.map((it, idx) => {
+                      const cleanSku = String(it.sku || '').trim().toUpperCase();
+                      const isExisting = existingProductsMap.has(cleanSku);
+
+                      return (
+                        <tr key={it.id || idx} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="p-2">
+                            <input
+                              type="text"
+                              value={it.sku}
+                              onChange={e => updateItemField(idx, 'sku', e.target.value.toUpperCase())}
+                              placeholder="Mã SKU..."
+                              className="w-full bg-[#121217] border border-white/[0.08] focus:border-orange-500/60 rounded-lg px-2 py-1 text-white font-mono font-bold text-xs outline-none"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="text"
+                              value={it.name}
+                              onChange={e => updateItemField(idx, 'name', e.target.value)}
+                              placeholder="Tên sản phẩm - Phân loại..."
+                              className="w-full bg-[#121217] border border-white/[0.08] focus:border-orange-500/60 rounded-lg px-2 py-1 text-zinc-200 text-xs outline-none"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="number"
+                              value={it.price}
+                              onChange={e => updateItemField(idx, 'price', Number(e.target.value))}
+                              placeholder="0"
+                              className="w-full bg-[#121217] border border-white/[0.08] focus:border-[#d4af37]/60 rounded-lg px-2 py-1 text-[#d4af37] font-mono font-bold text-xs outline-none text-right"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="number"
+                              value={it.quantity}
+                              onChange={e => updateItemField(idx, 'quantity', Number(e.target.value))}
+                              placeholder="0"
+                              className="w-full bg-[#121217] border border-white/[0.08] focus:border-cyan-500/60 rounded-lg px-2 py-1 text-cyan-300 font-mono font-bold text-xs outline-none text-center"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="text"
+                              value={it.unit}
+                              onChange={e => updateItemField(idx, 'unit', e.target.value)}
+                              className="w-full bg-[#121217] border border-white/[0.08] focus:border-white/30 rounded-lg px-2 py-1 text-zinc-300 text-xs outline-none text-center"
+                            />
+                          </td>
+                          <td className="p-2 text-center">
+                            {isExisting ? (
+                              <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                CẬP NHẬT
+                              </span>
+                            ) : (
+                              <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                TẠO MỚI
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => removeItem(idx)}
+                              className="w-6 h-6 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 flex items-center justify-center transition-all cursor-pointer"
+                              title="Xóa dòng"
+                            >
+                              <i className="fas fa-trash-can text-[10px]"></i>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* MODAL FOOTER */}
+        <div className="p-3.5 sm:px-5 sm:py-3 border-t border-white/[0.08] bg-[#141419] flex items-center justify-between gap-3 shrink-0 flex-wrap">
+          <div className="text-xs text-zinc-400 flex items-center gap-4 flex-wrap">
+            <div>Tổng tồn: <span className="text-cyan-300 font-mono font-bold">{totalQty.toLocaleString('vi-VN')}</span></div>
+            <div>Tổng giá trị: <span className="text-[#d4af37] font-mono font-bold">{Math.round(totalValue).toLocaleString('vi-VN')} đ</span></div>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSaving}
+              className="px-4 py-2 bg-white/[0.06] hover:bg-white/[0.1] text-zinc-300 font-bold rounded-xl text-xs uppercase transition-all cursor-pointer"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isSaving || items.length === 0}
+              className="px-5 py-2 bg-gradient-to-r from-[#ee4d2d] to-[#ff5722] hover:from-[#d73211] hover:to-[#ee4d2d] disabled:opacity-50 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(238,77,45,0.3)] cursor-pointer active:scale-95 flex items-center gap-2"
+            >
+              {isSaving ? (
+                <>
+                  <i className="fas fa-spinner fa-spin"></i>
+                  <span>Đang Lưu...</span>
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-cloud-arrow-up"></i>
+                  <span>Lưu Vào Kho ({items.length} Phân Loại)</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
 // 5. COMPONENT: MÀN HÌNH DANH MỤC & THỦ KHO (InventoryListView)
 // =========================================================================
 function InventoryListView({ data, pushData, pushDeltas, documents, isAdmin, isBoss: propIsBoss, userRole: propUserRole, currentUser: propCurrentUser, hasPerm: propHasPerm, triggerToast }) {
@@ -1065,6 +1829,7 @@ function InventoryListView({ data, pushData, pushDeltas, documents, isAdmin, isB
   const [showStockRules, setShowStockRules] = React.useState(false);
   const [showBulkEditPrice, setShowBulkEditPrice] = React.useState(false);
   const [showQuickNotes, setShowQuickNotes] = React.useState(false);
+  const [showShopeeImport, setShowShopeeImport] = React.useState(false);
   const formatMoney = (val) => Math.round(Number(val || 0)).toLocaleString('vi-VN');
   
   const currentRole = String(propUserRole || localStorage.getItem('rf_role') || '').trim();
@@ -1510,6 +2275,18 @@ function InventoryListView({ data, pushData, pushDeltas, documents, isAdmin, isB
                           <span>Thêm Hàng</span>
                       </button>
                   )}
+
+                  {(isBoss || currentRole === 'TỐI CAO') && (
+                      <button 
+                          type="button"
+                          onClick={() => setShowShopeeImport(true)} 
+                          className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-[#ee4d2d] to-[#ff5722] hover:from-[#d73211] hover:to-[#ee4d2d] text-white font-black text-[11px] uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(238,77,45,0.3)] hover:brightness-110 transition-all active:scale-95 cursor-pointer border border-orange-400/40"
+                          title="Nhập nhanh sản phẩm từ Shopee (Smart Paste / Excel) - Phân quyền TỐI CAO"
+                      >
+                          <i className="fas fa-bag-shopping text-white text-[12px]"></i>
+                          <span>Nhập Shopee</span>
+                      </button>
+                  )}
               </div>
           </div>
 
@@ -1731,6 +2508,16 @@ function InventoryListView({ data, pushData, pushDeltas, documents, isAdmin, isB
           )}
           {showBulkEditPrice && (
             <BulkEditPriceModal data={data} pushData={pushData} onClose={() => setShowBulkEditPrice(false)} />
+          )}
+          {showShopeeImport && (isBoss || currentRole === 'TỐI CAO') && (
+            <ShopeeProductImportModal 
+                onClose={() => setShowShopeeImport(false)} 
+                pushData={pushData} 
+                pushDeltas={pushDeltas}
+                data={data} 
+                currentCat={catFilter} 
+                triggerToast={triggerToast} 
+            />
           )}
       </div>
   );

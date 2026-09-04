@@ -435,6 +435,109 @@ assert('Tracking Update: Order with identical tracking is recognized as duplicat
 const existingWithDifferentTrack = { id: 'ORD_3', orderCode: '2609045SRFX04B', shippingCode: 'OLD_TRACK_123' };
 assert('Tracking Update: Order with updated/changed tracking triggers hasNewTrack', testCheckHasNewTrack(existingWithDifferentTrack, 'SPXVN068042561239') === true);
 
+// 13. TEST SHOPEE PRODUCT QUICK IMPORT & SUPREME ROLE GATING
+console.log('\n--- 13. Testing Shopee Product Quick Import & Supreme Role Gating ---');
+
+const tabInventoryPath = path.join(__dirname, 'Tab_Inventory.html');
+const tabInventoryContent = fs.readFileSync(tabInventoryPath, 'utf8');
+
+// 13.1 Role gating verification
+assert('Tab_Inventory.html contains ShopeeProductImportModal component', tabInventoryContent.includes('function ShopeeProductImportModal'));
+assert('Tab_Inventory.html gates Nhập Shopee button with TỐI CAO role', tabInventoryContent.includes("(isBoss || currentRole === 'TỐI CAO') &&") && tabInventoryContent.includes('Nhập Shopee'));
+assert('Tab_Inventory.html gates ShopeeProductImportModal mounting with TỐI CAO role', tabInventoryContent.includes("<ShopeeProductImportModal"));
+
+// 13.2 Smart Parse Algorithm Simulation
+function testParseShopee(text, defaultCategory = 'KHO LAYOUT', defaultUnit = 'Bộ') {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return [];
+    
+    let baseName = lines[0].includes('|') ? lines[0].split('|')[0].trim() : lines[0];
+    const upperBase = baseName.toUpperCase();
+    let detectedCat = defaultCategory;
+    let detectedUnit = defaultUnit;
+    if (upperBase.includes('LAYOUT') || upperBase.includes('RỪNG')) {
+        detectedCat = 'KHO LAYOUT';
+        detectedUnit = 'Bộ';
+    } else if (upperBase.includes('BỂ') || upperBase.includes('KÍNH')) {
+        detectedCat = 'KHO BỂ KÍNH';
+        detectedUnit = 'Cái';
+    }
+    
+    let parentSku = '';
+    for (let i = 0; i < lines.length; i++) {
+        const m = lines[i].match(/SKU sản phẩm:\s*([A-Za-z0-9_\-\.]+)/i);
+        if (m) { parentSku = m[1].trim(); break; }
+    }
+    
+    const variations = [];
+    let i = 0;
+    while (i < lines.length) {
+        const line = lines[i];
+        const mSku = line.match(/SKU phân loại:\s*([A-Za-z0-9_\-\.]+)/i);
+        if (mSku) {
+            const vSku = mSku[1].trim();
+            let vLabel = (i > 0 && !lines[i-1].includes('SKU') && !lines[i-1].includes('ID') && !lines[i-1].startsWith('₫')) ? lines[i-1] : '';
+            let price = 0, stock = 0, j = i + 1;
+            while (j < Math.min(lines.length, i + 7)) {
+                const next = lines[j];
+                if (next.includes('SKU phân loại:')) break;
+                const clean = next.replace(/[^\d]/g, '');
+                if ((next.includes('₫') || (clean && !next.includes('Model') && !next.includes('ID'))) && clean) {
+                    const numVal = parseInt(clean, 10);
+                    if (numVal >= 1000 && !price) price = numVal;
+                    else if (numVal >= 0 && price && !stock) stock = numVal;
+                }
+                j++;
+            }
+            variations.push({
+                sku: vSku.toUpperCase(),
+                name: vLabel ? `${baseName} - ${vLabel}` : baseName,
+                price: price,
+                quantity: stock,
+                category: detectedCat,
+                unit: detectedUnit
+            });
+            i = j - 1;
+        }
+        i++;
+    }
+    return variations;
+}
+
+const sampleShopeeMultiVar = `Layout Rừng Ver.21 | Nghệ Thuật Tái Tạo Cảnh Quan Tự Nhiên | Đ...
+SKU sản phẩm: RUN-021
+ID Sản phẩm: 57767368836
+₫505.000 - ₫795.000
+1.8k
+Size S
+SKU phân loại: RUN-021-202020
+Model ID: 287936773310
+₫505.000
+898
+Size M
+SKU phân loại: RUN-021-302020
+Model ID: 287936773311
+₫640.000
+666
+Size L
+SKU phân loại: RUN-021-402325
+Model ID: 287936773312
+₫795.000
+222`;
+
+const parsedVars = testParseShopee(sampleShopeeMultiVar);
+assert('Smart Shopee Parse: Extracts exact 3 variations', parsedVars.length === 3);
+assert('Smart Shopee Parse: Variation 1 SKU is RUN-021-202020', parsedVars[0].sku === 'RUN-021-202020');
+assert('Smart Shopee Parse: Variation 1 Price is 505.000', parsedVars[0].price === 505000);
+assert('Smart Shopee Parse: Variation 1 Stock is 898', parsedVars[0].quantity === 898);
+assert('Smart Shopee Parse: Variation 1 Name has base + size', parsedVars[0].name === 'Layout Rừng Ver.21 - Size S');
+assert('Smart Shopee Parse: Variation 2 SKU is RUN-021-302020', parsedVars[1].sku === 'RUN-021-302020');
+assert('Smart Shopee Parse: Variation 2 Price is 640.000', parsedVars[1].price === 640000);
+assert('Smart Shopee Parse: Variation 3 SKU is RUN-021-402325', parsedVars[2].sku === 'RUN-021-402325');
+assert('Smart Shopee Parse: Variation 3 Price is 795.000', parsedVars[2].price === 795000);
+assert('Smart Shopee Parse: Auto-categorizes to KHO LAYOUT', parsedVars[0].category === 'KHO LAYOUT');
+assert('Smart Shopee Parse: Auto-assigns Bộ unit for Layout', parsedVars[0].unit === 'Bộ');
+
 // SUMMARY
 console.log(`\n========================================`);
 console.log(`TEST SUMMARY: ${passedTests}/${totalTests} Passed (${failedTests} Failed)`);

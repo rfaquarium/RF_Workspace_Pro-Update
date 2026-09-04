@@ -781,9 +781,39 @@
 
         const RELEASES = [
             {
-                version: 'Royal v2.40.4',
+                version: 'Royal v2.40.5',
                 date: '04/09/2026',
                 isLatest: true,
+                badge: 'CHUẨN HÓA ĐỊNH MỨC & GIÁ KEO 502',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Chuẩn Hóa Trọng Lượng Tịnh & Đơn Giá Keo 502 (1 Chai = 100g Keo, 220đ/gam)',
+                summary: 'Khắc phục triệt để sai lệch định mức và giá vốn Keo 502: 1 chai mua vào có tổng trọng lượng 162g, vỏ chai rỗng 62g -> Lượng keo thực tế sử dụng được là 100g keo với giá mua 22.000đ / 100g (220đ/gam). Xóa bỏ hoàn toàn việc chia 162 làm sai lệch đơn giá xuống 136đ và lỗi chia 2 lần khiến tiền keo chỉ còn 215đ trên phiếu xuất kho.',
+                categories: ['Kho Hàng', 'BOM', 'Giá Vốn', 'Keo 502', 'Định Mức'],
+                items: [
+                    {
+                        icon: 'fa-bottle-droplet',
+                        color: 'text-amber-400',
+                        title: 'Quy Cách Chuẩn 1 Chai = 100g Keo Thực Tế (Vỏ 62g, Tổng 162g)',
+                        desc: 'Xác lập đúng quy chuẩn vật lý: Trừ bỏ 62g vỏ nhựa chai rỗng, chỉ tính 100g keo thực tế đưa vào dán sản phẩm, quy đổi chính xác số chai tiêu hao theo định mức sản xuất.'
+                    },
+                    {
+                        icon: 'fa-calculator',
+                        color: 'text-emerald-400',
+                        title: 'Đơn Giá Thực Tế 220đ/gam & Triệt Tiêu Lỗi Chia 2 Lần (215đ)',
+                        desc: 'Đơn giá 1 gam keo = 22.000đ / 100g = 220đ/gam. Xóa bỏ hoàn toàn lỗi chia đúp cả số lượng lẫn đơn giá khiến phiếu xuất kho chỉ tính 215 đồng cho cả chai keo.'
+                    },
+                    {
+                        icon: 'fa-rotate',
+                        color: 'text-cyan-400',
+                        title: 'Đồng Bộ Toàn Diện CSDL & Tự Động Sửa Phiếu Xuất BOM Cũ',
+                        desc: 'Cập nhật logic cấn trừ tại _processMaterialDeduction_Core, calculateBomItemCost, Tab_ImportExport và tích hợp runner AAA_REPAIR_KEO502_PRICE_AND_BOM chuẩn hóa dữ liệu cũ.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.40.4',
+                date: '04/09/2026',
+                isLatest: false,
                 badge: 'CHÍNH XÁC 100% MVĐ & DIỆT LỖI GÁN NHẦM KIỆN HÀNG',
                 badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
                 title: 'Nâng Cấp Thuật Toán Định Vị Cột Ưu Tiên (Key-Priority Search) & Bảo Vệ Mã Vận Đơn Thực Tế',
@@ -6132,7 +6162,7 @@
                                     <div className="w-5 flex justify-center text-[#d4af37] text-[13px]"><i className="fas fa-rocket"></i></div>
                                     <span>Bản Cập Nhật</span>
                                 </div>
-                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.40.4</span>
+                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.40.5</span>
                             </button>
                         </div>
                     </div>

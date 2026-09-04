@@ -1462,7 +1462,11 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
                                                 (itSku && String(x.name || '').toLowerCase() === itSkuLower)
                                             );
 
-                                            const displayUnit = (matchedP && matchedP.unit) ? matchedP.unit : (it.unit || 'Cái');
+                                            const itUnitClean = String(it.unit || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+                                            const isItChai = itUnitClean === 'chai' || itUnitClean.includes('chai') || itUnitClean.includes('162') || itUnitClean.includes('100');
+                                            const isKeo502 = itSkuLower.includes('502') || itNameLower.includes('502') || itNameLower.includes('keo');
+
+                                            const displayUnit = isItChai ? 'Chai' : ((matchedP && matchedP.unit) ? matchedP.unit : (it.unit || 'Cái'));
                                             const uClean = String(displayUnit || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
                                             const isGram = uClean === 'gam' || uClean === 'g' || uClean === 'gram';
 
@@ -1479,14 +1483,24 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
 
                                             let effectivePrice = rawPrice;
 
-                                            // Chỉ quy đổi đơn giá nếu là phiếu xuất BOM và đơn vị tính của dòng thực sự là gam
-                                            if (isBomTicket && isGram && effectivePrice >= 1000) {
+                                            // Quy đổi đơn giá phiếu xuất BOM chuẩn xác
+                                            if (isBomTicket && isKeo502) {
+                                                // 1 chai keo 502: 162g tổng - vỏ 62g = 100g keo thực tế, giá 22.000đ/100g
+                                                if (isItChai || displayUnit === 'Chai') {
+                                                    effectivePrice = (rawPrice > 1000) ? rawPrice : 22000;
+                                                } else if (isGram) {
+                                                    effectivePrice = 220; // 22.000đ / 100g = 220đ/gam
+                                                }
+                                            } else if (isBomTicket && isGram && effectivePrice >= 1000) {
                                                 const conv = (matchedP && Number(matchedP.conversionRate) > 1) ? Number(matchedP.conversionRate) : 1000;
                                                 effectivePrice = Number((rawPrice / conv).toFixed(2));
                                             }
 
                                             let lineAmt = Number(it.amount);
-                                            if (isNaN(lineAmt) || lineAmt <= 0) {
+                                            // Khắc phục hiển thị cho phiếu BOM cũ bị chia 2 lần khiến giá trị chỉ còn 215đ
+                                            if (isBomTicket && isKeo502 && (!lineAmt || lineAmt <= 500)) {
+                                                lineAmt = Math.round(qty * effectivePrice);
+                                            } else if (isNaN(lineAmt) || lineAmt <= 0) {
                                                 lineAmt = Math.round(qty * effectivePrice);
                                             }
 
@@ -1506,7 +1520,8 @@ const ImportExportTab = React.memo(function ImportExportTab({ data, pushData, is
                                             };
                                         });
 
-                                        const displayTotalAmount = (isBomTicket && calculatedTotal < Number(log.totalAmount || 0)) 
+                                        const hasCorruptedKeo = isBomTicket && rawItems.some(x => (String(x.sku || '').includes('502') || String(x.name || '').includes('502')) && Number(x.amount || 0) <= 500);
+                                        const displayTotalAmount = (isBomTicket && (hasCorruptedKeo || calculatedTotal < Number(log.totalAmount || 0))) 
                                             ? calculatedTotal 
                                             : Number(log.totalAmount || calculatedTotal || 0);
 

@@ -135,18 +135,18 @@ function calculateBomItemCost(mat, rawQty, rawBomUnit) {
     const isBomCm = bomUnit === 'cm' || bomUnit === 'centimet';
     const isBomMm = bomUnit === 'mm' || bomUnit === 'milimet';
 
-    // Nhận diện Keo 502 tính theo chai 162g
+    // Nhận diện Keo 502: 1 chai 162g - vỏ 62g = 100g keo thực tế, giá 22.000đ / 100g = 220đ/gam
     const isKeo502 = matSku.includes('502') || matName.includes('502') || matName.includes('keo');
-    const isMatChai162 = matUnit.includes('162') || matUnit === 'chai' || matName.includes('162') || matName.includes('chai');
+    const isMatChai502 = matUnit.includes('chai') || matName.includes('chai') || matUnit.includes('100') || matUnit.includes('162') || matName.includes('162');
 
     let convertedPrice = unitPrice;
     let convertedQty = qty;
     let conversionNote = '';
 
-    if (isKeo502 && isMatChai162 && isBomGram) {
-        convertedPrice = unitPrice / 162;
-        convertedQty = qty / 162;
-        conversionNote = '1 chai = 162g';
+    if (isKeo502 && isMatChai502 && isBomGram) {
+        convertedPrice = unitPrice / 100; // 22.000đ / 100g = 220đ/gam keo thực tế
+        convertedQty = qty / 100;         // Quy đổi số chai: 1 chai = 100g keo (162g tổng - 62g vỏ)
+        conversionNote = '1 chai = 100g keo (vỏ 62g, tổng 162g)';
     } else if (isMatKg && isBomGram) {
         convertedPrice = unitPrice / 1000;
         convertedQty = qty / 1000;

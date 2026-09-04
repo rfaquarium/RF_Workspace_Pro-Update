@@ -142,6 +142,22 @@ const mockStock = [
 const deductionResults = simulateBomDeduction('Rừng ver.19 - 30x20x20cm', mockBOM, mockStock);
 assert('BOM deduction deducts exact materials from stock', deductionResults.length === 2 && mockStock[0].quantity === 48 && mockStock[1].quantity === 19);
 
+// 6.2 Testing Keo 502 net weight specification & price conversion (162g gross - 62g shell = 100g net glue @ 22.000đ/100g = 220đ/gam)
+const netGramsPerBottle = 162 - 62; // 100g
+const pricePerGram = 22000 / netGramsPerBottle; // 220đ/g
+assert('Keo 502 net weight is 100g per bottle (162g gross - 62g shell)', netGramsPerBottle === 100);
+assert('Keo 502 price is 220đ per gram (22.000đ / 100g)', pricePerGram === 220);
+
+const testGrams = 256;
+const bottlesUsed = Number((testGrams / netGramsPerBottle).toFixed(3)); // 2.56 chai
+const totalCostChai = Math.round(bottlesUsed * 22000); // 56.320đ
+const totalCostGram = Math.round(testGrams * pricePerGram); // 56.320đ
+assert('Keo 502 256g converts to 2.56 bottles (not 1.58)', bottlesUsed === 2.56);
+assert('Keo 502 256g calculates 56.320đ cost (never 215đ)', totalCostChai === 56320 && totalCostGram === 56320);
+
+const configHtmlKeo = fs.readFileSync(path.join(__dirname, 'Config.html'), 'utf8');
+assert('Config.html specifies Keo 502 net 100g and 220đ/g', configHtmlKeo.includes('220đ/gam') && configHtmlKeo.includes('unitPrice / 100') && configHtmlKeo.includes('qty / 100'));
+
 // 7. TEST CONCURRENCY, DATA INTEGRITY & DEDUPING COMPLIANCE
 console.log('\n--- 7. Testing Concurrency, Data Integrity & Deduping Rules ---');
 

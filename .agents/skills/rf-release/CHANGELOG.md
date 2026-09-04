@@ -4,6 +4,32 @@ Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến tr
 
 ---
 
+## [v2.40.5] - 2026-09-04
+
+### 💎 Chuẩn Hóa Trọng Lượng Tịnh & Đơn Giá Keo 502 (1 Chai = 100g Keo Thực Tế, 220đ/gam)
+- **Phân tích nguyên nhân gốc rễ (Root Cause Analysis)**:
+  - **Quy chuẩn vật lý thực tế**: 1 chai keo 502 mua vào có tổng cân nặng là **162g** (cả chai đầy), vỏ chai rỗng (khi dùng hết keo) nặng **62g**. Do đó, lượng keo thực tế sử dụng được bên trong là **100g keo** (162g - 62g = 100g keo).
+  - **Đơn giá mua vào**: Giá mua 1 chai là **22.000đ / 100g keo thực tế**, suy ra đơn giá mỗi gam keo chuẩn xác là:
+    $$\text{Đơn giá 1 gam keo} = \frac{22.000\text{ đ}}{100\text{ gam}} = \mathbf{220\text{ đ/gam}}$$
+  - **Lỗi hệ thống cũ**:
+    1. Chia cho 162 thay vì 100 ($22.000 / 162 = 136\text{ đ/gam}$), làm hạ giá vốn keo phi thực tế gần 40%.
+    2. Nghiêm trọng hơn, khi cấn trừ lệnh sản xuất (ví dụ dùng 256g keo), hệ thống chia 162 thành `1.58 chai`, nhưng lại gán đơn vị là `gam` và tiếp tục chia giá 22.000 cho 162 thành `136đ`, dẫn tới lỗi chia 2 lần khiến tiền keo chỉ còn: $1.58 \times 136\text{đ} = \mathbf{215\text{ đ}}$ (hai trăm mười lăm đồng)!
+- **Nâng cấp Toàn Diện Engine Tính Chi Phí & Định Mức**:
+  - `Config.html` (`calculateBomItemCost`): Nhận diện Keo 502 quy đổi chuẩn `unitPrice / 100` (= 220đ/gam) và `qty / 100` (số chai tiêu hao thực tế theo 100g keo/chai).
+  - `Code.js` (`getBomMapByLayout`, `_processMaterialDeduction_Core`, `syncBomConfigFromLayoutSheet`):
+    - Đơn vị chai quy đổi: $\text{Số chai} = \text{Tổng số gam keo} / 100$.
+    - Đơn giá keo: 22.000đ/chai hoặc 220đ/gam.
+    - Thành tiền: Khớp chuẩn xác $256\text{g} \times 220\text{đ} = 2.56\text{ chai} \times 22.000\text{đ} = \mathbf{56.320\text{ đ}}$ (triệt tiêu vĩnh viễn con số 215đ).
+  - `Tab_ImportExport.html`:
+    - Bảo toàn hiển thị đúng đơn vị `Chai` hoặc `gam` theo từng chứng từ, không đè nhầm đơn vị chéo.
+    - Tự động sửa hiển thị cho các phiếu xuất BOM cũ bị chia đúp khiến tiền keo $\le 500$đ.
+  - Bổ sung runner `AAA_REPAIR_KEO502_PRICE_AND_BOM()` (`repairKeo502PriceAndBom`): Chuẩn hóa tự động bảng `Products`, `BomLayout` và cập nhật dữ liệu các phiếu `IE_BOM_` / `IE_TP_` cũ.
+- **Kiểm định tự động đạt 175/175 test cases Passed (`run_tests.js`)**:
+  - Xác thực công thức 162g - 62g = 100g keo thực tế.
+  - Xác thực đơn giá 220đ/gam và chi phí 56.320đ cho 256g keo.
+
+---
+
 ## [v2.40.4] - 2026-09-04
 
 ### 🎯 Bảo Vệ Chính Xác Mã Vận Đơn (MVĐ) & Triệt Tiêu Nhận Diện Nhầm "Mã Kiện Hàng" Shopee

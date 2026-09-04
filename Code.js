@@ -19,6 +19,13 @@ function AAA_RUN_STANDARDIZE_SKU() {
   return standardizeWarehouseSKU();
 }
 
+/**
+ * ⚡ RUNNER CHẠY NHANH: SỬA ĐỊNH MỨC & GIÁ KEO 502 (1 CHAI 162G - VỎ 62G = 100G KEO, GIÁ 22.000Đ/100G)
+ */
+function AAA_REPAIR_KEO502_PRICE_AND_BOM() {
+  return repairKeo502PriceAndBom();
+}
+
 var SCHEMA = {
   Orders: ['id', 'orderCode', 'channel', 'customer', 'createdAt', 'deadline', 'date', 'status', 'accessories', 'hasProduction', 'isCarriedToWH', 'updatedBy', 'revenue', 'phone', 'address', 'note', 'prePaid', 'cod', 'costTotal', 'responsibleUser', 'discount', 'shippingMethod', 'sizeCoefficient', 'cogs', 'feeFixed', 'feeService', 'feePayment', 'feeAffiliate', 'shopVoucher', 'tax', 'reconciledAt', 'isReconciled', 'isUrgent', 'urgentAt'],
   Orders_Archive: ['id', 'orderCode', 'channel', 'customer', 'createdAt', 'deadline', 'date', 'status', 'accessories', 'hasProduction', 'isCarriedToWH', 'updatedBy', 'revenue', 'phone', 'address', 'note', 'prePaid', 'cod', 'costTotal', 'responsibleUser', 'discount', 'shippingMethod', 'sizeCoefficient', 'cogs', 'feeFixed', 'feeService', 'feePayment', 'feeAffiliate', 'shopVoucher', 'tax', 'reconciledAt', 'isReconciled', 'isUrgent', 'urgentAt'],
@@ -327,6 +334,15 @@ function handleApiRequest(payload) {
       var auth = validatePin(pin);
       if (auth && auth.valid) {
         response = syncBomMaterialSkusWithProducts(payload);
+      } else {
+        response.message = 'Xác thực thất bại!';
+      }
+    }
+    else if (action === 'repairKeo502PriceAndBom') {
+      var pin = payload.pin;
+      var auth = validatePin(pin);
+      if (auth && auth.valid) {
+        response = repairKeo502PriceAndBom();
       } else {
         response.message = 'Xác thực thất bại!';
       }
@@ -8910,14 +8926,15 @@ function getBomFromBomLayoutSheet(ss, prodName, targetSku) {
       });
 
       if (totalKeoGrams > 0) {
-        var bottleQty = Number((totalKeoGrams / 162).toFixed(3));
+        // 1 chai keo 502: 162g tổng - 62g vỏ = 100g keo thực tế, giá 22.000đ/100g
+        var bottleQty = Number((totalKeoGrams / 100).toFixed(3));
         items['NLSX-502-1CHAI'] = {
           sku: 'NLSX-502-1CHAI',
           qty: bottleQty,
           grams: totalKeoGrams,
           prodUnit: 'gam',
-          importUnit: 'Chai 162g',
-          unit: 'Chai 162g',
+          importUnit: 'Chai 100g',
+          unit: 'Chai',
           price: 22000
         };
       }
@@ -9279,14 +9296,20 @@ function _processMaterialDeduction_Core(prodId, materialUsageData, ss) {
         var displayUnit = matUnit || bomProdUnit || 'kg';
         var unitPrice = rawCost;
 
-        if (isKeo502 && (isMatChai || matUnitClean === 'chai')) {
-          if (bomItem.grams) {
-            convertedDeductQty = Number((bomItem.grams / 162).toFixed(3));
-          } else if (isProdGram) {
-            convertedDeductQty = Number((deductQty / 162).toFixed(3));
+        if (isKeo502) {
+          // Keo 502: 1 chai 162g - vỏ 62g = 100g keo thực tế, giá 22.000đ / 100g = 220đ/gam
+          var totalKeoGrams = bomItem.grams || (isProdGram ? (deductQty > 10 ? deductQty : deductQty * 100) : (deductQty <= 10 ? deductQty * 100 : deductQty));
+          if (isMatChai || matUnitClean === 'chai') {
+            // Kho quản lý bằng CHAI: Trừ số chai thực tế tiêu hao (1 chai = 100g keo)
+            convertedDeductQty = Number((totalKeoGrams / 100).toFixed(3));
+            displayUnit = 'Chai';
+            unitPrice = (rawCost > 0) ? rawCost : 22000;
+          } else {
+            // Kho quản lý bằng GAM: Trừ số gam keo thực tế tiêu hao
+            convertedDeductQty = Number(totalKeoGrams.toFixed(2));
+            displayUnit = 'gam';
+            unitPrice = 220; // 22.000đ / 100g = 220đ/gam
           }
-          displayUnit = 'Chai 162g';
-          unitPrice = (rawCost > 0) ? rawCost : 22000;
         } else if (isMatKg && isProdGram) {
           // Kho quản lý bằng KG, BOM xuất bằng GAM -> quy đổi số lượng xuất sang KG (đơn giá giữ nguyên theo KG)
           convertedDeductQty = Number((deductQty / 1000).toFixed(4));
@@ -9646,11 +9669,11 @@ function repairAllBomTickets() {
 
             if (isKeo) {
               if (item.grams) {
-                displayQty = Number((item.grams / 162).toFixed(3));
+                displayQty = Number((item.grams / 100).toFixed(3));
               } else if (isGram) {
-                displayQty = Number((item.qty / 162).toFixed(3));
+                displayQty = Number((item.qty / 100).toFixed(3));
               }
-              displayUnit = 'Chai 162g';
+              displayUnit = 'Chai';
               unitCost = 22000;
             } else if (isKg) {
               if (item.qty >= 10 || isGram) {
@@ -9886,6 +9909,151 @@ function cleanupPhantomBomTickets() {
   } catch (err) {
     Logger.log('Lỗi cleanupPhantomBomTickets: ' + err.toString());
     return { success: false, message: 'Lỗi: ' + err.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * SỬA ĐỊNH MỨC & GIÁ KEO 502 TRÊN TOÀN HỆ THỐNG
+ * 1 chai keo 502: tổng 162g, vỏ chai rỗng 62g -> còn 100g keo thực tế.
+ * Giá mua 22.000đ / chai (100g keo) -> Đơn giá thực tế = 220đ / gam keo!
+ */
+function repairKeo502PriceAndBom() {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (e) {
+    return { success: false, message: 'Hệ thống đang bận, vui lòng thử lại sau!' };
+  }
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var results = { productsUpdated: 0, bomLayoutUpdated: 0, ieTicketsUpdated: 0 };
+
+    // 1. Cập nhật bảng Products
+    var pSheet = ss.getSheetByName('Products');
+    if (pSheet) {
+      var pData = pSheet.getDataRange().getValues();
+      var pHeaders = pData[0];
+      var skuIdx = pHeaders.indexOf('sku');
+      var nameIdx = pHeaders.indexOf('name');
+      var costIdx = pHeaders.indexOf('costPrice');
+      var unitIdx = pHeaders.indexOf('unit');
+      var importUnitIdx = pHeaders.indexOf('importUnit');
+      var convRateIdx = pHeaders.indexOf('conversionRate');
+
+      for (var r = 1; r < pData.length; r++) {
+        var sku = String(pData[r][skuIdx] || '').trim().toUpperCase();
+        var name = String(pData[r][nameIdx] || '').trim().toLowerCase();
+        if (sku.indexOf('502') !== -1 || name.indexOf('502') !== -1 || name.indexOf('keo 502') !== -1) {
+          if (costIdx >= 0) pSheet.getRange(r + 1, costIdx + 1).setValue(22000);
+          if (importUnitIdx >= 0) pSheet.getRange(r + 1, importUnitIdx + 1).setValue('Chai 100g');
+          if (convRateIdx >= 0) pSheet.getRange(r + 1, convRateIdx + 1).setValue(100);
+          results.productsUpdated++;
+        }
+      }
+    }
+
+    // 2. Cập nhật bảng BomLayout
+    var bSheet = ss.getSheetByName('BomLayout');
+    if (bSheet) {
+      var bData = bSheet.getDataRange().getValues();
+      if (bData.length >= 5) {
+        for (var c = 2; c < bData[0].length; c++) {
+          var header = String(bData[1] ? bData[1][c] : '').toUpperCase();
+          if (header.indexOf('502') !== -1 || header.indexOf('KEO') !== -1) {
+            // Dòng 3 (index 2): Đơn giá nhập = 22.000 đ
+            if (bData[2]) {
+              bSheet.getRange(3, c + 1).setValue('22.000 đ');
+            }
+            // Dòng 4 (index 3): Đơn vị nhập = Chai 100g
+            if (bData[3]) {
+              bSheet.getRange(4, c + 1).setValue('Chai 100g');
+            }
+            results.bomLayoutUpdated++;
+          }
+        }
+      }
+    }
+
+    // 3. Sửa lại các phiếu xuất BOM cũ trong ImportExport bị sai giá 136đ/215đ
+    var ieSheet = ss.getSheetByName('ImportExport');
+    if (ieSheet) {
+      var ieData = ieSheet.getDataRange().getValues();
+      var ieHeaders = ieData[0];
+      var idIdx = ieHeaders.indexOf('id');
+      var totalAmtIdx = ieHeaders.indexOf('totalAmount');
+      var itemsIdx = ieHeaders.indexOf('itemsData');
+
+      for (var i = 1; i < ieData.length; i++) {
+        var rowId = String(ieData[i][idIdx] || '').trim();
+        if (rowId.startsWith('IE_BOM_')) {
+          var rawJson = ieData[i][itemsIdx];
+          if (!rawJson) continue;
+          try {
+            var items = JSON.parse(rawJson);
+            if (!Array.isArray(items)) continue;
+            var isChanged = false;
+            var newTotal = 0;
+
+            items.forEach(function(it) {
+              var itSku = String(it.sku || '').toUpperCase();
+              var itName = String(it.name || '').toLowerCase();
+              var isKeo = itSku.indexOf('502') !== -1 || itName.indexOf('502') !== -1 || itName.indexOf('keo') !== -1;
+              if (isKeo && (Number(it.price) < 500 || Number(it.amount) <= 500)) {
+                var uClean = String(it.unit || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+                var isChai = uClean === 'chai' || uClean.indexOf('chai') !== -1;
+                if (isChai) {
+                  it.price = 22000;
+                  it.costPrice = 22000;
+                  it.unit = 'Chai';
+                  it.amount = Math.round(it.qty * 22000);
+                } else {
+                  it.price = 220;
+                  it.costPrice = 220;
+                  it.unit = 'gam';
+                  it.amount = Math.round(it.qty * 220);
+                }
+                isChanged = true;
+              }
+              newTotal += Number(it.amount || 0);
+            });
+
+            if (isChanged) {
+              ieSheet.getRange(i + 1, itemsIdx + 1).setValue(JSON.stringify(items));
+              ieSheet.getRange(i + 1, totalAmtIdx + 1).setValue(Math.round(newTotal));
+              results.ieTicketsUpdated++;
+
+              // Đồng bộ cập nhật phiếu Nhập Thành Phẩm IE_TP_ tương ứng
+              var tpLogId = rowId.replace('IE_BOM_', 'IE_TP_');
+              for (var j = 1; j < ieData.length; j++) {
+                if (String(ieData[j][idIdx] || '').trim() === tpLogId) {
+                  ieSheet.getRange(j + 1, totalAmtIdx + 1).setValue(Math.round(newTotal));
+                  var tpItemsJson = ieData[j][itemsIdx];
+                  if (tpItemsJson) {
+                    try {
+                      var tpItems = JSON.parse(tpItemsJson);
+                      if (Array.isArray(tpItems) && tpItems[0]) {
+                        tpItems[0].price = Math.round(newTotal);
+                        tpItems[0].costPrice = Math.round(newTotal);
+                        tpItems[0].amount = Math.round(newTotal);
+                        ieSheet.getRange(j + 1, itemsIdx + 1).setValue(JSON.stringify(tpItems));
+                      }
+                    } catch (e) {}
+                  }
+                  break;
+                }
+              }
+            }
+          } catch (e) {}
+        }
+      }
+    }
+
+    return { success: true, results: results, message: 'Đã chuẩn hóa giá Keo 502 (100g keo, 220đ/g) thành công!' };
+  } catch (err) {
+    return { success: false, message: err.toString() };
   } finally {
     lock.releaseLock();
   }
@@ -10588,8 +10756,8 @@ function autoGenerateAndSyncLayoutBOM() {
       REU_DO: 15,     // P - Rêu Đỏ (gam)
       FOMEX_8LI: 16,  // Q - Fomex 8li (m²)
       FOMEX_10LI: 17, // R - Fomex 10li (m²)
-      KEO_DK: 18,     // S - Keo Dựng Khung (Chai 162g / gam)
-      KEO_GC: 19      // T - Keo Gia Cố (Chai 162g / gam)
+      KEO_DK: 18,     // S - Keo Dựng Khung (Chai 100g keo / gam)
+      KEO_GC: 19      // T - Keo Gia Cố (Chai 100g keo / gam)
     };
 
     const woodCols = [COL.SAN_MIENG, COL.SAN_CANH, COL.DO_QUYEN, COL.RE_RUNG, COL.THACH_SUNG, COL.NHO_NOI];
@@ -10736,13 +10904,14 @@ function autoGenerateAndSyncLayoutBOM() {
         // Gom Keo 502 (Dựng Khung + Gia Cố)
         const totalKeoGrams = (Number(data[r][COL.KEO_DK]) || 0) + (Number(data[r][COL.KEO_GC]) || 0);
         if (totalKeoGrams > 0) {
-          const bottleQty = Number((totalKeoGrams / 162).toFixed(2));
+          // 1 chai keo 502: 162g tổng - 62g vỏ = 100g keo thực tế, giá 22.000đ/100g
+          const bottleQty = Number((totalKeoGrams / 100).toFixed(2));
           newBomRows.push([
             `BOM_${targetCode}_502`,
             targetCode,
             'NLSX-502-1CHAI',
             bottleQty,
-            'Chai 162g'
+            'Chai'
           ]);
         }
 

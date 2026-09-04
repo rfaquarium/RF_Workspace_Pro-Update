@@ -781,9 +781,39 @@
 
         const RELEASES = [
             {
-                version: 'Royal v2.40.2',
+                version: 'Royal v2.40.3',
                 date: '04/09/2026',
                 isLatest: true,
+                badge: 'CHUẨN HÓA MVĐ & TRẠM BƠM ĐƠN EXCEL',
+                badgeColor: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+                title: 'Chuẩn Hóa Bộ Phân Giải & Cập Nhật Mã Vận Đơn (MVĐ) Tại Trạm Bơm Đơn',
+                summary: 'Khắc phục triệt để sự cố không nhận diện hoặc không cập nhật mã vận đơn khi nạp file Excel từ Shopee và TikTok (Order.toship, Order.all). Mở rộng 30+ từ khóa nhận diện cột vận đơn, dọn sạch chuỗi rác None/công thức, giải phóng điều kiện so khớp hasNewTrack cho phép cập nhật đè MVĐ mới và tự động chuyển đơn sang Sẵn Sàng Đóng Gói theo đúng quy trình Lean.',
+                categories: ['Trạm Bơm Đơn', 'Mã Vận Đơn', 'Shopee', 'TikTok Shop', 'Lean Flow'],
+                items: [
+                    {
+                        icon: 'fa-barcode',
+                        color: 'text-blue-400',
+                        title: 'Mở Rộng 30+ Từ Khóa Quét Tiêu Đề Cột Mã Vận Đơn (iTrack)',
+                        desc: 'Bao quát 100% các biến thể header: Mã vận đơn, Số theo dõi, Mã theo dõi, Tracking Number, Tracking ID, Waybill, AWB... cho mọi file Shopee VN, Shopee Global và TikTok.'
+                    },
+                    {
+                        icon: 'fa-broom',
+                        color: 'text-amber-400',
+                        title: 'Khử Sạch Chuỗi Rác None & Công Thức Excel',
+                        desc: 'Tự động lọc bỏ các giá trị None, null, - do Shopee xuất khi đơn chưa sắp xếp lấy hàng; bóc tách sạch sẽ công thức ="SPXVN..." và ký tự ẩn giúp nhận diện mã vận đơn chính xác 100%.'
+                    },
+                    {
+                        icon: 'fa-sync-alt',
+                        color: 'text-emerald-400',
+                        title: 'Động Cơ Cập Nhật Đè MVĐ & Nhãn Trực Quan [CẬP NHẬT MVĐ]',
+                        desc: 'Cho phép cập nhật mã vận đơn mới cho các đơn cũ đang chờ; hiển thị nhãn hổ phách [CẬP NHẬT MVĐ] và tự động kích hoạt nút Chốt bơm đơn, đẩy đủ shippingCode vào hệ thống.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.40.2',
+                date: '04/09/2026',
+                isLatest: false,
                 badge: 'ROYAL IMAGE LIGHTBOX & DIỆT LỖI DRIVE CHẶN',
                 badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
                 title: 'Trình Xem Phóng To Ảnh Nội Bộ (Royal Image Lightbox) & Triệt Tiêu Lỗi Bị Chặn Google Drive',
@@ -4740,7 +4770,7 @@
                                 Nhật Ký Cập Nhật Hệ Thống
                             </h1>
                             <span className="px-2 py-0.5 rounded bg-[#d4af37]/10 text-[#d4af37] text-[11px] font-mono font-bold border border-[#d4af37]/30">
-                                Royal v2.40.2
+                                Royal v2.40.3
                             </span>
                         </div>
                         <p className="text-[12px] text-zinc-400 mt-0.5">
@@ -6072,7 +6102,7 @@
                                     <div className="w-5 flex justify-center text-[#d4af37] text-[13px]"><i className="fas fa-rocket"></i></div>
                                     <span>Bản Cập Nhật</span>
                                 </div>
-                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.40.2</span>
+                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.40.3</span>
                             </button>
                         </div>
                     </div>

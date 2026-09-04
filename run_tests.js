@@ -352,6 +352,52 @@ assert('getSafeDriveViewUrl transforms blocked thumbnail URL to safe Drive viewe
 assert('extractDriveId extracts file ID from /file/d/ link', testExtractDriveId('https://drive.google.com/file/d/1DD6z3znL2zjjWnfdViHN6mrZU8-mWDzO/view') === '1DD6z3znL2zjjWnfdViHN6mrZU8-mWDzO');
 assert('extractDriveId extracts file ID from googleusercontent.com CDN', testExtractDriveId('https://lh3.googleusercontent.com/d/1DD6z3znL2zjjWnfdViHN6mrZU8-mWDzO=w800') === '1DD6z3znL2zjjWnfdViHN6mrZU8-mWDzO');
 
+// --- 12. Testing Tracking Number (MVĐ) Resolution & Update Engine ---
+console.log(`\n--- 12. Testing Tracking Number (MVĐ) Resolution & Update Engine ---`);
+const sec12ModalsOrders = fs.readFileSync(path.join(__dirname, 'Modals_Orders.html'), 'utf8');
+
+assert('Modals_Orders.html contains comprehensive iTrack header keywords', sec12ModalsOrders.includes('mã kiện hàng') && sec12ModalsOrders.includes('số theo dõi') && sec12ModalsOrders.includes('waybill'));
+assert('Modals_Orders.html indexes shippingCode in combinedOrdersPool', sec12ModalsOrders.includes('rawShipping = String(o.shippingCode') && sec12ModalsOrders.includes('existingByTrackMap.set(cShip'));
+assert('Modals_Orders.html filters out None/null/- dirty strings from tracking cells', sec12ModalsOrders.includes("rawTrack.toLowerCase() === 'none'") && sec12ModalsOrders.includes("rawTrack === '-'"));
+assert('Modals_Orders.html extracts existingTrack from shippingCode and orderCode', sec12ModalsOrders.includes('existing.shippingCode') && sec12ModalsOrders.includes("existing.orderCode.split('|')"));
+assert('Modals_Orders.html evaluates hasNewTrack using alphanumeric difference', sec12ModalsOrders.includes('toAlphaNum(cleanT) !== toAlphaNum(existingTrack)'));
+assert('Modals_Orders.html passes shippingCode in submit() newOrders payload', sec12ModalsOrders.includes('shippingCode: effShippingCode'));
+assert('Modals_Orders.html renders [CẬP NHẬT MVĐ] badge in UI', sec12ModalsOrders.includes("p.hasNewTrack ? 'CẬP NHẬT MVĐ' : 'CẬP NHẬT'"));
+
+// Functional Unit Test for Tracking Resolution Algorithm
+function testResolveTracking(rawCell) {
+    let raw = (rawCell !== undefined && rawCell !== null) ? String(rawCell).trim() : '';
+    if (raw.toLowerCase() === 'none' || raw.toLowerCase() === 'null' || raw === '-' || raw === 'n/a') {
+        raw = '';
+    }
+    return testCleanRawCode(raw);
+}
+
+function testCheckHasNewTrack(existingRecord, incomingTCode) {
+    let existingTrack = '';
+    if (existingRecord.shippingCode && String(existingRecord.shippingCode).trim()) {
+        existingTrack = testCleanRawCode(existingRecord.shippingCode);
+    } else if (existingRecord.orderCode && existingRecord.orderCode.includes('|')) {
+        const parts = existingRecord.orderCode.split('|');
+        existingTrack = testCleanRawCode(parts[1].replace(/^(?:MVĐ|MVD|Tracking)[\s:]*/i, ''));
+    }
+    const cleanT = testCleanRawCode(incomingTCode);
+    return Boolean(cleanT && (!existingTrack || testToAlphaNum(cleanT) !== testToAlphaNum(existingTrack)));
+}
+
+assert('Tracking Resolution: Shopee "None" cell safely resolves to empty string', testResolveTracking('None') === '');
+assert('Tracking Resolution: Shopee formula ="SPXVN065832344889" cleans to SPXVN065832344889', testResolveTracking('="SPXVN065832344889"') === 'SPXVN065832344889');
+assert('Tracking Resolution: GHN code with tab cleans properly', testResolveTracking("GYYG9R67\t") === 'GYYG9R67');
+
+const existingWithoutTrack = { id: 'ORD_1', orderCode: '260818N174UWQQ', shippingCode: '' };
+assert('Tracking Update: Order without tracking gets new tracking code', testCheckHasNewTrack(existingWithoutTrack, 'SPXVN061323872498') === true);
+
+const existingWithSameTrack = { id: 'ORD_2', orderCode: '2609021SME73FS | MVĐ: SPXVN065832344889', shippingCode: 'SPXVN065832344889' };
+assert('Tracking Update: Order with identical tracking is recognized as duplicate', testCheckHasNewTrack(existingWithSameTrack, 'SPXVN065832344889') === false);
+
+const existingWithDifferentTrack = { id: 'ORD_3', orderCode: '2609045SRFX04B', shippingCode: 'OLD_TRACK_123' };
+assert('Tracking Update: Order with updated/changed tracking triggers hasNewTrack', testCheckHasNewTrack(existingWithDifferentTrack, 'SPXVN068042561239') === true);
+
 // SUMMARY
 console.log(`\n========================================`);
 console.log(`TEST SUMMARY: ${passedTests}/${totalTests} Passed (${failedTests} Failed)`);

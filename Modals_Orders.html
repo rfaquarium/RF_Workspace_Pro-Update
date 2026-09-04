@@ -745,7 +745,15 @@
             }
 
             let iCode = findCol(['mã đơn hàng', 'mã đơn', 'order id', 'order sn', 'order_sn', 'order_id', 'order no', 'order no.', 'order number', 'หมายเลขคำสั่งซื้อ', 'no. pesanan', 'id pesanan']);
-            let iTrack = findCol(['mã vận đơn', 'mã bưu gửi', 'tracking number', 'tracking id', 'tracking no', 'tracking no.', 'tracking_number', 'tracking_no', 'หมายเลขติดตามพัสดุ', 'no. penjejakan']);
+            let iTrack = findCol([
+                'mã vận đơn', 'ma van don', 'mvd', 'mvđ', 
+                'tracking number', 'tracking id', 'tracking no', 'tracking no.', 'tracking #', 'tracking code', 'tracking',
+                'mã theo dõi', 'ma theo doi', 'số theo dõi', 'so theo doi', 
+                'mã bưu gửi', 'ma buu gui', 'số vận đơn', 'so van don', 
+                'mã vận chuyển', 'ma van chuyen', 'mã kiện hàng', 'ma kien hang', 
+                'waybill', 'awb', 'airway bill', 'air waybill', 'shipping number', 'shipping no', 'shipping code', 'delivery id', 
+                'หมายเลขติดตามพัสดุ', 'no. penjejakan'
+            ]);
             let iProd = findCol(['tên sản phẩm', 'product name', 'ชื่อสินค้า', 'item name', 'product_name']);
             let iVar = findCol(['tên phân loại', 'variation name', 'variation', 'tên mẫu mã', 'tên biến thể', 'tên sku', 'sku name', 'thông tin phân loại', 'phân loại', 'ชื่อตัวเลือกสินค้า', 'ชื่อตัวเลือก', 'variation_name', 'model name', 'option']);
             let iQty = findCol(['số lượng', 'quantity', 'จำนวน', 'qty', 'quantity_purchased']);
@@ -817,14 +825,17 @@
                 if (!o) return;
                 const rawCode = String(o.orderCode || '').trim();
                 const rawId = String(o.id || '').trim();
+                const rawShipping = String(o.shippingCode || '').trim();
                 
                 // Tách phần mã đơn và mã vận đơn nếu có dấu gạch đứng '|'
                 let basePart = rawCode;
-                let trackPart = '';
+                let trackPart = rawShipping;
                 if (rawCode.includes('|')) {
                     const splitParts = rawCode.split('|');
                     basePart = splitParts[0].trim();
-                    trackPart = splitParts.slice(1).join('|').replace(/^(?:MVĐ|MVD|Tracking)[\s:]*/i, '').trim();
+                    if (!trackPart) {
+                        trackPart = splitParts.slice(1).join('|').replace(/^(?:MVĐ|MVD|Tracking)[\s:]*/i, '').trim();
+                    }
                 } else if (rawCode.includes(' - ')) {
                     const splitParts = rawCode.split(' - ');
                     basePart = splitParts[0].trim();
@@ -834,21 +845,25 @@
                 const cTrack = cleanRawCode(trackPart);
                 const cFull = cleanRawCode(rawCode);
                 const cId = cleanRawCode(rawId);
+                const cShip = cleanRawCode(rawShipping);
 
                 if (cBase) existingByCodeMap.set(cBase.toLowerCase(), o);
                 if (cFull) existingByCodeMap.set(cFull.toLowerCase(), o);
                 if (cTrack) existingByTrackMap.set(cTrack.toLowerCase(), o);
+                if (cShip) existingByTrackMap.set(cShip.toLowerCase(), o);
                 if (cId) existingByIdMap.set(cId.toLowerCase(), o);
 
                 const aBase = toAlphaNum(cBase);
                 const aTrack = toAlphaNum(cTrack);
                 const aFull = toAlphaNum(cFull);
                 const aId = toAlphaNum(cId);
+                const aShip = toAlphaNum(cShip);
 
                 if (aBase) existingByAlphaMap.set(aBase, o);
                 if (aTrack) existingByAlphaMap.set(aTrack, o);
                 if (aFull) existingByAlphaMap.set(aFull, o);
                 if (aId) existingByAlphaMap.set(aId, o);
+                if (aShip) existingByAlphaMap.set(aShip, o);
             });
 
             // Hàm tra cứu so khớp đơn hàng cũ tuyệt đối (Exact + Alphanumeric + Substring)
@@ -900,9 +915,14 @@
                 for (let i = currentIndex; i < endIndex; i++) {
                     const cols = rows[i];
                     if (iCode < 0 || !cols[iCode]) continue;
-                    const oCode = String(cols[iCode]).trim();
+                    let rawOrderCode = String(cols[iCode]).trim();
+                    const oCode = cleanRawCode(rawOrderCode);
                     if (!oCode || oCode.toLowerCase().includes('mã đơn') || oCode.toLowerCase().includes('platform unique')) continue;
-                    const tCode = (iTrack >= 0 && cols[iTrack]) ? String(cols[iTrack]).trim() : '';
+                    let rawTrack = (iTrack >= 0 && cols[iTrack] !== undefined && cols[iTrack] !== null) ? String(cols[iTrack]).trim() : '';
+                    if (rawTrack.toLowerCase() === 'none' || rawTrack.toLowerCase() === 'null' || rawTrack === '-' || rawTrack === 'n/a') {
+                        rawTrack = '';
+                    }
+                    const tCode = cleanRawCode(rawTrack);
                     const finalOrderCode = tCode ? `${oCode} | MVĐ: ${tCode}` : oCode;
                     const varSku = (iVarSku >= 0 && cols[iVarSku]) ? String(cols[iVarSku]).trim() : '';
                     const parentSku = (iParentSku >= 0 && cols[iParentSku]) ? String(cols[iParentSku]).trim() : '';
@@ -1084,8 +1104,8 @@
                         if (orderMap[oCode].customer === 'Khách' && customerName !== 'Khách') {
                             orderMap[oCode].customer = customerName;
                         }
-                        if (!orderMap[oCode].orderCode.includes(' | MVĐ: ') && finalOrderCode.includes(' | MVĐ: ')) {
-                            orderMap[oCode].orderCode = finalOrderCode;
+                        if (tCode && !orderMap[oCode].orderCode.includes(' | MVĐ: ')) {
+                            orderMap[oCode].orderCode = `${oCode} | MVĐ: ${tCode}`;
                         }
                         // [REMOVED] Không cộng dồn rawStatus để Exact Match luôn chính xác với dòng đầu tiên của sản phẩm
                         const isItemLevel = ['đơn giá', 'deal price', 'giá bán deal', 'giá bán', 'original price'].some(k => headers[iRevenue] && headers[iRevenue].includes(k));
@@ -1147,11 +1167,18 @@
 
                         const existing = findExistingOrder(baseCode, tCode);
                         if (existing) {
-                            const existingTrack = (existing.orderCode || '').includes('|') ? (existing.orderCode || '').split('|')[1].replace(/^(?:MVĐ|MVD|Tracking)[\s:]*/i, '').trim() : '';
+                            let existingTrack = '';
+                            if (existing.shippingCode && String(existing.shippingCode).trim()) {
+                                existingTrack = cleanRawCode(existing.shippingCode);
+                            } else if (existing.orderCode && existing.orderCode.includes('|')) {
+                                const parts = existing.orderCode.split('|');
+                                existingTrack = cleanRawCode(parts[1].replace(/^(?:MVĐ|MVD|Tracking)[\s:]*/i, ''));
+                            }
+                            const cleanT = cleanRawCode(tCode);
+                            const hasNewTrack = Boolean(cleanT && (!existingTrack || toAlphaNum(cleanT) !== toAlphaNum(existingTrack)));
                             const existingCustomer = existing.customer || '';
                             const existingRevenue = Number(existing.revenue || 0);
 
-                            const hasNewTrack = tCode && !existingTrack;
                             const hasNewCustomer = (o.customer && o.customer !== 'Khách') && (!existingCustomer || existingCustomer === 'Khách');
                             const hasNewRevenue = o.revenue > 0 && existingRevenue === 0;
 
@@ -1174,12 +1201,16 @@
                             o.mappedStatus = mappedStatus; // Truyền xuống function submit
 
                             if (hasNewTrack || hasNewCustomer || hasNewRevenue || hasNewStatus || hasNewFees || hasNewNote) {
+                                const updatedOrderCode = cleanT ? `${cleanRawCode(baseCode)} | MVĐ: ${cleanT}` : o.orderCode;
                                 return {
                                     ...o,
+                                    orderCode: updatedOrderCode,
+                                    shippingCode: cleanT || existingTrack || '',
                                     isDuplicate: false,
                                     isUpdate: true,
                                     existingId: existing.id,
-                                    existingRecord: existing
+                                    existingRecord: existing,
+                                    hasNewTrack: hasNewTrack
                                 };
                             } else {
                                 return {
@@ -1192,6 +1223,7 @@
                         }
                         return {
                             ...o,
+                            shippingCode: cleanRawCode(tCode),
                             isDuplicate: false,
                             isUpdate: false
                         };
@@ -1450,22 +1482,29 @@
                         const finalHasProduction = currentOrderProdItems.length > 0 || orderHasProductionNeeded || (hasExistingProds && isExistingTerminal);
                         let finalStatus = calculatedStatus;
                         if (!finalStatus) {
-                            const hasTracking = o.orderCode && o.orderCode.includes(' | MVĐ: ') && o.orderCode.split(' | MVĐ: ')[1].trim() !== '';
+                            const hasTracking = (o.shippingCode && o.shippingCode.trim()) || 
+                                (o.orderCode && o.orderCode.includes(' | MVĐ: ') && o.orderCode.split(' | MVĐ: ')[1].trim() !== '');
                             const isWaitConfirm = o.rawStatus && String(o.rawStatus).toLowerCase().includes('chờ xác nhận');
                             if (finalHasProduction && orderHasProductionNeeded) {
                                 finalStatus = 'Chờ Sản Xuất';
                             } else if (!hasTracking || isWaitConfirm) {
                                 finalStatus = 'Chờ Sản Xuất';
                             } else {
-                                finalStatus = 'Sẵn Sàng Đóng Gói';
+                                finalStatus = (o.existingRecord && ['Chờ Bàn Giao', 'Đã Bàn Giao', 'Đối Soát Thành Công', 'Hoàn Thành', 'Hàng Hoàn', 'Đơn Huỷ'].includes(o.existingRecord.status))
+                                    ? o.existingRecord.status
+                                    : 'Sẵn Sàng Đóng Gói';
                             }
                         }
+
+                        const effShippingCode = o.shippingCode || (o.orderCode.includes('|') ? o.orderCode.split('|')[1].replace(/^(?:MVĐ|MVD|Tracking)[\s:]*/i, '').trim() : '') || (o.existingRecord && o.existingRecord.shippingCode) || '';
 
                         newOrders.push({
                             id: targetOrderId,
                             orderCode: o.orderCode,
                             channel: o.channel || (o.existingRecord && o.existingRecord.channel) || 'Shopee VN',
                             customer: (o.customer && o.customer !== 'Khách') ? o.customer : (o.existingRecord.customer || 'Khách'),
+                            phone: o.existingRecord.phone || '',
+                            address: o.existingRecord.address || '',
                             note: finalOrderCustomerNote,
                             createdAt: o.existingRecord.createdAt || safeDateFull,
                             deadline: o.existingRecord.deadline || defaultDeadline,
@@ -1474,12 +1513,15 @@
                             accessories: typeof finalAccessories === 'string' ? finalAccessories : JSON.stringify(finalAccessories),
                             hasProduction: finalHasProduction,
                             updatedBy: activeUser,
+                            responsibleUser: o.existingRecord.responsibleUser || activeUser,
                             revenue: Number(o.revenue || 0) > 0 ? Number(o.revenue) : Number(o.existingRecord.revenue || 0),
                             feeFixed: o.feeFixed || o.existingRecord.feeFixed || 0,
                             feeService: o.feeService || o.existingRecord.feeService || 0,
                             feePayment: o.feePayment || o.existingRecord.feePayment || 0,
                             feeAffiliate: o.feeAffiliate || o.existingRecord.feeAffiliate || 0,
-                            shopVoucher: o.shopVoucher || o.existingRecord.shopVoucher || 0
+                            shopVoucher: o.shopVoucher || o.existingRecord.shopVoucher || 0,
+                            shippingCode: effShippingCode,
+                            shippingMethod: o.shippingMethod || (o.existingRecord && o.existingRecord.shippingMethod) || ''
                         });
                     } else {
                         const orderDateFormatted = o.rawDate ? (o.rawDate.includes(' ') || o.rawDate.includes('T') ? o.rawDate.replace('T', ' ') : o.rawDate + ' 12:00') : safeDateFull;
@@ -1487,7 +1529,8 @@
                         const hasProdItems = newProdItems.some(p => p.orderId === targetOrderId);
                         let finalStatus = calculatedStatus;
                         if (!finalStatus) {
-                            const hasTracking = o.orderCode && o.orderCode.includes(' | MVĐ: ') && o.orderCode.split(' | MVĐ: ')[1].trim() !== '';
+                            const hasTracking = (o.shippingCode && o.shippingCode.trim()) || 
+                                (o.orderCode && o.orderCode.includes(' | MVĐ: ') && o.orderCode.split(' | MVĐ: ')[1].trim() !== '');
                             const isWaitConfirm = o.rawStatus && String(o.rawStatus).toLowerCase().includes('chờ xác nhận');
                             if (hasProdItems && orderHasProductionNeeded) {
                                 finalStatus = 'Chờ Sản Xuất';
@@ -1498,18 +1541,32 @@
                             }
                         }
 
+                        const effShippingCode = o.shippingCode || (o.orderCode.includes('|') ? o.orderCode.split('|')[1].replace(/^(?:MVĐ|MVD|Tracking)[\s:]*/i, '').trim() : '') || '';
+
                         newOrders.push({
-                            id: targetOrderId, orderCode: o.orderCode, channel: o.channel || 'Shopee VN', customer: o.customer,
+                            id: targetOrderId, 
+                            orderCode: o.orderCode, 
+                            channel: o.channel || 'Shopee VN', 
+                            customer: o.customer,
+                            phone: '',
+                            address: '',
                             note: finalOrderCustomerNote,
-                            createdAt: orderDateFormatted, deadline: defaultDeadline, date: dateOnly,
-                            status: finalStatus, accessories: JSON.stringify(accessories),
-                            hasProduction: hasProdItems, updatedBy: activeUser, responsibleUser: activeUser,
+                            createdAt: orderDateFormatted, 
+                            deadline: defaultDeadline, 
+                            date: dateOnly,
+                            status: finalStatus, 
+                            accessories: JSON.stringify(accessories),
+                            hasProduction: hasProdItems, 
+                            updatedBy: activeUser, 
+                            responsibleUser: activeUser,
                             revenue: Number(o.revenue || 0),
                             feeFixed: o.feeFixed || 0,
                             feeService: o.feeService || 0,
                             feePayment: o.feePayment || 0,
                             feeAffiliate: o.feeAffiliate || 0,
-                            shopVoucher: o.shopVoucher || 0
+                            shopVoucher: o.shopVoucher || 0,
+                            shippingCode: effShippingCode,
+                            shippingMethod: o.shippingMethod || ''
                         });
                     }
                 });
@@ -1588,7 +1645,12 @@
                                         <div className="flex justify-between items-center mb-1">
                                             <div className={`font-black text-[12px] ${p.isDuplicate ? 'text-rose-400 line-through opacity-70' : 'text-[#f5f5f5]'}`}>{p.orderCode} <span className="text-[9px] text-[#3b82f6] bg-[#3b82f6]/10 px-1.5 py-0.5 rounded ml-1">{p.channel}</span></div>
                                             {p.isDuplicate && <span className="text-[9px] font-black bg-rose-500/20 text-rose-500 px-2 py-0.5 rounded border border-rose-500/30">ĐÃ BƠM</span>}
-                                            {p.isUpdate && <span className="text-[9px] font-black bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded border border-amber-500/30">CẬP NHẬT</span>}
+                                            {p.isUpdate && (
+                                                <span className="text-[9px] font-black bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded border border-amber-500/30 flex items-center gap-1">
+                                                    <i className="fas fa-sync-alt text-[8px]"></i>
+                                                    {p.hasNewTrack ? 'CẬP NHẬT MVĐ' : 'CẬP NHẬT'}
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="flex justify-between items-center text-[9px] text-gray-500 font-bold mb-2 gap-2 flex-wrap bg-[#111] p-1.5 rounded-lg border border-[#222]">
                                             <span>Khách: <span className="text-[#3b82f6]">{p.customer}</span></span>

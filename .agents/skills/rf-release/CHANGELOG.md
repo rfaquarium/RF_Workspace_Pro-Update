@@ -4,6 +4,29 @@ Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến tr
 
 ---
 
+## [v2.40.3] - 2026-09-04
+
+### 🏷️ Chuẩn Hóa Bộ Phân Giải & Cập Nhật Mã Vận Đơn (MVĐ) Tại Trạm Bơm Đơn (BulkImportModal)
+- **Khắc phục triệt để lỗi "Có mã vận đơn nhưng không cập nhật" (`Modals_Orders.html`)**:
+  - **Phân tích nguyên nhân gốc rễ**: Khi nạp file Shopee `Order.toship...` hoặc `Order.all...`, các ô mã vận đơn chưa phát sinh được Shopee xuất dưới dạng chuỗi `'None'`, hoặc công thức dạng `="SPXVN..."`. Hệ thống cũ không dọn sạch chuỗi `'None'` và giới hạn điều kiện so khớp `hasNewTrack = tCode && !existingTrack` khiến các đơn cần cập nhật mã vận đơn mới bị nhận diện nhầm thành `[ĐÃ BƠM]` (`isDuplicate: true`), làm nút chốt đơn hiển thị `CHỐT BƠM 0 ĐƠN`.
+  - **Mở rộng 30+ từ khóa nhận diện cột vận đơn (`iTrack`)**:
+    - Quét toàn diện tất cả các biến thể: `'mã vận đơn'`, `'ma van don'`, `'mvd'`, `'mvđ'`, `'tracking number'`, `'tracking id'`, `'tracking no'`, `'tracking no.''`, `'tracking #'`, `'tracking code'`, `'tracking'`, `'số theo dõi'`, `'so theo doi'`, `'mã theo dõi'`, `'ma theo doi'`, `'mã bưu gửi'`, `'ma buu gui'`, `'số vận đơn'`, `'so van don'`, `'mã vận chuyển'`, `'ma van chuyen'`, `'mã kiện hàng'`, `'ma kien hang'`, `'waybill'`, `'awb'`, `'airway bill'`, `'air waybill'`, `'shipping number'`, `'shipping no'`, `'shipping code'`, `'delivery id'`, `'หมายเลขติดตามพัสดุ'`, `'no. penjejakan'`.
+  - **Làm sạch chuỗi rác & công thức Excel**:
+    - Tự động phát hiện và loại bỏ các giá trị `'None'`, `'null'`, `'-'`, `'n/a'` về rỗng.
+    - Áp dụng `cleanRawCode` dọn sạch dấu ngoặc kép, dấu bằng, tab, xuống dòng trên cả `oCode` và `tCode`.
+  - **Động cơ so khớp đa chiều & Cập nhật đè MVĐ**:
+    - Trích xuất mã vận đơn hiện tại trong hệ thống từ cả `existing.shippingCode` và `existing.orderCode`.
+    - Điều kiện `hasNewTrack`: Kích hoạt khi file mới có mã vận đơn và (đơn cũ chưa có MVĐ hoặc MVĐ mới khác với MVĐ cũ theo thuật toán `toAlphaNum`).
+    - Khi `hasNewTrack` kích hoạt: Đơn hàng chuyển sang `isUpdate: true`, `isDuplicate: false`, cập nhật `orderCode: ${baseCode} | MVĐ: ${cleanT}`, `shippingCode: cleanT` và hiển thị nhãn hổ phách nổi bật **`[CẬP NHẬT MVĐ]`**. Nút `CHỐT BƠM X ĐƠN` kích hoạt bình thường!
+  - **Đồng bộ Lean One-Piece Flow & Tự động nâng trạng thái**:
+    - Khi đơn hàng đang chờ mã vận đơn tại `Chờ Sản Xuất` (`isMissingMVD`), nếu nạp file cập nhật có mã vận đơn và hàng đã đủ/sản xuất xong, đơn tự động nhảy sang `Sẵn Sàng Đóng Gói`.
+    - Bảo toàn trạng thái cho các đơn đã `Chờ Bàn Giao`, `Đã Bàn Giao` hoặc dứt điểm.
+    - Hoàn thiện payload `submit()` đẩy đủ `shippingCode` và `shippingMethod` xuống hệ thống `pushDeltas`.
+- **Kiểm định tự động đạt 168/168 test cases Passed (`run_tests.js`)**:
+  - Bổ sung Section 12 kiểm thử tự động toàn diện: làm sạch chuỗi `None`, bóc tách công thức Shopee, tra cứu đa bản đồ, so khớp cập nhật MVĐ và kiểm tra payload lưu đơn.
+
+---
+
 ## [v2.40.2] - 2026-09-04
 
 ### 🖼️ Trình Xem Ảnh Phóng To Nội Bộ (Royal Image Lightbox) & Triệt Tiêu Lỗi Google Drive Bị Chặn (ERR_BLOCKED_BY_RESPONSE)

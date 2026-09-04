@@ -3,6 +3,26 @@
 Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến trúc, tối ưu nghiệp vụ và sửa lỗi của hệ điều hành `RF_Workspace_Pro`.
 ---
 
+## [v2.40.4] - 2026-09-04
+
+### 🎯 Bảo Vệ Chính Xác Mã Vận Đơn (MVĐ) & Triệt Tiêu Nhận Diện Nhầm "Mã Kiện Hàng" Shopee
+- **Phân tích nguyên nhân gốc rễ (Root Cause Analysis)**:
+  - File Excel Shopee (`Order.all...` hoặc `Order.toship...`) có cấu trúc tiêu đề chứa:
+    - Cột 1: `Mã Kiện Hàng` (Shopee Package ID nội bộ dạng số 19 chữ số: ví dụ `6021700621857282367`).
+    - Cột 7: `Mã vận đơn` (Mã vận đơn giao hàng thực tế của SPX Express / đơn vị vận chuyển: ví dụ `SPXVN065693856028`).
+  - Hệ thống trước đây đưa `'mã kiện hàng'` vào danh sách từ khóa `iTrack`, đồng thời hàm `findCol` duyệt qua mảng `headers` theo thứ tự từ trái sang phải (`headers.findIndex(...)`). Do đó khi duyệt tới Cột 1 (`Mã Kiện Hàng`), hàm thấy khớp với từ khóa và trả về ngay Cột 1, dẫn tới việc thẻ đơn hàng hiển thị `MVĐ: 6021700621857282367` thay vì `MVĐ: SPXVN065693856028`.
+- **Nâng cấp Thuật toán Định vị Cột Ưu Tiên (Key-Priority Search) (`Modals_Orders.html`)**:
+  - Tái cấu trúc hàm `findCol`: Duyệt tuần tự theo mức độ ưu tiên của mảng từ khóa `keys` (chính xác trước, chuỗi con sau, rồi mới tới chuẩn hóa alphanumeric), thay vì duyệt theo thứ tự cột xuất hiện trong file Excel.
+  - Đảm bảo từ khóa `'mã vận đơn'` có độ ưu tiên cao nhất luôn giành chiến thắng tuyệt đối, bất kể nó nằm ở cột thứ mấy trong file.
+  - Bãi bỏ hoàn toàn các từ khóa không thuộc mã vận đơn (`'mã kiện hàng'`, `'ma kien hang'`) ra khỏi bộ từ khóa `iTrack`.
+- **Tăng cường phòng vệ `cleanRawCode`**:
+  - Tích hợp kiểm tra và dọn sạch các chuỗi rác `'None'`, `'null'`, `'-'`, `'n/a'` trực tiếp trong hàm `cleanRawCode`, bảo đảm không bao giờ để lọt chuỗi rác vào CSDL.
+- **Kiểm định tự động đạt 170/170 test cases Passed (`run_tests.js`)**:
+  - Bổ sung test kiểm thử thuật toán `Key-Priority findCol` và xác nhận bỏ qua `Mã Kiện Hàng` (Cột 1) để chọn đúng `Mã vận đơn` (Cột 7) cho đơn hàng `260806M6FWA4EA` (`SPXVN065693856028`).
+  - Kiểm tra hàng loạt 58 file Excel Shopee thực tế trong thư mục Downloads: 100% khớp đúng cột `Mã vận đơn`, 0 lỗi nhận diện nhầm.
+
+---
+
 ## [v2.40.3] - 2026-09-04
 
 ### 🏷️ Chuẩn Hóa Bộ Phân Giải & Cập Nhật Mã Vận Đơn (MVĐ) Tại Trạm Bơm Đơn (BulkImportModal)

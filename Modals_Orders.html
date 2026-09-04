@@ -722,16 +722,28 @@
             }
             const headers = (rows[headerIdx] || []).map(h => String(h || '').toLowerCase().replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim());
             const findCol = (keys) => {
-                let idx = headers.findIndex(h => keys.some(k => h === k));
-                if (idx === -1) idx = headers.findIndex(h => keys.some(k => h.includes(k)));
-                if (idx === -1) {
-                    const cleanH = headers.map(h => h.replace(/[^a-z0-9]/g, ''));
-                    idx = cleanH.findIndex(h => keys.some(k => {
-                        const cleanK = k.replace(/[^a-z0-9]/g, '');
-                        return h && cleanK && (h === cleanK || h.includes(cleanK));
-                    }));
+                // 1. Khớp chính xác theo thứ tự ưu tiên của từ khoá (ưu tiên cao nhất)
+                for (const k of keys) {
+                    const cleanK = String(k || '').toLowerCase().trim();
+                    const idx = headers.findIndex(h => h === cleanK);
+                    if (idx !== -1) return idx;
                 }
-                return idx;
+                // 2. Khớp chuỗi con theo thứ tự ưu tiên
+                for (const k of keys) {
+                    const cleanK = String(k || '').toLowerCase().trim();
+                    if (!cleanK) continue;
+                    const idx = headers.findIndex(h => h.includes(cleanK));
+                    if (idx !== -1) return idx;
+                }
+                // 3. Khớp alphanumeric sau khi loại bỏ ký tự đặc biệt
+                const cleanH = headers.map(h => h.replace(/[^a-z0-9]/g, ''));
+                for (const k of keys) {
+                    const cleanK = String(k || '').replace(/[^a-z0-9]/g, '');
+                    if (!cleanK) continue;
+                    const idx = cleanH.findIndex(h => h && (h === cleanK || h.includes(cleanK)));
+                    if (idx !== -1) return idx;
+                }
+                return -1;
             };
             // --- BỘ NHẬN DIỆN SÀN & KÊNH BÁN TỰ ĐỘNG CHỐNG GÁN BÁN LẺ ---
             let detectedChannel = 'Shopee VN';
@@ -750,8 +762,8 @@
                 'tracking number', 'tracking id', 'tracking no', 'tracking no.', 'tracking #', 'tracking code', 'tracking',
                 'mã theo dõi', 'ma theo doi', 'số theo dõi', 'so theo doi', 
                 'mã bưu gửi', 'ma buu gui', 'số vận đơn', 'so van don', 
-                'mã vận chuyển', 'ma van chuyen', 'mã kiện hàng', 'ma kien hang', 
-                'waybill', 'awb', 'airway bill', 'air waybill', 'shipping number', 'shipping no', 'shipping code', 'delivery id', 
+                'mã vận chuyển', 'ma van chuyen', 
+                'waybill', 'awb', 'airway bill', 'air waybill', 'shipping number', 'shipping no', 'shipping code',
                 'หมายเลขติดตามพัสดุ', 'no. penjejakan'
             ]);
             let iProd = findCol(['tên sản phẩm', 'product name', 'ชื่อสินค้า', 'item name', 'product_name']);
@@ -790,8 +802,10 @@
 
             // --- HỆ THỐNG TRA CỨU ĐƠN CŨ ĐA TẦNG (MULTI-TIER DEDUPLICATION POOL) ---
             const cleanRawCode = (val) => {
-                if (!val) return '';
-                return String(val)
+                if (val === undefined || val === null) return '';
+                let s = String(val).trim();
+                if (s.toLowerCase() === 'none' || s.toLowerCase() === 'null' || s === '-' || s === 'n/a') return '';
+                return s
                     .replace(/[\r\n\t\u00A0'"`=]/g, '')
                     .replace(/^(mã\s*đơn\s*hàng|mã\s*đơn|order\s*id|order\s*sn|mvđ|mvd)[\s:]+/gi, '')
                     .trim();
@@ -8342,9 +8356,18 @@
 
             const headers = rows[headerIdx].map(h => String(h).toLowerCase().trim());
             const findCol = (keys) => {
-                let idx = headers.findIndex(h => keys.some(k => String(h) === k));
-                if (idx === -1) idx = headers.findIndex(h => keys.some(k => String(h).includes(k)));
-                return idx;
+                for (const k of keys) {
+                    const cleanK = String(k || '').toLowerCase().trim();
+                    const idx = headers.findIndex(h => h === cleanK);
+                    if (idx !== -1) return idx;
+                }
+                for (const k of keys) {
+                    const cleanK = String(k || '').toLowerCase().trim();
+                    if (!cleanK) continue;
+                    const idx = headers.findIndex(h => h.includes(cleanK));
+                    if (idx !== -1) return idx;
+                }
+                return -1;
             };
 
             const allHeaderStr = rows.slice(0, 5).map(r => (r || []).join(' ').toLowerCase()).join(' ');

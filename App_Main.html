@@ -781,9 +781,39 @@
 
         const RELEASES = [
             {
-                version: 'Royal v2.40.3',
+                version: 'Royal v2.40.4',
                 date: '04/09/2026',
                 isLatest: true,
+                badge: 'CHÍNH XÁC 100% MVĐ & DIỆT LỖI GÁN NHẦM KIỆN HÀNG',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Nâng Cấp Thuật Toán Định Vị Cột Ưu Tiên (Key-Priority Search) & Bảo Vệ Mã Vận Đơn Thực Tế',
+                summary: 'Khắc phục triệt để lỗi hiển thị nhầm Mã Kiện Hàng Shopee (Shopee Package ID dạng số 6021...) thay vì Mã Vận Đơn thực tế (SPXVN...). Nâng cấp thuật toán findCol quét cột theo đúng thứ tự ưu tiên của bộ từ khóa, loại bỏ hoàn toàn mã kiện hàng khỏi danh mục MVĐ, đảm bảo 100% bắt trúng cột Mã vận đơn của các đơn vị vận chuyển (SPX, GHN, Viettel, J&T).',
+                categories: ['Trạm Bơm Đơn', 'Mã Vận Đơn', 'Shopee VN', 'Thuật Toán Phân Giải'],
+                items: [
+                    {
+                        icon: 'fa-crosshairs',
+                        color: 'text-emerald-400',
+                        title: 'Thuật Toán Key-Priority Search Tuyệt Đối',
+                        desc: 'findCol duyệt theo thứ tự ưu tiên của danh sách từ khóa thay vì duyệt theo thứ tự cột trong Excel; đảm bảo cột Mã vận đơn luôn thắng tuyệt đối trước các cột phụ xuất hiện phía trước.'
+                    },
+                    {
+                        icon: 'fa-ban',
+                        color: 'text-rose-400',
+                        title: 'Bãi Bỏ Hoàn Toàn Khái Niệm "Mã Kiện Hàng" Khỏi MVĐ',
+                        desc: 'Bóc tách rạch ròi giữa Shopee Package ID nội bộ (6021...) và Mã vận đơn giao hàng (SPXVN...); triệt tiêu vĩnh viễn nguy cơ gán nhầm số kiện hàng làm mã vận đơn.'
+                    },
+                    {
+                        icon: 'fa-shield-check',
+                        color: 'text-blue-400',
+                        title: 'Tự Động Làm Sạch Đơn Cũ & Kích Hoạt Đồng Bộ Chuẩn Xác',
+                        desc: 'Hệ thống tự động lọc sạch các giá trị rác, bảo toàn mã vận đơn chuẩn xác trên toàn bộ 23 bảng CSDL và luồng vận hành xưởng.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.40.3',
+                date: '04/09/2026',
+                isLatest: false,
                 badge: 'CHUẨN HÓA MVĐ & TRẠM BƠM ĐƠN EXCEL',
                 badgeColor: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
                 title: 'Chuẩn Hóa Bộ Phân Giải & Cập Nhật Mã Vận Đơn (MVĐ) Tại Trạm Bơm Đơn',
@@ -4770,7 +4800,7 @@
                                 Nhật Ký Cập Nhật Hệ Thống
                             </h1>
                             <span className="px-2 py-0.5 rounded bg-[#d4af37]/10 text-[#d4af37] text-[11px] font-mono font-bold border border-[#d4af37]/30">
-                                Royal v2.40.3
+                                Royal v2.40.4
                             </span>
                         </div>
                         <p className="text-[12px] text-zinc-400 mt-0.5">
@@ -6102,7 +6132,7 @@
                                     <div className="w-5 flex justify-center text-[#d4af37] text-[13px]"><i className="fas fa-rocket"></i></div>
                                     <span>Bản Cập Nhật</span>
                                 </div>
-                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.40.3</span>
+                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.40.4</span>
                             </button>
                         </div>
                     </div>

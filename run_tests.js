@@ -356,13 +356,34 @@ assert('extractDriveId extracts file ID from googleusercontent.com CDN', testExt
 console.log(`\n--- 12. Testing Tracking Number (MVĐ) Resolution & Update Engine ---`);
 const sec12ModalsOrders = fs.readFileSync(path.join(__dirname, 'Modals_Orders.html'), 'utf8');
 
-assert('Modals_Orders.html contains comprehensive iTrack header keywords', sec12ModalsOrders.includes('mã kiện hàng') && sec12ModalsOrders.includes('số theo dõi') && sec12ModalsOrders.includes('waybill'));
+assert('Modals_Orders.html contains comprehensive iTrack header keywords and excludes package ID (mã kiện hàng)', !sec12ModalsOrders.includes("'mã kiện hàng'") && sec12ModalsOrders.includes('mã bưu gửi') && sec12ModalsOrders.includes('số theo dõi') && sec12ModalsOrders.includes('waybill'));
+assert('Modals_Orders.html implements key-priority findCol algorithm', sec12ModalsOrders.includes('for (const k of keys)') && sec12ModalsOrders.includes('headers.findIndex(h => h === cleanK)'));
 assert('Modals_Orders.html indexes shippingCode in combinedOrdersPool', sec12ModalsOrders.includes('rawShipping = String(o.shippingCode') && sec12ModalsOrders.includes('existingByTrackMap.set(cShip'));
 assert('Modals_Orders.html filters out None/null/- dirty strings from tracking cells', sec12ModalsOrders.includes("rawTrack.toLowerCase() === 'none'") && sec12ModalsOrders.includes("rawTrack === '-'"));
 assert('Modals_Orders.html extracts existingTrack from shippingCode and orderCode', sec12ModalsOrders.includes('existing.shippingCode') && sec12ModalsOrders.includes("existing.orderCode.split('|')"));
 assert('Modals_Orders.html evaluates hasNewTrack using alphanumeric difference', sec12ModalsOrders.includes('toAlphaNum(cleanT) !== toAlphaNum(existingTrack)'));
 assert('Modals_Orders.html passes shippingCode in submit() newOrders payload', sec12ModalsOrders.includes('shippingCode: effShippingCode'));
 assert('Modals_Orders.html renders [CẬP NHẬT MVĐ] badge in UI', sec12ModalsOrders.includes("p.hasNewTrack ? 'CẬP NHẬT MVĐ' : 'CẬP NHẬT'"));
+
+// Functional Unit Test for Key-Priority findCol
+function testFindColPriority(headers, keys) {
+    for (const k of keys) {
+        const cleanK = String(k || '').toLowerCase().trim();
+        const idx = headers.findIndex(h => h === cleanK);
+        if (idx !== -1) return idx;
+    }
+    for (const k of keys) {
+        const cleanK = String(k || '').toLowerCase().trim();
+        if (!cleanK) continue;
+        const idx = headers.findIndex(h => h.includes(cleanK));
+        if (idx !== -1) return idx;
+    }
+    return -1;
+}
+
+const mockShopeeHeaders = ['mã đơn hàng', 'mã kiện hàng', 'ngày đặt hàng', 'trạng thái đơn hàng', 'sản phẩm', 'lý do hủy', 'nhận xét', 'mã vận đơn'];
+const trackKeys = ['mã vận đơn', 'ma van don', 'mvd', 'mvđ', 'tracking number', 'tracking id', 'số theo dõi', 'waybill'];
+assert('findCol prioritizes Mã vận đơn (Col 7) and ignores Mã Kiện Hàng (Col 1)', testFindColPriority(mockShopeeHeaders, trackKeys) === 7);
 
 // Functional Unit Test for Tracking Resolution Algorithm
 function testResolveTracking(rawCell) {

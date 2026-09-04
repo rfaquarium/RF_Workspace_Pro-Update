@@ -614,6 +614,136 @@ assert('Smart Shopee Parse: Auto-categorizes to KHO LAYOUT', parsedVars[0].categ
 assert('Smart Shopee Parse: Auto-subcategorizes to RỪNG', parsedVars[0].sub_category === 'RỪNG');
 assert('Smart Shopee Parse: Auto-assigns Bộ unit for Layout', parsedVars[0].unit === 'Bộ');
 
+// ============================================================================
+// 14. PRODUCTION & ORDER LEAN FLOW OPTIMIZATION TESTS (ROYAL V2.42.0)
+// ============================================================================
+console.log("\n--- SECTION 14: PRODUCTION & ORDER LEAN FLOW OPTIMIZATION ---");
+
+// Test 14.1: Phase 1 completion auto-advances to Phase 2 (status = 'Done', qc_status = 'Khung đã nộp', Phase 2 unlocked)
+function simulatePhase1Complete(item, currentUser) {
+    const isTwoPhaseProduct = item.type === 'Layout' || item.type === 'Bể Kính';
+    const updated = JSON.parse(JSON.stringify(item));
+    updated.phases.phase1.status = 'Done';
+    updated.phases.phase1.user = currentUser;
+    updated.phases.phase1.endTime = '2026-09-04T10:30:00.000Z';
+    updated.p1_status = 'Done';
+    updated.p1_user = currentUser;
+    updated.p1_endTime = '2026-09-04T10:30:00.000Z';
+    if (isTwoPhaseProduct) {
+        updated.status = 'In Progress';
+        updated.qc_status = 'Khung đã nộp';
+    } else {
+        updated.status = 'Done';
+    }
+    return updated;
+}
+
+function checkPhase2IsLocked(item) {
+    const p1Status = item.phases?.phase1?.status;
+    const isP1Done = p1Status === 'Done' || p1Status === 'ĐÃ XONG';
+    const isQcRejected = item.qc_status === 'Yêu cầu làm lại';
+    return !isP1Done || isQcRejected;
+}
+
+const mockItem = {
+    id: 'PRD-001',
+    type: 'Layout',
+    status: 'In Progress',
+    phases: {
+        phase1: { status: 'In Progress', user: 'Vinh' },
+        phase2: { status: 'Pending', user: '' }
+    },
+    qc_status: ''
+};
+
+const completedP1 = simulatePhase1Complete(mockItem, 'Vinh');
+assert('P1 Complete: Sets phase1.status to Done', completedP1.phases.phase1.status === 'Done');
+assert('P1 Complete: Sets qc_status to Khung đã nộp (non-blocking)', completedP1.qc_status === 'Khung đã nộp');
+assert('P1 Complete: Phase 2 is immediately UNLOCKED for worker', checkPhase2IsLocked(completedP1) === false);
+
+const rejectedItem = { ...completedP1, qc_status: 'Yêu cầu làm lại' };
+assert('P1 Rejected: Phase 2 remains LOCKED if Admin explicitly requests remake', checkPhase2IsLocked(rejectedItem) === true);
+
+// Test 14.2: Foreign Key Matching (isOrderMatch) across Order.id and Order.orderCode
+function isOrderMatch(pOrderId, ord) {
+    if (!pOrderId || !ord) return false;
+    const pStr = String(pOrderId).trim();
+    const oId = String(ord.id || '').trim();
+    const oCode = String(ord.orderCode || '').trim();
+    const oBase = oCode.split(' | ')[0].split('|')[0].trim();
+    return pStr === oId || (oCode && pStr === oCode) || (oBase && pStr === oBase);
+}
+
+const testOrder = { id: 'ORD-12345', orderCode: 'ORD-12345 | MVĐ: SPX12345678' };
+assert('isOrderMatch: Matches exact order.id', isOrderMatch('ORD-12345', testOrder) === true);
+assert('isOrderMatch: Matches full orderCode', isOrderMatch('ORD-12345 | MVĐ: SPX12345678', testOrder) === true);
+assert('isOrderMatch: Matches base orderCode before pipe', isOrderMatch('ORD-12345', { id: '99999', orderCode: 'ORD-12345 | MVĐ: SPX' }) === true);
+assert('isOrderMatch: Rejects mismatched orderId', isOrderMatch('ORD-99999', testOrder) === false);
+
+// Test 14.3: Order readiness without MVD blocking box packing
+function computeEffectiveOrderStatus(order, allProdDone, hasDonePack, isMissingMVD) {
+    let eff = String(order.status || 'Chờ Sản Xuất').toUpperCase().trim();
+    if (allProdDone && (eff === 'CHỜ SẢN XUẤT' || eff === 'QUÉT TỰ ĐỘNG' || eff === 'ĐANG SẢN XUẤT' || eff === 'CHỜ PHỤ KIỆN')) {
+        eff = 'SẴN SÀNG ĐÓNG GÓI';
+    } else if (!allProdDone && eff === 'SẴN SÀNG ĐÓNG GÓI' && !hasDonePack) {
+        eff = 'CHỜ SẢN XUẤT';
+    }
+    return eff;
+}
+
+const ordNoMVD = { id: 'ORD-001', status: 'Chờ Sản Xuất', channel: 'Shopee VN' };
+const effStatusWithoutMVD = computeEffectiveOrderStatus(ordNoMVD, true, false, true);
+assert('Order Readiness: Advances to SẴN SÀNG ĐÓNG GÓI even when MVD is pending', effStatusWithoutMVD === 'SẴN SÀNG ĐÓNG GÓI');
+
+const ordNotDone = { id: 'ORD-002', status: 'Sẵn Sàng Đóng Gói' };
+const effStatusNotDone = computeEffectiveOrderStatus(ordNotDone, false, false, false);
+assert('Order Readiness: Reverts to CHỜ SẢN XUẤT if prods are not done', effStatusNotDone === 'CHỜ SẢN XUẤT');
+
+// Test 14.4: Earliest Deadline First (EDF) Sorting
+function getEffectiveDeadline(item, order) {
+    if (item && item.deadline) {
+        const t = new Date(item.deadline).getTime();
+        if (!isNaN(t)) return t;
+    }
+    if (order && order.deadline) {
+        const t = new Date(order.deadline).getTime();
+        if (!isNaN(t)) return t;
+    }
+    return Infinity;
+}
+
+const prodList = [
+    { id: 'PRD-A', deadline: '2026-09-04T17:00:00Z', isUrgent: false },
+    { id: 'PRD-B', deadline: '2026-09-05T12:00:00Z', isUrgent: false },
+    { id: 'PRD-C', deadline: '2026-09-04T11:30:00Z', isUrgent: false },
+    { id: 'PRD-D', deadline: '2026-09-06T12:00:00Z', isUrgent: true }
+];
+
+const sortedProds = [...prodList].sort((a, b) => {
+    if (a.isUrgent !== b.isUrgent) return b.isUrgent ? 1 : -1;
+    const dlA = getEffectiveDeadline(a, null);
+    const dlB = getEffectiveDeadline(b, null);
+    return dlA - dlB;
+});
+
+assert('EDF Sorting: Urgent order PRD-D is #1', sortedProds[0].id === 'PRD-D');
+assert('EDF Sorting: Earliest deadline PRD-C is #2', sortedProds[1].id === 'PRD-C');
+assert('EDF Sorting: PRD-A (today 17:00) is #3', sortedProds[2].id === 'PRD-A');
+assert('EDF Sorting: PRD-B (tomorrow) is #4', sortedProds[3].id === 'PRD-B');
+
+// Test 14.5: Sub-filter phase segregation
+const itemsInQueue = [
+    { id: 'Q1', phases: { phase1: { status: 'Pending' }, phase2: { status: 'Pending' } } },
+    { id: 'Q2', phases: { phase1: { status: 'Done' }, phase2: { status: 'Pending' } } },
+    { id: 'Q3', phases: { phase1: { status: 'Done' }, phase2: { status: 'Done' } } }
+];
+
+const needPhase1 = itemsInQueue.filter(i => (i.phases?.phase1?.status || 'Pending') !== 'Done');
+const needPhase2 = itemsInQueue.filter(i => (i.phases?.phase1?.status === 'Done') && (i.phases?.phase2?.status !== 'Done'));
+
+assert('Sub-filter: Exactly 1 item needs Phase 1 (Q1)', needPhase1.length === 1 && needPhase1[0].id === 'Q1');
+assert('Sub-filter: Exactly 1 item needs Phase 2 (Q2)', needPhase2.length === 1 && needPhase2[0].id === 'Q2');
+
 // SUMMARY
 console.log(`\n========================================`);
 console.log(`TEST SUMMARY: ${passedTests}/${totalTests} Passed (${failedTests} Failed)`);

@@ -6727,8 +6727,14 @@ function safeDeductInventoryOnHandover(ordersToHandover, ss) {
       if (oCode) orderCodes.push(oCode);
 
       // 1. Sản phẩm từ Production (Bể Kính / Layout): Chỉ trừ kho thành phẩm cho các món LẤY TỪ TỒN KHO CÓ SẴN (fulfilledFromStock = true). Hàng sản xuất mới (MTO) đã khấu trừ phôi BOM trước đó nên không trừ kho thành phẩm nữa để chống trừ kép.
+      var oId = String(order.id || '').trim();
+      var oFullCode = String(order.orderCode || '').trim();
+      var oBaseCode = oFullCode.split(' | ')[0].split('|')[0].trim();
       var orderProds = prodData.filter(function (p) {
-        if (!p || String(p.orderId) !== String(order.id)) return false;
+        if (!p) return false;
+        var pOrderId = String(p.orderId || '').trim();
+        var isMatch = pOrderId === oId || (oFullCode && pOrderId === oFullCode) || (oBaseCode && pOrderId === oBaseCode);
+        if (!isMatch) return false;
         var status = String(p.status).trim().toUpperCase();
         if (normalizeStatus(status) === 'Đơn Huỷ') return false;
         var isFulfilledFromStock = p.fulfilledFromStock === true || String(p.fulfilledFromStock).toUpperCase() === 'TRUE';

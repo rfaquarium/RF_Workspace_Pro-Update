@@ -781,9 +781,51 @@
 
         const RELEASES = [
             {
-                version: 'Royal v2.41.1',
+                version: 'Royal v2.42.0',
                 date: '04/09/2026',
                 isLatest: true,
+                badge: 'TỐI ƯU DÒNG CHẢY LEAN SẢN XUẤT & ĐƠN HÀNG',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Tối Ưu Hóa Dòng Chảy Lean (One-Piece Flow), Phá Vỡ Điểm Nghẽn Sản Xuất & Giao Hàng',
+                summary: 'Đột phá toàn diện 5 giải pháp loại trừ thời gian chết (Muda): Tự động mở khóa Khâu 2 (Gia cố/Gọt keo) ngay khi Khâu 1 xong, cho phép đóng hộp trước khi có mã vận đơn (chống dồn ứ đơn lúc 16:00), thuật toán điều phối EDF (Earliest Deadline First) bảo vệ cam kết SLA sàn TMĐT, chuẩn hóa khóa ngoại isOrderMatch đồng bộ đa định dạng và bổ sung thanh phân khâu Kanban 1 chạm cho thợ kéo việc.',
+                categories: ['Sản Xuất', 'Đơn Hàng', 'Lean Flow', 'Takt Time', 'Kanban', 'SLA'],
+                items: [
+                    {
+                        icon: 'fa-forward',
+                        color: 'text-amber-400',
+                        title: 'Tự Động Chuyển Giao Khâu 1 Sang Khâu 2 (Auto-Advance Phase 2)',
+                        desc: 'Khâu 1 bấm Xong sẽ tự động chốt trạng thái ĐÃ XONG, tính tiền công thợ K1 và mở khóa Khâu 2 cho thợ Tâm làm ngay mà không bị chặn bởi Admin duyệt khung (KCS chuyển sang kiểm tra bất đồng bộ).'
+                    },
+                    {
+                        icon: 'fa-box-open',
+                        color: 'text-emerald-400',
+                        title: 'Đóng Hộp Đơn Sớm Khi Thiếu Mã Vận Đơn (Early Box Packing)',
+                        desc: 'Khi xưởng hoàn thành 100% phôi/bể, đơn lập tức nhảy sang Sẵn Sàng Đóng Gói kèm huy hiệu [CHỜ MÃ VẬN ĐƠN - ĐÓNG HỘP TRƯỚC], giúp Hương đóng hộp trước và giải phóng áp lực trước 16:00.'
+                    },
+                    {
+                        icon: 'fa-calendar-check',
+                        color: 'text-cyan-400',
+                        title: 'Thuật Toán Sắp Xếp Hạn Bàn Giao Sớm Nhất (Earliest Deadline First - EDF)',
+                        desc: 'Ưu tiên hiển thị và sản xuất theo hạn deadline thực tế trong ngày trước giờ cắt đơn (17:30 / 11:30), ngăn chặn tình trạng đơn tồn cũ chen ngang làm trễ SLA giao hàng của sàn.'
+                    },
+                    {
+                        icon: 'fa-link',
+                        color: 'text-purple-400',
+                        title: 'Chuẩn Hóa Khóa Ngoại Hai Chiều isOrderMatch (ID & OrderCode)',
+                        desc: 'Đồng bộ logic tìm kiếm và liên kết đơn hàng - lệnh sản xuất trong Tab_Production và safeDeductInventoryOnHandover, hỗ trợ cả mã ID số lẫn chuỗi OrderCode sàn.'
+                    },
+                    {
+                        icon: 'fa-filter',
+                        color: 'text-blue-400',
+                        title: 'Bộ Lọc Phân Khâu Kanban 1 Chạm (Lean Pull Flow)',
+                        desc: 'Thanh chip lọc [Tất Cả Khâu], [Khâu 1 Cần Làm], [Khâu 2 Cần Gia Cố] trực quan kèm số lượng realtime, giúp thợ kéo việc theo năng lực chuyên môn không nhầm lẫn.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.41.1',
+                date: '04/09/2026',
+                isLatest: false,
                 badge: 'CHUẨN HÓA SKU XƯỞNG',
                 badgeColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
                 title: 'Chuẩn Hóa Mã SKU & Tên Sản Phẩm Shopee Theo Quy Chuẩn Xưởng Rich Fish',
@@ -6222,7 +6264,7 @@
                                     <div className="w-5 flex justify-center text-[#d4af37] text-[13px]"><i className="fas fa-rocket"></i></div>
                                     <span>Bản Cập Nhật</span>
                                 </div>
-                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.41.1</span>
+                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.42.0</span>
                             </button>
                         </div>
                     </div>

@@ -1773,7 +1773,7 @@
                 .trim();
         };
 
-        let isLocked = c.req.some(rk => ((item.phases || {})[rk] || {}).status !== 'Done') || item.qc_status === 'Chờ duyệt khung' || item.qc_status === 'Yêu cầu làm lại';
+        let isLocked = c.req.some(rk => ((item.phases || {})[rk] || {}).status !== 'Done') || item.qc_status === 'Yêu cầu làm lại';
 
         const isOwner = !data.user || String(data.user).trim() === '' || isStaffMatch(data.user, currentUser);
         const isPending = data.status !== 'In Progress' && data.status !== 'Done';
@@ -1799,7 +1799,7 @@
             const updateTimer = () => {
                 const startMs = parseDateSafe(data.start);
                 let nowMs = Date.now();
-                if (item.qc_status === 'Chờ duyệt khung' && data.endTime) {
+                if ((item.qc_status === 'Chờ duyệt khung' || item.qc_status === 'Khung đã nộp') && data.endTime) {
                     nowMs = parseDateSafe(data.endTime);
                 }
                 if (isNaN(startMs)) return;
@@ -1898,13 +1898,13 @@
             if (c.k === 'phase1' && isTwoPhaseProduct && s === 'Done') {
                 upd.phases['phase1'] = {
                     ...upd.phases['phase1'],
-                    status: 'In Progress',
+                    status: 'Done',
                     user: currentUser,
                     date: currentDateTime.split(' ')[0],
                     start: data.start || currentDateTime,
                     endTime: currentDateTime
                 };
-                upd.qc_status = 'Chờ duyệt khung';
+                upd.qc_status = 'Khung đã nộp';
                 upd.status = 'In Progress';
             } else {
                 upd.phases[c.k] = {
@@ -2011,7 +2011,7 @@
                 'Ghi chú thêm': `Định mức: +${(kpiData.reward || 0).toLocaleString('vi-VN')}đ | Thiết bị: ${/Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'Điện thoại' : 'Máy tính'}`
             }];
 
-            await pushDeltas(payloadDeltas, s === 'In Progress' ? `Đã nhận ${c.n}` : (c.k === 'phase1' && isTwoPhaseProduct ? `Đã nộp ${c.n} - Chờ duyệt khung!` : `Xong ${c.n}`), s === 'In Progress' ? 'fa-play' : 'fa-check');
+            await pushDeltas(payloadDeltas, s === 'In Progress' ? `Đã nhận ${c.n}` : (c.k === 'phase1' && isTwoPhaseProduct ? `Hoàn thành ${c.n} - Sẵn sàng Khâu 2!` : `Xong ${c.n}`), s === 'In Progress' ? 'fa-play' : 'fa-check');
             setProcessing(false);
         };
 
@@ -2052,14 +2052,14 @@
                 if (c.k === 'phase1' && isTwoPhaseProduct) {
                     upd.phases['phase1'] = {
                         ...upd.phases['phase1'],
-                        status: 'In Progress',
+                        status: 'Done',
                         user: currentUser,
                         date: currentDateTime.split(' ')[0],
                         start: data.start || currentDateTime,
                         endTime: currentDateTime,
                         photo: url
                     };
-                    upd.qc_status = 'Chờ duyệt khung';
+                    upd.qc_status = 'Khung đã nộp';
                     upd.qc_front_photo = url;
                     upd.status = 'In Progress';
                 } else {
@@ -2167,7 +2167,7 @@
                     itemName: item.name,
                     orderId: item.orderId,
                     reward: baseReward,
-                    status: c.k === 'phase1' && isTwoPhaseProduct ? 'Chờ duyệt khung' : 'Done'
+                    status: 'Done'
                 });
 
                 // PHÁT ÂM THANH & RUNG ĐIỆN THOẠI XÁC NHẬN HOÀN THÀNH
@@ -2177,16 +2177,16 @@
                 payloadDeltas.Tracking_Log = [{
                     'Thời gian': currentDateTime,
                     'Tên nhân sự': currentUser,
-                    'Hoàn thành': `${c.k === 'phase1' && isTwoPhaseProduct ? 'Nộp ảnh chờ duyệt khung' : 'Hoàn thành'} ${c.n} - ${item.name} (${item.orderId || 'Sản xuất lẻ'})`,
+                    'Hoàn thành': `Hoàn thành ${c.n} - ${item.name} (${item.orderId || 'Sản xuất lẻ'})`,
                     'Hỏi AI': navigator.onLine ? 'Online' : 'Offline Mode',
                     'Ghi chú thêm': `Thưởng nhận: +${baseReward.toLocaleString('vi-VN')}đ | Thiết bị: ${/Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'Điện thoại' : 'Máy tính'}`
                 }];
 
-                await pushDeltas(payloadDeltas, c.k === 'phase1' && isTwoPhaseProduct ? `Đã nộp ảnh ${c.n} - Chờ Quản lý duyệt!` : `Tải ảnh & hoàn thành ${c.n}`, 'fa-check-double');
+                await pushDeltas(payloadDeltas, c.k === 'phase1' && isTwoPhaseProduct ? `Hoàn thành ${c.n} - Sẵn sàng Khâu 2!` : `Tải ảnh & hoàn thành ${c.n}`, 'fa-check-double');
                 if (isLate || durationMins < 2) {
                     triggerToast(`Có lỗi vi phạm thao tác/trễ hạn. Đã ghi nhận phạt!`, 'fa-times-circle', 'danger');
                 } else {
-                    triggerToast(c.k === 'phase1' && isTwoPhaseProduct ? `Đã nộp ảnh Khung thành công! Chờ Quản lý duyệt.` : `Tải ảnh & hoàn thành ${c.n} thành công!`, 'fa-check', 'success');
+                    triggerToast(c.k === 'phase1' && isTwoPhaseProduct ? `Hoàn thành ${c.n} thành công! Khâu 2 đã mở khóa.` : `Tải ảnh & hoàn thành ${c.n} thành công!`, 'fa-check', 'success');
                 }
 
                 // BẬT MODAL NHẮC VIẾT MÃ ĐÁY BỂ NỔI BẬT NẾU LÀ BỂ KÍNH HOÀN THÀNH KHÂU 2
@@ -2225,8 +2225,16 @@
         // CHỐT CHẶN TIỀN TRẠM (PRE-FLIGHT CHECK) KHI HOÀN THÀNH KCS
         // ==========================================
         const checkAndToggleOrderReadiness = async (targetOrder, allProdItems, currentErpProducts) => {
-            // Lọc ra toàn bộ các sản phẩm con cùng thuộc đơn hàng gốc này
-            const orderProds = (allProdItems || []).filter(p => String(p.orderId) === String(targetOrder.id) && !p.fulfilledFromStock);
+            // Lọc ra toàn bộ các sản phẩm con cùng thuộc đơn hàng gốc này (khớp cả id, orderCode và baseCode)
+            const isOrderMatch = (pOrderId, ord) => {
+                if (!pOrderId || !ord) return false;
+                const pStr = String(pOrderId).trim();
+                const oId = String(ord.id || '').trim();
+                const oCode = String(ord.orderCode || '').trim();
+                const oBase = oCode.split(' | ')[0].split('|')[0].trim();
+                return pStr === oId || (oCode && pStr === oCode) || (oBase && pStr === oBase);
+            };
+            const orderProds = (allProdItems || []).filter(p => isOrderMatch(p.orderId, targetOrder) && !p.fulfilledFromStock);
             const isAllProdDone = orderProds.every(p => {
                 if (p.id === item.id) return true;
                 const s = String(p.status).toUpperCase().trim();
@@ -3565,8 +3573,7 @@
         const p1Status = _item.phases?.phase1?.status || 'Pending';
         const p2Status = _item.phases?.phase2?.status || 'Pending';
         const isAnyInProgress = p1Status === 'In Progress' || p2Status === 'In Progress';
-        const isLegacyDone = p1Status === 'Done' && !_item.qc_status && !_item.qc_front_photo;
-        const isPhase2Pending = (isLegacyDone || _item.qc_status === 'Đã duyệt') && p2Status === 'Pending' && _item.status !== 'Done' && _item.status !== 'Đã Huỷ';
+        const isPhase2Pending = p1Status === 'Done' && p2Status === 'Pending' && _item.status !== 'Done' && _item.status !== 'Đã Huỷ' && _item.qc_status !== 'Yêu cầu làm lại';
         const isReadyForInspection = _item.status === 'Kiểm Định' || (p1Status === 'Done' && p2Status === 'Done' && _item.status !== 'Done' && _item.status !== 'Đã Huỷ');
 
         const isBothDone = (p1Status === 'Done' && p2Status === 'Done');
@@ -3719,10 +3726,6 @@
                                     <span className="text-[8.5px] font-black px-2 py-0.5 bg-rose-500/20 text-rose-300 border border-rose-500/40 rounded-md uppercase tracking-wider flex items-center gap-1 shrink-0">
                                         <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span> YÊU CẦU LÀM LẠI
                                     </span>
-                                ) : _item.qc_status === 'Chờ duyệt khung' ? (
-                                    <span className="text-[8.5px] font-black px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 rounded-md uppercase tracking-wider flex items-center gap-1 shrink-0">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span> CHỜ DUYỆT KHÂU 1
-                                    </span>
                                 ) : isAnyInProgress ? (
                                     (() => {
                                         const activeP = p1Status === 'In Progress' ? (configs[0]?.n || 'Khâu 1') : (configs[1]?.n || 'Khâu 2');
@@ -3742,6 +3745,10 @@
                                             </span>
                                         );
                                     })()
+                                ) : (_item.qc_status === 'Chờ duyệt khung' || _item.qc_status === 'Khung đã nộp') ? (
+                                    <span className="text-[8.5px] font-black px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 rounded-md uppercase tracking-wider flex items-center gap-1 shrink-0">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span> CHỜ DUYỆT KHÂU 1
+                                    </span>
                                 ) : (
                                     <span className="text-[8.5px] font-bold px-2 py-0.5 bg-zinc-800 text-zinc-400 border border-zinc-700/60 rounded-md uppercase tracking-wider flex items-center gap-1 shrink-0">
                                         <span className="w-1.5 h-1.5 rounded-full bg-zinc-500"></span> CHỜ NHẬN VIỆC
@@ -3959,7 +3966,7 @@
 
                     {isExpanded && (
                         <div className="px-2 pb-2 border-t border-white/[0.08] pt-2 flex flex-col gap-1 w-full animate-fade-in rounded-b-xl bg-transparent">
-                            {canApproveQC && _item.qc_status === 'Chờ duyệt khung' && (
+                            {canApproveQC && (_item.qc_status === 'Chờ duyệt khung' || _item.qc_status === 'Khung đã nộp') && (
                                 <div className="mb-2 p-2.5 bg-[#14141a] rounded-xl border border-indigo-500/40 relative flex items-center gap-2.5 shadow-sm">
                                     <div className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden border border-indigo-500/30 bg-black/40 cursor-pointer group" onClick={(e) => { e.stopPropagation(); setPreviewImg(_item.qc_front_photo); }}>
                                         <img src={_item.qc_front_photo} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="Mặt trước" />
@@ -4392,6 +4399,7 @@
     const ProductionTab = React.memo(function ProductionTab({ attendance, orders, prodItems, packings, erpProducts, currentUser, userRole: propUserRole, hasPerm: propHasPerm, pushDeltas, userConfigs, triggerToast, kpiConfig, erpData, models3D, documents }) {
         const [typeTab, setTypeTab] = React.useState('Layout');
         const [statusTab, setStatusTab] = React.useState('CHỜ SẢN XUẤT');
+        const [prodPhaseSubFilter, setProdPhaseSubFilter] = React.useState('ALL');
         const [filterChannel, setFilterChannel] = React.useState('ALL');
         const [filterTime, setFilterTime] = React.useState('Tháng Này');
         const [customMonth, setCustomMonth] = React.useState('');
@@ -4836,10 +4844,30 @@
         }, [prodItems, currentUser]);
 
         const counts = { 'CHỜ SẢN XUẤT': 0, 'KIỂM ĐỊNH': 0, 'ĐÃ XONG': 0, 'ĐÃ HUỶ': 0, 'TẤT CẢ': typeFiltered.length };
-        listWithStatus.forEach(i => { counts[i._computedStatus] = (counts[i._computedStatus] || 0) + 1; });
+        let countChoKhau1 = 0;
+        let countChoKhau2 = 0;
+        listWithStatus.forEach(i => {
+            counts[i._computedStatus] = (counts[i._computedStatus] || 0) + 1;
+            if (i._computedStatus === 'CHỜ SẢN XUẤT') {
+                const p1 = i.phases?.phase1?.status || 'Pending';
+                const p2 = i.phases?.phase2?.status || 'Pending';
+                const p1Done = p1 === 'Done' || String(p1).toUpperCase() === 'ĐÃ XONG';
+                const p2Done = p2 === 'Done' || String(p2).toUpperCase() === 'ĐÃ XONG';
+                if (!p1Done) countChoKhau1++;
+                else if (p1Done && !p2Done) countChoKhau2++;
+            }
+        });
 
         const list = listWithStatus.filter(i => {
             if (statusTab !== 'TẤT CẢ' && statusTab !== i._computedStatus) return false;
+            if (statusTab === 'CHỜ SẢN XUẤT' && prodPhaseSubFilter !== 'ALL') {
+                const p1 = i.phases?.phase1?.status || 'Pending';
+                const p2 = i.phases?.phase2?.status || 'Pending';
+                const p1Done = p1 === 'Done' || String(p1).toUpperCase() === 'ĐÃ XONG';
+                const p2Done = p2 === 'Done' || String(p2).toUpperCase() === 'ĐÃ XONG';
+                if (prodPhaseSubFilter === 'PHASE1' && p1Done) return false;
+                if (prodPhaseSubFilter === 'PHASE2' && (!p1Done || p2Done)) return false;
+            }
             return true;
         });
 
@@ -5433,6 +5461,41 @@
                     })}
                 </div>
 
+                {/* SUB-FILTER KANBAN THEO KHÂU: CHO PHÉP THỢ BẤM 1 CHẠM ĐỂ KÉO VIỆC (LEAN PULL FLOW) */}
+                {statusTab === 'CHỜ SẢN XUẤT' && (
+                    <div className="flex items-center gap-2 mb-3.5 px-1 animate-fade-in flex-wrap">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-1 mr-1">
+                            <i className="fas fa-filter text-amber-400 text-[9px]"></i> Phân Khâu:
+                        </span>
+                        {[
+                            { id: 'ALL', label: 'Tất Cả Khâu', count: counts['CHỜ SẢN XUẤT'] || 0, icon: 'fa-stream' },
+                            { id: 'PHASE1', label: typeTab === 'Bể Kính' ? 'Cắt Dán Kính' : 'Dựng Khung Phôi', count: countChoKhau1, icon: 'fa-cube', highlight: 'text-amber-300' },
+                            { id: 'PHASE2', label: typeTab === 'Bể Kính' ? 'Gọt Keo Bể' : 'Gia Cố / Gọt Keo', count: countChoKhau2, icon: 'fa-shield-alt', highlight: 'text-emerald-300' }
+                        ].map(sub => {
+                            const isSubActive = prodPhaseSubFilter === sub.id;
+                            return (
+                                <button
+                                    key={sub.id}
+                                    onClick={() => setProdPhaseSubFilter(sub.id)}
+                                    className={`px-3 py-1.5 rounded-lg text-[10.5px] font-black flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
+                                        isSubActive
+                                            ? 'bg-amber-500 text-zinc-950 shadow-md ring-1 ring-amber-400'
+                                            : 'bg-white/[0.04] text-zinc-300 border border-white/[0.08] hover:bg-white/[0.08] hover:text-white'
+                                    }`}
+                                >
+                                    <i className={`fas ${sub.icon} text-[9px] ${isSubActive ? 'text-zinc-950' : (sub.highlight || 'text-zinc-400')}`}></i>
+                                    <span>{sub.label}</span>
+                                    <span className={`px-1.5 py-0.2 rounded text-[9px] min-w-[18px] text-center font-black ${
+                                        isSubActive ? 'bg-black/30 text-amber-200' : 'bg-black/40 text-zinc-400 border border-white/5'
+                                    }`}>
+                                        {sub.count}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+
 
                 {/* DANH SÁCH LỆNH SẢN XUẤT RESPONSIVE CHUẨN ĐỒNG BỘ MỌI THIẾT BỊ */}
                 <div className="w-full space-y-4 mt-1 pb-6">
@@ -5504,6 +5567,25 @@
                                 return channelPriority[upper] || 99;
                             };
 
+                            const getEffectiveDeadline = (item, order) => {
+                                if (item && item.deadline) {
+                                    const t = new Date(item.deadline).getTime();
+                                    if (!isNaN(t)) return t;
+                                }
+                                if (order && order.deadline) {
+                                    const t = new Date(order.deadline).getTime();
+                                    if (!isNaN(t)) return t;
+                                }
+                                if (typeof getAutoDeadline === 'function' && order) {
+                                    const auto = getAutoDeadline(order.channel, order.createdAt || order.date, order.shippingMethod);
+                                    if (auto) {
+                                        const t = new Date(auto).getTime();
+                                        if (!isNaN(t)) return t;
+                                    }
+                                }
+                                return Infinity;
+                            };
+
                             const sortedList = [...list].sort((a, b) => {
                                 const oA = (orders || []).find(x => x.id === a.orderId || x.orderCode === a.orderId) || {};
                                 const oB = (orders || []).find(x => x.id === b.orderId || x.orderCode === b.orderId) || {};
@@ -5512,23 +5594,26 @@
                                 const bUrgent = b.isUrgent === true || String(b.isUrgent).toUpperCase() === 'TRUE' || oB.isUrgent === true || String(oB.isUrgent).toUpperCase() === 'TRUE';
                                 if (aUrgent !== bUrgent) return bUrgent ? 1 : -1;
 
-                                const pA = getChannelPrio(normalizeProductionChannel(oA.channel));
-                                const pB = getChannelPrio(normalizeProductionChannel(oB.channel));
-                                if (pA !== pB) return pA - pB;
-
                                 if (statusTab === 'ĐÃ XONG' || statusTab === 'KIỂM ĐỊNH') {
                                     const getEnd = (i) => i.phases?.phase2?.endTime || i.phases?.phase1?.endTime || i.phases?.phase2?.date || i.phases?.phase1?.date || '0';
                                     const comp = String(getEnd(b)).localeCompare(String(getEnd(a)));
                                     if (comp !== 0) return comp;
                                 } else {
-                                    const dateA = oA.createdAt || oA.date || '0';
-                                    const dateB = oB.createdAt || oB.date || '0';
-                                    const dateComp = String(dateA).localeCompare(String(dateB));
-                                    if (dateComp !== 0) return dateComp;
+                                    // ƯU TIÊN HẠN BÀN GIAO SỚM NHẤT (EARLIEST DEADLINE FIRST - BẢO VỆ SLA GIAO HÀNG TRÁNH NGHẼN CUỐI NGÀY)
+                                    const dlA = getEffectiveDeadline(a, oA);
+                                    const dlB = getEffectiveDeadline(b, oB);
+                                    if (dlA !== dlB) return dlA - dlB;
                                 }
 
-                                const dDiff = new Date(a.deadline || 0) - new Date(b.deadline || 0);
-                                if (dDiff !== 0) return dDiff;
+                                const pA = getChannelPrio(normalizeProductionChannel(oA.channel));
+                                const pB = getChannelPrio(normalizeProductionChannel(oB.channel));
+                                if (pA !== pB) return pA - pB;
+
+                                const dateA = oA.createdAt || oA.date || '0';
+                                const dateB = oB.createdAt || oB.date || '0';
+                                const dateComp = String(dateA).localeCompare(String(dateB));
+                                if (dateComp !== 0) return dateComp;
+
                                 return String(a.id).localeCompare(String(b.id));
                             });
 

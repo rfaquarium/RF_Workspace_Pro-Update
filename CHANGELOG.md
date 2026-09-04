@@ -3,6 +3,43 @@
 Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến trúc, tối ưu nghiệp vụ và sửa lỗi của hệ điều hành `RF_Workspace_Pro`.
 ---
 
+## [v2.42.0] - 2026-09-04
+
+### ⚡ Tối Ưu Hóa Dòng Chảy Lean (One-Piece Flow), Phá Vỡ Điểm Nghẽn Sản Xuất & Giao Hàng
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **Điểm nghẽn 1 (Tắc dòng chảy K1 ➔ K2)**: Thợ Khâu 1 (như Vinh dựng khung) hoàn thành xong thì Khâu 2 (thợ Tâm gia cố) bị khóa cứng với trạng thái `Chờ duyệt khung`, bắt buộc Admin phải vào bấm duyệt thủ công thì Khâu 2 mới mở ra. Thợ Khâu 2 phải ngồi chờ (lãng phí thời gian chết Muda), phá vỡ nguyên lý One-Piece Flow.
+  - **Điểm nghẽn 2 (Tắc giao hàng lúc 16:00 do nghẽn mã vận đơn)**: Đơn hàng Shopee/TikTok đã xong 100% sản phẩm nhưng chưa kịp sinh mã vận đơn thì hệ thống giam giữ cố định ở `Chờ Sản Xuất`. Thợ đóng gói (Hương) không thấy đơn ở `Sẵn Sàng Đóng Gói` để bọc xốp, đóng thùng carton trước. Đến 16:00 khi sàn cấp mã vận đơn hàng loạt thì dồn ứ khối lượng đóng gói, gây trễ hẹn giao hàng cho shipper.
+  - **Điểm nghẽn 3 (Lệch khóa ngoại OrderId vs OrderCode)**: Một số lệnh sản xuất ghi `orderId` là chuỗi `ORD-XXXXX`, trong khi đơn hàng liên kết lưu ID số, dẫn đến hàm `checkAndToggleOrderReadiness` (`Tab_Production.html`) và `safeDeductInventoryOnHandover` (`Code.js`) không khớp được sản phẩm, làm đơn không tự nhảy sang đóng gói và bỏ sót trừ tồn kho khi bàn giao.
+  - **Điểm nghẽn 4 (Đảo ngược độ ưu tiên hàng chờ - Priority Inversion)**: Danh sách lệnh sản xuất sắp xếp kênh bán trước hạn chót, dẫn đến đơn cũ không gấp lại nằm trên đỉnh, trong khi đơn mới có deadline hôm nay (cần giao trước 17:30) lại bị đẩy xuống dưới.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật**:
+  1. **Tự Động Mở Khóa Khâu 2 (Auto-Advance Phase 2 - `Tab_Production.html`)**:
+     - Khi Khâu 1 hoàn tất, hệ thống tự động ghi nhận `phases.phase1.status = 'Done'`, chốt thời gian `p1_endTime`, ghi nhận tiền thưởng KPI và gắn cờ `qc_status = 'Khung đã nộp'`.
+     - Loại bỏ điều kiện chặn `item.qc_status === 'Chờ duyệt khung'` khỏi biến `isLocked`. Khâu 2 tự động mở khóa ngay lập tức cho thợ gia cố thao tác.
+     - Quy trình KCS của Admin chuyển sang kiểm tra độc lập bất đồng bộ; chỉ khi Admin chủ động bấm từ chối (`qc_status === 'Yêu cầu làm lại'`) thì Khâu 2 mới bị khóa lại.
+  2. **Cho Phép Đóng Hộp Trước Khi Thiếu Mã Vận Đơn (Early Box Packing - `Tab_Orders.html` & `Modals_Orders.html`)**:
+     - Khi `allProdDone = true`, đơn lập tức chuyển sang `Sẵn Sàng Đóng Gói` để đóng hộp trước, xóa bỏ điều kiện chặn bởi `isMissingMVD`.
+     - Trên thẻ đơn hiển thị huy hiệu cảnh báo màu hổ phách: `[CHỜ MÃ VẬN ĐƠN - ĐÓNG HỘP TRƯỚC]`.
+     - Nút `BÀN GIAO` được bọc chốt chặn Poka-Yoke: Nếu thiếu mã vận đơn sẽ cảnh báo và chặn xuất kho, đảm bảo kiện hàng đã đóng sẵn chỉ chờ dán tem là giao ngay cho shipper.
+  3. **Chuẩn Hóa Khóa Ngoại Hai Chiều `isOrderMatch` (`Tab_Production.html` & `Code.js`)**:
+     - Xây dựng logic so khớp toàn diện: `pOrderId === oId || pOrderId === oCode || pOrderId === oBaseCode`.
+     - Đảm bảo 100% sản phẩm và đơn hàng liên kết chính xác, đồng bộ trừ kho thành phẩm trong `safeDeductInventoryOnHandover`.
+  4. **Thuật Toán Sắp Xếp Hạn Bàn Giao Sớm Nhất (Earliest Deadline First - EDF - `Tab_Production.html`)**:
+     - Lập chỉ mục `getEffectiveDeadline` tự động tính toán deadline thực tế (Shopee 17:30 / 11:30 hôm sau).
+     - Thứ tự ưu tiên điều phối hàng chờ:
+       1. Đơn Hỏa Tốc (`isUrgent`)
+       2. Hạn bàn giao sớm nhất (`dlA - dlB`)
+       3. Mức độ ưu tiên kênh bán (`channelPriority`)
+       4. Ngày tạo đơn (`createdAt`)
+  5. **Thanh Lọc Phân Khâu Kanban 1 Chạm (Lean Pull Flow - `Tab_Production.html`)**:
+     - Bổ sung cụm chip lọc trực quan tại tab `CHỜ SẢN XUẤT`:
+       - `[Tất Cả Khâu]`
+       - `[Dựng Khung Phôi / Cắt Dán Kính]` (Khâu 1 chưa xong)
+       - `[Gia Cố Keo / Gọt Keo Bể]` (Khâu 1 đã xong, Khâu 2 sẵn sàng làm)
+     - Giúp thợ kéo việc đúng chuyên môn chỉ với 1 cú chạm, không cần lục tìm danh sách.
+- **Kiểm Định Tự Động**: 209/209 test cases đạt chuẩn (`run_tests.js`).
+
+---
+
 ## [v2.41.1] - 2026-09-04
 
 ### 💎 Chuẩn Hóa SKU & Tên Sản Phẩm Shopee Theo Đúng Quy Cách Xưởng Rich Fish

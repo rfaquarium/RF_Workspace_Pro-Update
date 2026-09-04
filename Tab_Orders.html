@@ -1768,11 +1768,12 @@
                 }
                 const meta = computeOrderMetadata(o);
                 
-                // Hàng sản xuất xong vẫn nằm ở Chờ Sản Xuất cho đến khi có mã vận đơn mới nhảy sang Sẵn Sàng Đóng Gói
-                if (meta.allProdDone && !meta.isMissingMVD && (eff === 'CHỜ SẢN XUẤT' || eff === 'QUÉT TỰ ĐỘNG' || eff === 'ĐANG SẢN XUẤT' || eff === 'CHỜ PHỤ KIỆN')) {
+                // Khi toàn bộ sản phẩm sản xuất đã xong (meta.allProdDone = true), cho phép đơn chuyển sang SẴN SÀNG ĐÓNG GÓI
+                // để đóng hộp trước (tiết kiệm thời gian chờ mã vận đơn, triệt tiêu nghẽn giao hàng lúc 16:00).
+                if (meta.allProdDone && (eff === 'CHỜ SẢN XUẤT' || eff === 'QUÉT TỰ ĐỘNG' || eff === 'ĐANG SẢN XUẤT' || eff === 'CHỜ PHỤ KIỆN')) {
                     eff = 'SẴN SÀNG ĐÓNG GÓI';
-                } else if ((!meta.allProdDone && eff === 'SẴN SÀNG ĐÓNG GÓI' && !meta.hasDonePack) || (meta.isMissingMVD && eff === 'SẴN SÀNG ĐÓNG GÓI' && !meta.hasDonePack)) {
-                    // Nếu đơn cần sản xuất nhưng phôi/bể chưa xong hoặc lệnh đã bị xoá hoặc chưa có mã vận đơn (chờ xác nhận), bắt buộc giữ ở Chờ Sản Xuất
+                } else if (!meta.allProdDone && eff === 'SẴN SÀNG ĐÓNG GÓI' && !meta.hasDonePack) {
+                    // Nếu đơn cần sản xuất nhưng phôi/bể chưa xong hoặc lệnh đã bị xoá, bắt buộc giữ ở Chờ Sản Xuất
                     eff = 'CHỜ SẢN XUẤT';
                 }
 

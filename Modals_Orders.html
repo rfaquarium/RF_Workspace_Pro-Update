@@ -4925,11 +4925,10 @@
             } else if (orderRequiresProd && !prodsReady) {
                 // Đơn cần sản xuất nhưng chưa xong sản xuất hoặc thiếu lệnh -> Giữ ở Chờ Sản Xuất
                 effectiveStatus = 'Chờ Sản Xuất';
-            } else if (_order._isMissingMVD || _order._computedStatus === 'CHỜ SẢN XUẤT' || _order._computedStatus === 'Chờ Sản Xuất') {
-                // Đơn chưa có mã vận đơn từ sàn (chờ xác nhận): Giữ cố định ở Chờ Sản Xuất
-                effectiveStatus = 'Chờ Sản Xuất';
             } else if (_order._computedStatus === 'SẴN SÀNG ĐÓNG GÓI' || _order._computedStatus === 'Sẵn Sàng Đóng Gói' || filterStatus === 'Sẵn Sàng Đóng Gói') {
                 effectiveStatus = 'Sẵn sàng đóng gói';
+            } else if (_order._computedStatus === 'CHỜ SẢN XUẤT' || _order._computedStatus === 'Chờ Sản Xuất') {
+                effectiveStatus = 'Chờ Sản Xuất';
             } else {
                 if (prodsReady && stockValid) {
                     effectiveStatus = 'Sẵn sàng đóng gói';
@@ -5751,6 +5750,10 @@
                     icon: processing ? 'fas fa-spinner fa-spin' : 'fas fa-truck',
                     onClick: (e) => { 
                         e.stopPropagation(); 
+                        if (_order._isMissingMVD) {
+                            alert(`Đơn ${_order.orderCode || _order.id} chưa có Mã Vận Đơn hợp lệ (hoặc thông tin nhà xe)! Vui lòng bổ sung Mã Vận Đơn trước khi bàn giao.`);
+                            return;
+                        }
                         if (window.confirm(`Xác nhận BÀN GIAO & XUẤT KHO đơn ${_order.orderCode || _order.id}?`)) {
                             handleAct('SHIP'); 
                         }
@@ -6892,9 +6895,16 @@
                                                         </span>
                                                     ) : (isItemDone || isReadyPack) ? (
                                                         !isStockFulfilled ? (
-                                                            <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider mt-0.5 flex items-center gap-1">
-                                                                <i className="fas fa-check-circle"></i> SẴN SÀNG ĐÓNG GÓI
-                                                            </span>
+                                                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                                                <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                                                                    <i className="fas fa-check-circle"></i> SẴN SÀNG ĐÓNG GÓI
+                                                                </span>
+                                                                {_order._isMissingMVD && (
+                                                                    <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[8.5px] font-bold">
+                                                                        <i className="fas fa-clock mr-0.5"></i> CHỜ MÃ VẬN ĐƠN - ĐÓNG HỘP TRƯỚC
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         ) : (
                                                             <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                                                                 <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">

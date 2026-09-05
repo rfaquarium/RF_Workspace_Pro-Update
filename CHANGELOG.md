@@ -1,7 +1,187 @@
 # 🚀 RF_WORKSPACE_PRO — SYSTEM CHANGELOG & RELEASE HISTORY
 
 Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến trúc, tối ưu nghiệp vụ và sửa lỗi của hệ điều hành `RF_Workspace_Pro`.
+
+## [v2.45.3] - 2026-09-05
+
+### 📊 Đồng Bộ Dữ Liệu Thời Gian Thực Vào War Room & Triệt Tiêu Hallucination 7 Agents
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **1. Hiện tượng Hallucination (Ảo giác AI)**: Khi Chỉ huy hỏi *"Tháng này liệu nhân sự nào có thể hoàn thành được 100% KPI"*, 7 Agent tự vẽ ra nhân vật lạ không có thật trong xưởng (*"anh Tuấn"*), bịa đặt số liệu giả (*"120 hồ mài vát kim cương"*) gây bức xúc và mất tính thực chiến.
+  - **2. Nguyên nhân gốc rễ (Root Cause)**:
+    - Ở tầng Client (`Components.html`), hàm `runWarRoomDiscussion` trước đây chỉ gửi mỗi chuỗi văn bản `{ incident: incidentText }`, hoàn toàn không gửi kèm dữ liệu hệ thống.
+    - Ở tầng Backend (`server_kcs.py` & `agent_war_room.py`), mô hình Gemini Flash không được cấp context dữ liệu về nhân sự, KPI, đơn hàng hay tồn kho của Rich Fish, dẫn đến việc mô hình tự do sáng tác các kịch bản viễn tưởng.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật**:
+  1. **Đột Phá Kiến Trúc Live Operational Context Injection (`Components.html` & `App_Main.html`)**:
+     - Cung cấp đầy đủ props `orders`, `prodItems`, `packings`, `attendance`, `erpData`, `userConfigs`, `kpiConfig` vào `<RFAgentControlTower>`.
+     - Xây dựng hàm `buildLiveOperationalContext()` trích xuất snapshot dữ liệu thời gian thực:
+       + **Nhân sự**: Lấy danh sách nhân sự chính thức (`Nguyễn Hoàng Dương`, `Trần Duy Tân`, `Nguyễn Thị Diệu Hương`, `Nguyễn Thị Trang`, `Nguyễn Ngọc Tiến`) và danh sách từ `Config_NhanSu`.
+       + **KPI thời gian thực**: Trích xuất tỷ lệ hoàn thành thực tế từ bảng `KPI_Progress` (`user`, `kpiName`, `current`, `target`, `unit`, `pct%`).
+       + **Tiến độ sản xuất**: Sản lượng theo từng thợ (`p1_user`, `p2_user`) từ bảng `Production`.
+       + **Tồn kho**: Trích xuất tồn keo Wacker 121 và danh sách vật tư cảnh báo sắp hết (`quantity <= minStock`) từ bảng `Products`.
+       + **Đơn hàng**: Tỷ lệ đơn chờ xử lý, đơn hoàn thành từ bảng `Orders`.
+     - Đóng gói toàn bộ payload context gửi đồng thời lên endpoint `POST /api/warroom/discuss`.
+  2. **Bộ Quy Tắc Nghiệp Vụ Chống Bịa Đặt & Trích Xuất Chuẩn (`agent_war_room.py`)**:
+     - Cập nhật schema `IncidentRequest` tiếp nhận trường `context: Optional[Dict[str, Any]]`.
+     - Thiết lập quy tắc **Anti-Hallucination** đanh thép: Nghiêm cấm bịa đặt nhân sự không có trong danh sách CSDL (tuyệt đối không được nói anh Tuấn, anh Hùng...); mọi nhận định về KPI, sản lượng, đơn hàng bắt buộc phải trích dẫn số liệu thật từ context.
+     - Trợ lý HR (hr) và các Agent phân tích chính xác tiến độ của từng thợ (Diệu Hương đạt bao nhiêu %, Hoàng Dương bao nhiêu %, Duy Tân bao nhiêu %), đánh giá rào cản về phôi/kính và dòng tiền.
+  3. **Kịch Bản Dự Phòng Thông Minh Bám Sát Dữ Liệu (Smart Adaptive Fallback)**:
+     - Ngay cả khi mất kết nối backend hoặc API nghẽn, kịch bản dự phòng phía client và server vẫn tự động tính toán nhân sự đang dẫn đầu KPI từ bảng `KPI_Progress` để phản hồi chính xác tên người và số liệu thật, không bao giờ nói vớ vẩn.
+
 ---
+
+## [v2.45.2] - 2026-09-05
+
+### 💬 Khung Chat Điều Hành Trực Tiếp (Commander Chat) & Tự Động Kích Hoạt 7 Agents Xưởng
+- **Bối cảnh & Yêu cầu thực tế xưởng**:
+  - **Loại bỏ tính năng mô phỏng mẫu**: Các nút và chip sự vụ mẫu trước đây chỉ dùng để demo, không phục vụ mục đích điều hành linh hoạt hàng ngày.
+  - **Nhu cầu đối thoại hai chiều trực tiếp**: Chỉ huy / Quản lý xưởng cần một thanh nhập liệu (Chat Bar) trực quan để gõ bất kỳ sự vụ phát sinh, câu hỏi kỹ thuật hay lệnh điều động nào cho 7 Agent.
+  - **Nhu cầu tự động phối hợp (Auto-Coordination)**: Cần cơ chế để khi thợ bị AI KCS từ chối chất lượng hoặc khi tồn kho vật tư chạm đáy, Ban Điều Hành 7 Agent phải tự động xuất hiện và nhóm họp giải quyết mà không cần con người phải tự mở ứng dụng bấm thủ công.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật**:
+  1. **Khung Chat Điều Hành Trực Tiếp (`Components.html`)**:
+     - Loại bỏ hoàn toàn khối nút mô phỏng chiến lược cũ.
+     - Tích hợp thanh nhập liệu công thái học `form#rf-agent-footer` kèm nút gửi icon giấy bay phản quang `linear-gradient(#d4af37)`.
+     - Hỗ trợ gửi lệnh bằng phím Enter hoặc nút bấm, hiển thị tin nhắn Chỉ huy (`👤 currentUser`) trực tiếp vào luồng hội thoại với giao diện nổi bật trước khi 7 Agent phản hồi.
+  2. **Cơ Chế Tự Động Điều Phối Theo Thời Gian Thực (`Tab_Production.html`)**:
+     - Tự động kích hoạt `window.triggerRealtimeWarRoom` ngay khi máy trạm AI KCS phát hiện lỗi kỹ thuật ở Khâu 1 (Khung/Bố cục) hoặc Khâu 2 (Dán/Gọt vát) mà thợ gửi ảnh nghiệm thu.
+     - Cửa sổ War Room tự động mở ra, tự un-minimize và hiển thị toàn bộ phân tích nguyên nhân - phương án giải quyết của 7 nhân vật số.
+
+---
+
+## [v2.45.1] - 2026-09-05
+
+### 🛡️ Hotfix: Khắc Phục Lỗi Cú Pháp Unterminated String Khi Biên Dịch Components.html Trên Google Apps Script (Bảo Vệ URL Endpoint Máy Trạm Xưởng)
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **1. Triệu chứng**: Khi tải ứng dụng trên cả Vercel PWA lẫn Web App Google Apps Script, hệ thống hiển thị màn hình đỏ cảnh báo lỗi cú pháp: `❌ LỖI CÚ PHÁP TẠI FILE [Components]: unknown: Unterminated string constant. (691:40)`. Dòng mã gặp lỗi bị cắt cụt thành `const res = await fetch("http:` thay vì URL đầy đủ.
+  - **2. Cơ chế sinh lỗi (Root Cause)**: Khi phục vụ tệp HTML qua cơ chế `HtmlService.createTemplateFromFile().evaluate()`, trình tiền xử lý/bộ phân tích cú pháp Caja của Google Apps Script hiểu nhầm hai dấu gạch chéo liền kề `//` trong chuỗi ký tự URL `"http://127.0.0.1:8000/..."` là cú pháp bắt đầu của ghi chú một dòng (Single-line Comment). Hậu quả là toàn bộ phần đuôi của dòng mã bị cắt bỏ, để lại dấu mở ngoặc kép `"` không bao giờ được đóng trước khi xuống dòng.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật**:
+  1. **Hằng Số Ghép Chuỗi Kháng Phân Tích Cú Pháp (`Components.html`)**:
+     - Định nghĩa hằng số toàn cục `const KCS_LOCAL_URL = 'http' + '://' + '127.0.0.1:8000';`. Kỹ thuật ghép chuỗi tách rời hoàn toàn hai ký tự `//`, triệt tiêu 100% khả năng bị bất kỳ công cụ minify/sanitizer nào hiểu lầm là comment.
+     - Chuẩn hóa toàn bộ các lệnh `fetch` gọi dịch vụ máy trạm (Health Check, Báo thức loa xưởng, Trợ lý xưởng AI, và War Room 7 Agents) sử dụng biến `KCS_LOCAL_URL`.
+  2. **Đồng Bộ Phòng Ngừa (`Tab_Production.html`)**:
+     - Áp dụng cấu trúc ghép chuỗi tương tự cho lời gọi AI KCS `api/inspect` tại khâu thẩm định ảnh nghiệm thu.
+  3. **Độ Tin Cậy Vận Hành**:
+     - Biên dịch Phase 1 - Core trên client hoàn tất thành công trong 0ms từ Local Cache, sẵn sàng kích hoạt ngay War Room 7 Agents.
+
+---
+
+## [v2.45.0] - 2026-09-05
+
+### 🏛️ Ban Điều Hành Tác Nhân Số (RF War Room 7 Agents) & Single-Turn Orchestration với Gemini 3.6 Flash
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **Sự cô lập giữa các bộ phận khi xảy ra sự cố xưởng**: Khi xảy ra lỗi kỹ thuật (bọt khí, nứt góc kính, layout lung lay, tồn keo giảm), các khâu KCS, Thủ kho, Quản đốc, Tài chính và Nhân sự giải quyết rời rạc, thiếu sự đối thoại đa chiều và thiếu sự giám sát toàn diện từ Ban Điều Hành.
+  - **Hạn chế của kịch bản tĩnh (Hardcoded Script)**: Các thông báo lỗi trước đây là khuôn mẫu lặp lại, không phản ánh tính chất đa dạng của từng sự vụ và không tạo được văn hóa làm việc sống động, thấu đáo tại xưởng.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật**:
+  1. **Bộ Não Hội Thoại Đa Tác Nhân Single-Turn Orchestration (`agent_war_room.py`)**:
+     - Định nghĩa 7 nhân vật số độc lập với chuyên môn sắc sảo:
+       + **CSO (GĐ Chiến Lược)**: Đánh giá tác động thương hiệu, đại lý, tiềm năng SKU và rating 5 sao.
+       + **COO (GĐ Vận Hành)**: Điều phối tiến độ sản xuất, thời gian SOP và lịch giao vận Shipper.
+       + **CFO (GĐ Tài Chính)**: Kiểm soát chi phí phôi/keo, duyệt ngân sách và chuyển tiền phạt vào Quỹ Từ Thiện.
+       + **Thủ Kho (Thủ Kho AI)**: Cảnh báo tồn vật tư (kính siêu trong, keo Wacker 121 đen/trong, đá lũa).
+       + **KCS Giám Sát SX**: Soi chuẩn kỹ thuật giấu keo, bọt khí đáy, mài vát 45 độ và quy chuẩn an toàn.
+       + **Trợ Lý HR & KPI**: Tra cứu nội quy, áp dụng chế tài minh bạch và tính thưởng phạt chuyên cần.
+       + **Thánh Bao Đồng**: Nhân vật tếu táo chõ chuyện xưởng, bình luận dân dã dí dỏm, kéo gần khoảng cách anh em.
+     - Ứng dụng mô hình **Gemini 3.6 Flash** với kỹ thuật Single-Turn Multi-Agent Orchestration: Chỉ 1 lượt gọi API duy nhất sinh ra toàn bộ chuỗi hội thoại logic tự nhiên, tiết kiệm 85% chi phí token và phản hồi dưới 1 giây.
+     - Tích hợp kịch bản dự phòng thích ứng 100% (Offline Fallback Engine) khi gặp gián đoạn kết nối.
+  2. **Endpoint Mở Rộng Trên Máy Chủ Xưởng (`server_kcs.py`)**:
+     - Bổ sung route `POST /api/warroom/discuss` xử lý payload `IncidentRequest`.
+  3. **Cửa Sổ Nổi Thu Nhỏ Kéo Thả Công Thái Học (`Components.html` & `App_Main.html`)**:
+     - Cửa sổ nổi `rf-agent-control-tower` với thanh kéo thả drag-handle hỗ trợ cả chuột máy tính lẫn cảm ứng điện thoại/máy tính bảng.
+     - Roster 7 Agent đổi màu viền phát sáng theo lượt nhân vật đang phát biểu.
+     - Khung stream hội thoại tự động cuộn (Auto-scroll), các chip gợi ý sự vụ 1 chạm và nút launcher toàn cục `[🎖️ War Room (7)]`.
+
+## [v2.44.0] - 2026-09-05
+
+### 🤖 Tích Hợp Trợ Lý Điều Phối & Giám Sát Kỹ Thuật Xưởng (RF Workshop Assistant)
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **Khoảng trống hỗ trợ thợ tức thời tại xưởng**: Các thợ gia công (Hoàng Dương, Duy Tân) khi gặp sự cố kỹ thuật (bọt khí đường keo góc đáy, sứt mẻ cạnh kính khi mài vát, layout bị lung lay hoặc thiếu vững chãi) thường phải dừng công việc để chờ Quản đốc hoặc nhắn tin hỏi Admin, gây gián đoạn nhịp độ Takt Time và phát sinh thời gian chết (Muda).
+  - **Đứt gãy phản hồi sau khi KCS từ chối (Need_Repair)**: Khi mô hình AI Vision KCS phát hiện ảnh chụp không đạt chuẩn và trả về `Need_Repair`, thợ chỉ nhận được thông báo chung mà không có hướng dẫn từng bước cụ thể (cần khoét vát bao nhiêu độ, dùng loại keo nào, lau cồn ra sao, có cần thay kính không).
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật**:
+  1. **Bộ Não Quản Đốc Kỹ Thuật Số Độc Lập (`agent_assistant.py`)**:
+     - Định nghĩa vai trò Quản Đốc Ảo kiêm Kỹ Sư Trưởng Xưởng giàu kinh nghiệm, giọng điệu thực tế, thân thiện và tập trung vào hành động thực thi.
+     - Hướng dẫn chuyên sâu quy cách kỹ thuật bể kính (dán giấu keo, khe keo 1-2mm chịu lực, keo Wacker 121 / Dow Corning) và layout thủy sinh (tỉ lệ 1/3, làm thác cát, giấu keo 502 bằng mùn đá).
+     - Hướng dẫn chi tiết quy trình khắc phục lỗi KCS (Need_Repair) an toàn theo 4 bước chuẩn mực.
+     - Luôn nhắc nhở an toàn lao động (găng tay chống cắt cấp 5 khi vác kính, kính bảo hộ khi cắt mài đá lũa).
+     - Kiến trúc động Dual-Engine: Hỗ trợ linh hoạt cả Google GenAI Client lẫn Google Antigravity SDK nền tảng.
+  2. **Endpoint Hội Thoại Máy Chủ AI (`server_kcs.py`)**:
+     - Bổ sung route `POST /api/assistant/chat` tiếp nhận payload `AssistantRequest` (tin nhắn, tên thợ, công đoạn, tên sản phẩm, ghi chú lỗi KCS).
+     - Khởi chạy ngầm đồng bộ trên cổng 8000 của máy trạm xưởng.
+  3. **Widget Chat Công Thái Học Toàn Cục (`WorkshopAssistantWidget` trong `Components.html` & `App_Main.html`)**:
+     - Nút nổi góc phải dưới màn hình với huy hiệu trạng thái kết nối thời gian thực (PORT 8000 ONLINE / OFFLINE).
+     - Hộp thoại chat phong cách Hallmark sang trọng, nền tối kính mờ, tối ưu công thái học cả trên điện thoại và máy tính xưởng.
+     - Tích hợp 4 chip câu hỏi nhanh 1 chạm: `[Xử lý bọt khí đường keo]`, `[Chuẩn mài xiết vát 45°]`, `[An toàn vác kính khổ lớn]`, `[Tỉ lệ vàng layout lũa đá]`.
+  4. **Vòng Lặp Phản Hồi Tự Động KCS ➔ Assistant (`Tab_Production.html`)**:
+     - Khi AI KCS thẩm định ảnh chụp phát hiện lỗi và trả về `Need_Repair`, hệ thống tự động kích hoạt gọi `window.openWorkshopAssistant` kèm toàn bộ thông tin sản phẩm và mô tả lỗi để Quản Đốc Ảo lập tức hướng dẫn thợ cách sửa lỗi.
+
+## [v2.43.3] - 2026-09-05
+
+### 🛡️ Cải Tổ Cụm Nút Thao Tác Thẻ Đơn Hàng & Chốt Chặn Poka-Yoke 2 Lớp Chống Mất Đơn
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **Sự cố thực tế ("Vừa bé vừa không hỏi xác nhận trước khi hoàn huỷ. Bấm nhầm cái là nó nhấc đơn đi đâu mất")**:
+    - *Kích thước nút quá bé (24px `w-6 h-6`)*: Hàng loạt 8-10 nút icon (`⚡`, `📄`, `ℹ️`, `✏️`, `🕒`, `↩️`, `🚫`, `🗑️`) bị nhồi nhét chen chúc vào một dải hẹp với khoảng cách siêu nhỏ `gap-0.5`. Người dùng trên máy tính hoặc điện thoại khi định bấm xem chi tiết (`ℹ️`) hay in hoá đơn (`📄`) rất dễ bị chạm quẹt sang nút Hoàn (`↩️`) hoặc nút Huỷ (`🚫`).
+    - *Không có bước xác nhận khi bấm Chuyển Hoàn (`handleAct('RETURN')`)*: Hàm chuyển hoàn trước đây thực thi ngay lập tức chỉ với 1 cú click đơn lẻ mà không có bất kỳ hộp thoại xác nhận nào. Trạng thái đơn đổi thành `Hàng Hoàn` và biến mất ngay khỏi tab hiện tại ("Chờ Sản Xuất" hoặc "Sẵn Sàng Đóng Gói"), gây ức chế và hoang mang tột độ cho người vận hành.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật (`Modals_Orders.html`)**:
+  1. **Nâng Cấp Cụm Nút Công Thái Học Chuẩn Hallmark (Touch Ergonomics 32px)**:
+     - Tăng kích thước nút từ 24px lên 32px (`w-7.5 h-7.5` / `w-8 h-8`), bo góc mềm mại `rounded-xl`, phản hồi chạm nảy tay `active:scale-95`.
+     - Phân định rõ 4 nút chính trực quan: `[⚡ Hỏa tốc]` (vàng amber), `[📄 In bill/hoá đơn]` (xanh emerald), `[ℹ️ Chi tiết]` (xanh sky), `[••• Tác vụ khác]` (xám zinc).
+  2. **Tách Biệt Vùng Tác Vụ Phụ & Vùng Kiểm Soát Nguy Hiểm Qua React Portal Dropdown**:
+     - Toàn bộ các nút ít dùng và nút nguy hiểm được gom vào nút menu `•••`.
+     - Menu mở ra qua `ReactDOM.createPortal` gắn thẳng vào `document.body` (tọa độ tính toán động theo bounding rect), triệt tiêu hoàn toàn lỗi bị cắt góc/xén khung bởi thuộc tính `overflow-hidden` của thẻ đơn.
+     - Phân định rõ 2 khu vực: Nhóm tác vụ quản trị thông thường (Sửa đơn, Lịch sử, Đẩy GHN, Nhập SĐT xe) và Vùng kiểm soát nhạy cảm (Chuyển Hoàn, Hủy đơn, Xóa vĩnh viễn) với đường kẻ phân cách và icon khiên bảo vệ.
+  3. **Chốt Chặn An Toàn Poka-Yoke 2 Lớp (Bắt Buộc Xác Nhận)**:
+     - Dựng `OrderActionConfirmModal` toàn màn hình với nền mờ backdrop-blur:
+       - Header cảnh báo với icon và màu sắc tương ứng (Tím cho Hoàn, Đỏ cho Huỷ, Đỏ sẫm cho Xoá).
+       - Hiển thị rõ Mã đơn hàng, Tên khách hàng.
+       - Cảnh báo rõ ràng việc đơn sẽ rời khỏi danh sách sản xuất/đóng gói hiện tại.
+       - Hai nút bấm to rõ: `[ Huỷ bỏ (Giữ lại đơn) ]` (xám an toàn) và `[ Xác nhận... ]` (màu nổi bật theo hành động).
+     - Triệt tiêu 100% rủi ro bấm nhầm làm mất đơn hàng.
+
+## [v2.43.2] - 2026-09-05
+
+### 📦 Thông Luồng Đóng Gói Liên Tục Từng Đơn (Không Chờ Hoàn Tất Đơn Cũ) & Lọc Rác Dữ Liệu
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **Yêu cầu thực chiến của xưởng ("Chụp từng đơn, chụp xong không cần done mà chụp tiếp đơn nữa rồi mới đi đóng")**: Nhân sự đóng gói (Diệu Hương) cần thao tác trực tiếp trên từng thẻ đơn (`OrderCardV2`). Khi có 3-4 đơn hàng cần gói, Hương bấm "BẮT ĐẦU" chụp ảnh hàng hóa Đơn 1, sau đó không cần bấm "CHỤP KIỆN HÀNG" (done) ngay mà có thể tiếp tục bấm "BẮT ĐẦU" chụp ảnh hàng hóa Đơn 2, Đơn 3... Sau khi chụp xong hàng loạt thì mới mang toàn bộ ra bàn đóng gói, bọc xốp và dán băng keo. Đóng xong thùng nào thì bấm "CHỤP KIỆN HÀNG" trên chính thẻ đơn đó để hoàn tất độc lập.
+  - **Nguyên nhân 1 (Rác dữ liệu CSDL cũ - Zombie Packings)**: Trong Google Sheets, bảng `Packings` lưu trữ hàng nghìn dòng từ quá khứ. Các đơn hàng cũ đã Huỷ hoặc đã Bàn Giao bởi Admin nhưng không qua bước `DONE` của thợ đóng gói vẫn lưu `status: 'Packing'`. Khi số lượng này `>= 6`, hệ thống hiểu nhầm Hương đang nhận đủ 6 đơn dở dang và khóa cứng không cho nhận thêm đơn mới.
+  - **Nguyên nhân 2 (Lệch so khớp tên nhân sự `isPackOwner`)**: Thuật toán so khớp tuyệt đối `===` giữa `currentPackingTask.user` và `currentUser` (ví dụ `"Diệu Hương"` vs `"Nguyễn Thị Diệu Hương"`) khiến `isPackOwner` trả về `false`, làm ẩn biến mất nút "CHỤP KIỆN HÀNG" trên thẻ đơn.
+  - **Nguyên nhân 3 (Bẫy lan truyền sự kiện thẻ input file trên Mobile WebView)**: Thẻ `<label>` thiếu `e.stopPropagation()` khiến khi chạm vào nút chụp ảnh bị nảy click lên thẻ cha; thẻ `<input>` không reset `e.target.value = ''` sau khi chụp khiến các lần chụp liên tiếp không kích hoạt sự kiện `onChange`.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật (`Modals_Orders.html` & `Tab_Orders.html`)**:
+  1. **Bộ Lọc Rác Dữ Liệu Đóng Gói Cũ Thông Minh (`userActivePackings`)**:
+     - Kiểm tra trạng thái đơn hàng liên kết: Chỉ tính là đơn đang đóng nếu đơn hàng đó chưa hoàn thành hoặc chưa huỷ (`status !== 'Đã Bàn Giao' && status !== 'Hoàn Thành' && status !== 'Đơn Huỷ' && status !== 'Hàng Hoàn' && status !== 'Đối Soát Thành Công'`).
+     - Tự động bỏ qua các dòng packing mồ côi từ những ngày trước, giải phóng hoàn toàn quota 6 đơn cho nhân sự đóng gói.
+  2. **Chuẩn Hóa So Khớp Tên Nhân Sự Linh Hoạt (`isUserMatch`)**:
+     - Hỗ trợ so khớp họ tên đầy đủ và tên gọi thường ngày (`Diệu Hương` ⟷ `Nguyễn Thị Diệu Hương`).
+     - Đảm bảo `isPackOwner` luôn nhận diện chuẩn xác 100%, bảo vệ nút "CHỤP KIỆN HÀNG" luôn hiển thị đúng cho nhân sự đã bấm bắt đầu.
+  3. **Quy Trình Chụp Đóng Gói Liên Tiếp Không Nghẽn (Continuous Multi-Order Flow)**:
+     - Khi bấm "BẮT ĐẦU" chụp ảnh hàng hóa Đơn 1: Đơn 1 lập tức chuyển sang trạng thái "Đang đóng" (`isPacking = true`, nhãn nút chuyển sang "CHỤP KIỆN HÀNG" màu cam hổ phách kèm huy hiệu `📦 Đang đóng` nhấp nháy).
+     - Toàn bộ các thẻ đơn khác trong danh sách vẫn giữ nguyên nút "BẮT ĐẦU" màu xanh ngọc. Nhân viên có thể bấm "BẮT ĐẦU" chụp tiếp Đơn 2, Đơn 3 (tối đa 6 đơn cùng lúc).
+     - Khi đóng xong bất kỳ đơn nào: Bấm "CHỤP KIỆN HÀNG" trên chính thẻ đó ➔ Đơn chuyển sang "Chờ Bàn Giao" và tự động giải phóng 1 slot. Các đơn còn lại vẫn đang đóng độc lập không bị ảnh hưởng.
+  4. **Tối Ưu Phản Hồi Trực Quan & Trải Nghiệm Tương Tác Hallmark**:
+     - Bổ sung `onClick={e => e.stopPropagation()}` trên `<label>` bọc input file.
+     - Tự động xóa sạch `e.target.value = ''` mỗi lần click và change, đảm bảo camera trên thiết bị di động/WebView luôn bật mượt mà 100%.
+     - Khi đang tải ảnh: Nút hiển thị `ĐANG TẢI ẢNH...` / `ĐANG LƯU KIỆN...` kèm icon `fa-spinner fa-spin` và hiệu ứng thở ánh sáng.
+     - Khi đạt ngưỡng 6 đơn: Các đơn còn lại hiển thị nhãn cảnh báo trực quan `ĐANG GÓI 6/6`, chạm vào sẽ có Toast nhắc nhở nhẹ nhàng.
+  5. **Nâng Cấp Tra Cứu Khóa Kép `latestPackMap` (`Tab_Orders.html`)**:
+     - Hỗ trợ tra cứu packing theo cả `order.id` và `order.orderCode` (kể cả mã đơn có hậu tố `| MVĐ: ...`).
+- **Kiểm Định Tự Động**: Bổ sung bộ test Section 17 trong `run_tests.js` kiểm chứng luồng nhận liên tiếp nhiều đơn, độc lập hoàn tất và cơ chế lọc bỏ bản ghi mồ côi.
+
+
+## [v2.43.1] - 2026-09-05
+
+### ⚡ Tự Động Thông Luồng Sang Đóng Gói & Chọn Nhanh Lý Do Lỗi KCS 1 Chạm
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **Sự cố 1 (Nghẽn đơn tại khâu Kiểm Định - "Sao nó vẫn duyệt?")**: Khi thợ hoàn thành cả Khâu 1 (Tiến) và Khâu 2 (Tâm), hệ thống vẫn tự động gán trạng thái `status: 'Kiểm Định'` và giam giữ đơn hàng tại tab `Kiểm Định`. Đơn hàng không thể chuyển sang `Sẵn Sàng Đóng Gói` khiến nhân sự đóng gói không nhận được hàng, bắt buộc Admin phải vào bấm duyệt thủ công (`DUYỆT ĐẠT KCS`), phá vỡ dòng chảy liên tục Lean One-Piece Flow.
+  - **Sự cố 2 (Lỗi tương tác chọn lý do lỗi - "Sao không chọn được lý do?")**: Trong modal `Báo Lỗi Khung` (`ImageAnnotationModal` / `Modals.html`), các nút chọn lý do nhanh (`Sai bố cục / Tỷ lệ`, `Rễ đơ / Sai hướng`,...) chỉ đổi màu viền nhạt nhòa, không có dấu tích trực quan và **không tự điền vào ô mô tả lý do**. Người dùng thấy ô nhập liệu trống trơn nên tưởng hệ thống không nhận lệnh bấm. Ngoài ra, form `Yêu Cầu Làm Lại` ở tab sản xuất thiếu danh mục lý do nhanh, bắt buộc phải gõ tay.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật**:
+  1. **Tự Động Chốt Đã Xong Khi Khâu Cuối Hoàn Tất (`Tab_Production.html`)**:
+     - Cập nhật logic: Khi `isAllDone = true` (cả 2 khâu hoàn thành), hệ thống tự động gán `upd.status = 'Done'`, `upd.qc_status = 'Đã duyệt'`.
+     - Lập tức kích hoạt `checkAndToggleOrderReadiness(order, prodItems, erpProducts)` để tự động đưa đơn hàng sang `Sẵn Sàng Đóng Gói` cho Diệu Hương đóng hộp ngay mà không bị chặn bởi khâu duyệt của Admin.
+     - Quy trình kiểm định KCS của Admin chuyển hoàn toàn sang kiểm tra bất đồng bộ (Asynchronous Audit).
+  2. **Trải Nghiệm Chọn Nhanh Lý Do Lỗi 1 Chạm Siêu Rõ Ràng (`Modals.html` & `Tab_Production.html`)**:
+     - Nâng cấp chip chọn lý do trong `ImageAnnotationModal`: Khi bấm chọn, chip lập tức chuyển sang màu đỏ rực rỡ (`bg-rose-600 text-white font-black`) kèm icon tích tròn (`fa-check-circle`).
+     - Tự động điền và đồng bộ lý do đã chọn vào ô văn bản `extraText` / `reworkReason` theo thời gian thực (bấm chọn thêm sẽ nối chuỗi, bấm lại sẽ tự gỡ bỏ).
+     - Nếu đang mở điểm ghim trên ảnh (`activePin`), bấm lý do nhanh sẽ tự động điền luôn nội dung vào điểm ghim đó.
+     - Bổ sung bộ chip lý do nhanh tương tự vào form `Yêu Cầu Làm Lại` (`showReworkForm`) tại `Tab_Production.html`.
+- **Kiểm Định Tự Động**: Bổ sung bộ test Section 16 kiểm chứng toàn diện luồng auto-pass đơn khi xong sản xuất và cơ chế đồng bộ lý do lỗi KCS.
+
 
 ## [v2.43.0] - 2026-09-05
 

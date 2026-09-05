@@ -1,8 +1,11 @@
 # Dependencies & Environment
 node_modules/
+venv/
+__pycache__/
 .vscode/
 .gemini/
 .idea/
+.env
 
 # Backups, logs & scratch
 backups/
@@ -19,6 +22,7 @@ scratch/
 fix_temp.js
 temp_babel.js
 clasp_output.log
+war_room_context.json
 
 # Submodules & Agent Skills Cache
 .agents/skills/gstack/

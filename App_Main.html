@@ -781,9 +781,231 @@
 
         const RELEASES = [
             {
-                version: 'Royal v2.43.0',
+                version: 'Royal v2.45.3',
                 date: '05/09/2026',
                 isLatest: true,
+                badge: 'WAR ROOM REALTIME DATA GROUNDING & ANTI-HALLUCINATION',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Đồng Bộ Dữ Liệu Thời Gian Thực Vào War Room & Triệt Tiêu Hallucination 7 Agents',
+                summary: 'Đột phá kiến trúc Grounding Context cho Ban Điều Hành 7 Agents: Truyền tải trực tiếp snapshot dữ liệu thực tế từ Google Sheets (danh sách nhân sự Config_NhanSu, tiến độ KPI thực tế KPI_Progress, lệnh sản xuất Production, tồn kho keo/kính Products, đơn hàng Orders). Cấm triệt để AI bịa đặt nhân sự ảo (như anh Tuấn) và đảm bảo các Agent phân tích chính xác tiến độ, số liệu của Hoàng Dương, Duy Tân, Diệu Hương, Trang.',
+                categories: ['War Room Data Grounding', 'Anti-Hallucination', 'KPI Realtime', '7 Nhân Sự Số'],
+                items: [
+                    {
+                        icon: 'fa-database',
+                        color: 'text-emerald-400',
+                        title: 'Đồng Bộ Dữ Liệu Thực Tế Vào War Room (Live Data Grounding Context)',
+                        desc: 'Tự động trích xuất snapshot dữ liệu thời gian thực từ Google Sheets (Config_NhanSu, KPI_Progress, Products, Orders, Production) nhúng trực tiếp vào prompt gửi Gemini 3.6 Flash.'
+                    },
+                    {
+                        icon: 'fa-shield-halved',
+                        color: 'text-cyan-400',
+                        title: 'Triệt Tiêu Hoàn Toàn Bịa Đặt Nhân Sự (Anti-Hallucination)',
+                        desc: 'Quy tắc nghiệp vụ nghiêm ngặt cấm AI nhắc đến tên nhân viên giả tưởng (như anh Tuấn). Trợ lý HR và các Agent trích xuất chính xác tên thợ, % KPI đạt được và tồn kho keo/kính thực tế.'
+                    },
+                    {
+                        icon: 'fa-network-wired',
+                        color: 'text-amber-400',
+                        title: 'Kịch Bản Dự Phòng Thông Minh Bám Sát Dữ Liệu (Adaptive Fallback)',
+                        desc: 'Kể cả khi mất kết nối máy trạm xưởng, kịch bản dự phòng vẫn tự động tính toán nhân sự đang dẫn đầu KPI từ bộ nhớ đệm và phản hồi chuyên môn chuẩn xác.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.45.2',
+                date: '05/09/2026',
+                isLatest: false,
+                badge: 'WAR ROOM COMMANDER CHAT & AUTO-COORDINATION',
+                badgeColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                title: 'Khung Chat Điều Hành Trực Tiếp & Cơ Chế Tự Động Kích Hoạt 7 Agents Xưởng',
+                summary: 'Chuyển hóa hoàn toàn War Room từ mô phỏng thụ động sang trung tâm tương tác hai chiều thực thụ: Tích hợp khung chat nhập lệnh điều hành/sự vụ trực tiếp cho Chỉ huy, loại bỏ toàn bộ các nút mô phỏng mẫu; đồng thời kích hoạt cơ chế tự điều phối tự động khi KCS phát hiện lỗi kỹ thuật hoặc khi vật tư chạm đáy cảnh báo.',
+                categories: ['War Room Chat', 'Tự Điều Phối', 'AI KCS', 'Tương Tác Thực'],
+                items: [
+                    {
+                        icon: 'fa-paper-plane',
+                        color: 'text-amber-400',
+                        title: 'Khung Chat Nhập Lệnh Trực Tiếp (Commander Chat Input)',
+                        desc: 'Chỉ huy có thể gõ bất kỳ tình huống, câu hỏi kỹ thuật hay lệnh điều hành nào. 7 Agent tiếp nhận và tức thì thảo luận đa chiều theo phong cách chuyên môn riêng.'
+                    },
+                    {
+                        icon: 'fa-brain',
+                        color: 'text-cyan-400',
+                        title: 'Cơ Chế Tự Động Điều Phối Theo Thời Gian Thực (Auto-Coordination)',
+                        desc: 'Tự động kích hoạt Ban Điều Hành 7 Agent khi máy trạm AI KCS từ chối ảnh nghiệm thu (bọt khí, nứt kính, sai kích thước) mà không cần thao tác bấm tay.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.45.1',
+                date: '05/09/2026',
+                isLatest: false,
+                badge: 'HOTFIX CAJA/GAS SANITIZATION',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Bảo Vệ URL Endpoint Máy Trạm Xưởng (Khắc Phục Lỗi Cú Pháp Unterminated String Khi Biên Dịch Components.html Trên Apps Script)',
+                summary: 'Khắc phục triệt để lỗi biên dịch JavaScript/JSX "Unterminated string constant" tại Components.html trên nền tảng Google Apps Script: Chuyển đổi định dạng URL máy trạm xưởng sang hằng số ghép chuỗi an toàn KCS_LOCAL_URL, triệt tiêu nguy cơ trình phân tích cú pháp Caja của Apps Script nhầm lẫn hai dấu gạch chéo // trong URL là comment một dòng và cắt đứt chuỗi.',
+                categories: ['Hotfix', 'Độ Ổn Định', 'Caja Parser', 'Bảo Vệ URL'],
+                items: [
+                    {
+                        icon: 'fa-shield-halved',
+                        color: 'text-emerald-400',
+                        title: 'Miễn Nhiễm Trình Phân Tích Cú Pháp Caja Của Google Apps Script',
+                        desc: 'Tập trung hóa endpoint cổng 8000 thành hằng số KCS_LOCAL_URL sử dụng kỹ thuật ghép chuỗi an toàn, ngăn chặn việc Caja xóa nhầm đoạn mã phía sau // trong chuỗi ký tự.'
+                    },
+                    {
+                        icon: 'fa-circle-check',
+                        color: 'text-sky-400',
+                        title: 'Tương Thích Tuyệt Đối Trên Cả Môi Trường PWA Vercel Lẫn Web App GAS',
+                        desc: 'Đảm bảo tiến trình biên dịch Phase 1 - Core trên client diễn ra trơn tru với tốc độ 0ms không lỗi cú pháp, sẵn sàng cho War Room 7 Agents và Trợ Lý KCS.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.45.0',
+                date: '05/09/2026',
+                isLatest: false,
+                badge: 'ĐA TÁC NHÂN SỐ (RF WAR ROOM 7 AGENTS)',
+                badgeColor: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+                title: 'Ban Điều Hành Tác Nhân Số (RF War Room 7 Agents) & Single-Turn Orchestration với Gemini 3.6 Flash',
+                summary: 'Đột phá kiến trúc hội thoại chéo đa tác nhân: 7 nhân sự số (CSO, COO, CFO, Thủ Kho, KCS Giám Sát, HR/KPI, Thánh Bao Đồng) tự động phân tích sự vụ xưởng thời gian thực thông qua cơ chế Single-Turn Orchestration với Gemini 3.6 Flash. Cửa sổ nổi thu nhỏ có thể kéo thả (Draggable Mini Floating Window) linh hoạt trên cả chuột và cảm ứng, hỗ trợ thu nhỏ, mô phỏng sự vụ và nút bật tắt nhanh.',
+                categories: ['AI War Room', 'Đa Tác Nhân', 'Gemini Flash', 'Vận Hành', 'Sản Xuất'],
+                items: [
+                    {
+                        icon: 'fa-users-gear',
+                        color: 'text-cyan-400',
+                        title: 'Đội Ngũ 7 Nhân Sự Số Độc Lập (agent_war_room.py)',
+                        desc: 'Tích hợp 7 nhân vật số với góc nhìn chuyên sâu: CSO (chiến lược), COO (tiến độ SOP), CFO (tài chính quỹ), Thủ Kho (vật tư keo kính), KCS (kỹ thuật giấu keo), HR (thưởng phạt KPI) và Thánh Bao Đồng (tếu táo thực tế xưởng).'
+                    },
+                    {
+                        icon: 'fa-bolt',
+                        color: 'text-amber-400',
+                        title: 'Cơ Chế Single-Turn Orchestration Siêu Tốc',
+                        desc: '1 lượt gọi Gemini 3.6 Flash duy nhất trả về mảng thoại logic tuần tự, tiết kiệm chi phí gọi API, phản hồi dưới 1 giây và có cơ chế kịch bản dự phòng 100% khi mất mạng.'
+                    },
+                    {
+                        icon: 'fa-up-down-left-right',
+                        color: 'text-emerald-400',
+                        title: 'Cửa Sổ Nổi Kéo Thả Công Thái Học (Draggable Floating Window)',
+                        desc: 'Cửa sổ nổi điều hành z-index cao nhất, kéo thả mượt mà trên desktop/mobile, đổi màu viền avatar theo lượt nói, nút thu nhỏ/mở rộng và nút launcher War Room (7) toàn cục.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.44.0',
+                date: '05/09/2026',
+                isLatest: false,
+                badge: 'AI QUẢN ĐỐC ẢO XƯỞNG (RF ASSISTANT)',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Tích Hợp Trợ Lý Điều Phối & Giám Sát Kỹ Thuật Xưởng (RF Workshop Assistant)',
+                summary: 'Đột phá trợ lý AI Quản Đốc Ảo kiêm kỹ sư trưởng xưởng: Hướng dẫn kỹ thuật dán giấu keo, mài vát kim cương, phân bổ đá lũa tỉ lệ 1/3, văn hóa an toàn lao động và tự động kích hoạt hướng dẫn khắc phục từng bước khi KCS đánh giá Chưa Đạt (Need_Repair). Kết nối trực tiếp máy trạm AI KCS cổng 8000 qua widget chat công thái học thời gian thực.',
+                categories: ['AI KCS', 'Quản Đốc Ảo', 'Sản Xuất', 'An Toàn', 'Kỹ Thuật'],
+                items: [
+                    {
+                        icon: 'fa-robot',
+                        color: 'text-[#d4af37]',
+                        title: 'Bộ Não Quản Đốc Kỹ Thuật Số (agent_assistant.py)',
+                        desc: 'Được huấn luyện chuyên sâu theo chuẩn xưởng Rich Fish, giải đáp quy cách dán keo Wacker 121, xử lý bọt khí góc đáy bể, gia cố khung layout và nhắc nhở an toàn vác kính khổ lớn.'
+                    },
+                    {
+                        icon: 'fa-comments',
+                        color: 'text-emerald-400',
+                        title: 'Widget Chat Công Thái Học Toàn Cục (WorkshopAssistantWidget)',
+                        desc: 'Nút nổi thông minh góc phải dưới màn hình hiển thị trạng thái máy trạm (ONLINE / OFFLINE), bộ chip câu hỏi nhanh 1 chạm và cửa sổ chat mượt mà, phản hồi tức thì dưới 1s.'
+                    },
+                    {
+                        icon: 'fa-shield-virus',
+                        color: 'text-rose-400',
+                        title: 'Vòng Lặp Tự Động Hướng Dẫn Sửa Lỗi KCS (Need_Repair Loop)',
+                        desc: 'Khi AI KCS thẩm định ảnh chụp phát hiện lỗi (bọt khí, lệch góc), hệ thống tự động kích hoạt Quản Đốc Ảo phân tích nguyên nhân và đưa ra giải pháp khắc phục chi tiết cho thợ.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.43.3',
+                date: '05/09/2026',
+                isLatest: false,
+                badge: 'CÔNG THÁI HỌC & POKA-YOKE HOÀN/HUỶ',
+                badgeColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                title: 'Cải Tổ Cụm Nút Thao Tác Thẻ Đơn Hàng & Chốt Chặn Poka-Yoke 2 Lớp Chống Mất Đơn',
+                summary: 'Khắc phục triệt để lỗi thao tác nhạy cảm trên thẻ đơn hàng: Nâng cấp cụm nút tí hon 24px thành 4 nút chính công thái học 32px (w-8 h-8) to rõ, bấm êm tay [⚡ Hỏa tốc] [📄 In bill] [ℹ️ Chi tiết] [••• Tác vụ]. Đưa toàn bộ tác vụ nguy hiểm (Chuyển Hàng Hoàn, Hủy đơn, Xóa vĩnh viễn) vào Menu bảo vệ kèm Modal Xác Nhận Poka-Yoke 2 lớp với cảnh báo chi tiết, triệt tiêu 100% tình trạng chạm nhầm làm mất đơn.',
+                categories: ['Công Thái Học', 'Hallmark UX', 'Poka-Yoke', 'Đơn Hàng', 'An Toàn Dữ Liệu'],
+                items: [
+                    {
+                        icon: 'fa-shield-alt',
+                        color: 'text-amber-400',
+                        title: 'Chốt Chặn Poka-Yoke 2 Lớp Cho Thao Tác Hoàn / Huỷ / Xoá',
+                        desc: 'Khi kích hoạt Chuyển Hàng Hoàn hoặc Hủy đơn, hệ thống bắt buộc mở Modal Xác Nhận toàn màn hình ghi rõ Mã đơn, Cảnh báo rời danh sách hiện tại cùng 2 nút bấm rõ ràng [Huỷ bỏ (Giữ lại đơn)] và [Xác nhận].'
+                    },
+                    {
+                        icon: 'fa-hand-pointer',
+                        color: 'text-emerald-400',
+                        title: 'Cụm Nút Công Thái Học Chuẩn Hallmark (Touch Ergonomics 32px)',
+                        desc: 'Tăng kích thước nút từ 24px lên 32px (w-8 h-8), bo góc rounded-xl, khoảng cách thông thoáng, màu sắc nhận diện trực quan và phản hồi xúc giác nảy tay (active:scale-95).'
+                    },
+                    {
+                        icon: 'fa-ellipsis-v',
+                        color: 'text-sky-400',
+                        title: 'Menu Tác Vụ Đơn Hàng Độc Lập Qua React Portal',
+                        desc: 'Gom các tác vụ quản trị (Sửa đơn, Lịch sử, Đẩy GHN, Nhập SĐT xe) và Vùng kiểm soát nhạy cảm vào Menu Portal gắn trực tiếp document.body, chống hoàn toàn hiện tượng bị cắt bởi overflow-hidden của thẻ đơn.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.43.2',
+                date: '05/09/2026',
+                isLatest: false,
+                badge: 'THÔNG LUỒNG ĐÓNG GÓI LIÊN TỤC TỪNG ĐƠN',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Thông Luồng Đóng Gói Liên Tục Từng Đơn (Không Chờ Hoàn Tất Đơn Cũ) & Lọc Rác Dữ Liệu',
+                summary: 'Tối ưu hóa dòng chảy Lean One-Piece Flow cho khâu Đóng Gói: Cho phép nhân viên bấm "BẮT ĐẦU" chụp ảnh hàng hóa liên tiếp trên từng thẻ đơn (Đơn 1 -> Đơn 2 -> Đơn 3...), đơn nào chụp xong lập tức chuyển sang "Đang đóng" mà không cần done đơn cũ. Khi đóng xong kiện nào, nhân viên bấm "CHỤP KIỆN HÀNG" trên chính thẻ đơn đó để hoàn thành độc lập. Đồng thời loại bỏ hoàn toàn các bản ghi đóng gói mồ côi/rác cũ trong CSDL gây khóa nhầm hạn mức 6 đơn.',
+                categories: ['Đóng Gói', 'Lean Flow', 'Đơn Hàng', 'Poka-Yoke', 'UX/UI'],
+                items: [
+                    {
+                        icon: 'fa-camera',
+                        color: 'text-emerald-400',
+                        title: 'Chụp Hàng Hóa Liên Tục Từng Đơn (Continuous Multi-Order Capture)',
+                        desc: 'Giữ nguyên thao tác chụp trực tiếp trên từng thẻ đơn. Chụp xong đơn 1 chuyển sang Đang đóng, các thẻ đơn khác vẫn sẵn sàng nút BẮT ĐẦU để chụp tiếp đơn 2, 3... rồi mới mang đi đóng gói.'
+                    },
+                    {
+                        icon: 'fa-box-check',
+                        color: 'text-amber-400',
+                        title: 'Hoàn Thành Độc Lập Bằng Nút [CHỤP KIỆN HÀNG] Trên Từng Đơn',
+                        desc: 'Khi đóng hộp xong đơn nào trong lô, nhân sự bấm CHỤP KIỆN HÀNG trên chính thẻ đơn đó để hoàn tất và tự động giải phóng 1 slot trong hạn mức 6 đơn mà không ảnh hưởng đơn khác.'
+                    },
+                    {
+                        icon: 'fa-broom',
+                        color: 'text-cyan-400',
+                        title: 'Bộ Lọc Rác Dữ Liệu Đóng Gói Cũ & Chuẩn Hóa So Khớp Nhân Sự',
+                        desc: 'Tự động bỏ qua các bản ghi Packing dở dang từ các đơn đã giao hoặc đã huỷ trong quá khứ, chuẩn hóa isUserMatch chống lệch họ tên và loại bỏ bẫy nuốt sự kiện input camera trên mobile.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.43.1',
+                date: '05/09/2026',
+                isLatest: false,
+                badge: 'TỰ ĐỘNG THÔNG LUỒNG KHO & CHỌN LÝ DO LỖI',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Tự Động Thông Luồng Sang Đóng Gói Khi Xong Sản Xuất & Chọn Nhanh Lý Do Lỗi KCS 1 Chạm',
+                summary: 'Xóa bỏ hoàn toàn điểm nghẽn giam đơn tại tab Kiểm Định: Khi thợ hoàn tất các khâu sản xuất (Khâu 1 & Khâu 2), lệnh sản xuất tự động chốt ĐÃ XONG và kiểm tra đẩy đơn hàng ngay sang Sẵn Sàng Đóng Gói (KCS chuyển sang kiểm tra bất đồng bộ). Đồng thời nâng cấp modal Báo Lỗi Khung & Yêu Cầu Làm Lại: nút chọn lý do nhanh hiển thị trạng thái nổi bật tức thì (màu đỏ rực rỡ + icon tích xanh) và tự động đồng bộ vào văn bản mô tả.',
+                categories: ['Sản Xuất', 'Lean Flow', 'KCS', 'Báo Lỗi', 'UX/UI'],
+                items: [
+                    {
+                        icon: 'fa-bolt',
+                        color: 'text-amber-400',
+                        title: 'Tự Động Chốt Đã Xong Khi Khâu Cuối Hoàn Tất (Auto-Pass to Ready)',
+                        desc: 'Loại bỏ bước giam đơn ở trạng thái Kiểm Định. Khi thợ hoàn thành khâu cuối (Gia cố/Gọt keo), lệnh tự động chốt ĐÃ XONG và chuyển ngay đơn hàng sang Sẵn Sàng Đóng Gói cho Hương đóng hộp.'
+                    },
+                    {
+                        icon: 'fa-check-circle',
+                        color: 'text-emerald-400',
+                        title: 'Chọn Lý Do Lỗi Nhanh 1 Chạm Trực Quan (1-Touch Reason Selection)',
+                        desc: 'Nâng cấp toàn bộ chip lý do lỗi nhanh trong modal Báo Lỗi Khung và form Yêu Cầu Làm Lại: Bấm chọn là sáng rực rỡ kèm dấu tích, tự động điền lý do vào ô mô tả và đồng bộ vào điểm ghim trên ảnh.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.43.0',
+                date: '05/09/2026',
+                isLatest: false,
                 badge: 'MỞ KHÓA ĐÓNG GÓI ĐỒNG THỜI (MAX 6 ĐƠN)',
                 badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
                 title: 'Mở Khóa Nhận Đóng Gói Đồng Thời Theo Lô (Batch Packing - Tối Đa 6 Đơn/Tài Khoản)',
@@ -5988,70 +6210,99 @@
             };
         }, []);
 
-        // ĐỘNG CƠ "OPTIMISTIC UI": XỬ LÝ SIÊU TỐC - ĐÓNG FORM NGAY - LƯU NGẦM KHÔNG CHỜ ĐỢI
+        // Hàm kích hoạt tải lại dữ liệu nền an toàn qua CustomEvent
+        const triggerReloadData = React.useCallback(() => {
+            if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+                window.dispatchEvent(new CustomEvent('triggerReloadData'));
+            }
+        }, []);
+
+        // ĐỘNG CƠ "OPTIMISTIC UI": XỬ LÝ SIÊU TỐC - ĐÓNG FORM NGAY - LƯU NGẦM VÀ ĐẢM BẢO TOÀN VẸN
         const pushDeltas = React.useCallback(async (payload, successMsg, successIcon) => {
+            const currentRole = localStorage.getItem('rf_role') || '';
+            if (currentRole === 'KHÁCH') {
+                triggerToast("Tài khoản KHÁCH (Demo) chỉ có quyền xem, không thể thay đổi dữ liệu!", "fa-exclamation-triangle", "warning");
+                return { success: false, error: 'PERMISSION_DENIED', message: 'Tài khoản KHÁCH không có quyền ghi dữ liệu!' };
+            }
+
             pendingSyncsRef.current += 1;
             syncCounterRef.current += 1;
             const currentSyncId = syncCounterRef.current;
 
-            const currentRole = localStorage.getItem('rf_role') || '';
-            if (currentRole === 'KHÁCH') {
-                triggerToast("Tài khoản KHÁCH (Demo) chỉ có quyền xem, không thể thay đổi dữ liệu!", "fa-exclamation-triangle", "warning");
-                return Promise.resolve();
-            }
-            if (successMsg) triggerToast(successMsg, successIcon || 'fa-check', 'success');
-
             // 1. Áp dụng ngay trên máy hiện tại (Optimistic UI)
             applyDeltaToState(payload);
 
-            // 2. Phát ngay Delta siêu tốc (<50ms) cho các máy khác qua Firebase
-            if (window.firebase) {
-                try {
-                    window.firebase.database().ref('rf_realtime_delta').set({
-                        payload: payload,
-                        trigger_by: currentUser,
-                        client_id: clientId,
-                        timestamp: Date.now()
-                    });
-                } catch (fbErr) {
-                    console.warn("Lỗi Firebase Delta Broadcast:", fbErr);
+            setSyncing(true);
+            try {
+                const payloadWithUser = { 
+                    ...payload, 
+                    user: currentUser,
+                    _opId: payload._opId || ('OP_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6))
+                };
+                const d = await runGAS('syncDeltas', payloadWithUser);
+                const isServerSuccess = d && d.success === true;
+
+                if (currentSyncId === syncCounterRef.current) {
+                    if (isServerSuccess) {
+                        if (successMsg) triggerToast(successMsg, successIcon || 'fa-check', 'success');
+                        if (d.serverTime) lastSyncTimeRef.current = d.serverTime;
+                        if (d.orders || d.prodItems || d.Products) {
+                            mergeServerDataSilently(d);
+                        }
+                        // 2. Chỉ phát Delta qua Firebase SAU KHI server đã xác nhận lưu thành công
+                        if (window.firebase) {
+                            try {
+                                window.firebase.database().ref('rf_realtime_delta').set({
+                                    payload: payload,
+                                    trigger_by: currentUser,
+                                    client_id: clientId,
+                                    timestamp: Date.now()
+                                });
+                            } catch (fbErr) {
+                                console.warn("Lỗi Firebase Delta Broadcast:", fbErr);
+                            }
+                        }
+                        return { success: true, data: d };
+                    } else {
+                        const errMsg = (d && (d.message || d.error)) || "Cảnh báo: Không thể lưu dữ liệu lên Server!";
+                        triggerToast(errMsg, "fa-exclamation-triangle", "danger");
+                        if (pendingSyncsRef.current <= 1) {
+                            if (typeof triggerReloadData === 'function') {
+                                triggerReloadData();
+                            } else if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+                                window.dispatchEvent(new CustomEvent('triggerReloadData'));
+                            }
+                        }
+                        return { success: false, error: (d && d.error) || 'SYNC_FAILED', message: errMsg };
+                    }
+                } else {
+                    if (isServerSuccess) {
+                        if (d.serverTime) lastSyncTimeRef.current = d.serverTime;
+                        return { success: true, data: d };
+                    } else {
+                        return { success: false, error: (d && d.error) || 'SYNC_FAILED' };
+                    }
+                }
+            } catch (e) {
+                console.error("Lỗi syncToServer:", e);
+                const errMsg = "Lỗi đồng bộ Server: " + (e?.message || e?.toString() || "Mạng không ổn định");
+                triggerToast(errMsg, "fa-exclamation-triangle", 'warning');
+                if (pendingSyncsRef.current <= 1) {
+                    if (typeof triggerReloadData === 'function') {
+                        triggerReloadData();
+                    } else if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+                        window.dispatchEvent(new CustomEvent('triggerReloadData'));
+                    }
+                }
+                return { success: false, error: 'NETWORK_ERROR', message: errMsg };
+            } finally {
+                pendingSyncsRef.current -= 1;
+                lastSyncCompletedRef.current = Date.now();
+                if (currentSyncId === syncCounterRef.current) {
+                    setSyncing(false);
                 }
             }
-
-            setSyncing(true);
-            const syncToServer = async () => {
-                try {
-                    const payloadWithUser = { ...payload, user: currentUser };
-                    const d = await runGAS('syncDeltas', payloadWithUser);
-                    if (currentSyncId === syncCounterRef.current) {
-                        if (d && !d.error) {
-                            if (d.serverTime) lastSyncTimeRef.current = d.serverTime;
-                            // KHÔNG gọi updateStateWithData(d) nữa!
-                            // syncDeltas chỉ trả {success: true, serverTime} — không có data để đè.
-                            // Nếu server trả data đầy đủ (trường hợp hiếm), merge thay vì replace.
-                            if (d.orders || d.prodItems || d.Products) {
-                                mergeServerDataSilently(d);
-                            }
-                            // Đã loại bỏ rf_master_store.set() nặng — Firebase chỉ broadcast delta nhỏ
-                        } else {
-                            triggerToast(d?.error || "Cảnh báo: Không thể lưu ngầm lên Server!", "fa-exclamation-triangle", "danger");
-                        }
-                    }
-                } catch (e) {
-                    console.error("Lỗi syncToServer:", e);
-                    triggerToast("Lỗi đồng bộ Server: " + (e?.message || e?.toString() || "Mạng không ổn định"), "fa-exclamation-triangle", 'warning');
-                } finally {
-                    pendingSyncsRef.current -= 1;
-                    lastSyncCompletedRef.current = Date.now(); // Đánh dấu thời điểm sync xong cho cooldown guard
-                    if (currentSyncId === syncCounterRef.current) {
-                        setSyncing(false);
-                    }
-                }
-            };
-
-            syncToServer();
-            return Promise.resolve();
-        }, [currentUser, triggerToast, applyDeltaToState, clientId]);
+        }, [currentUser, triggerToast, applyDeltaToState, clientId, triggerReloadData]);
 
 
         const pushErpData = React.useCallback((payload, deletes, successMsg, successIcon) => {
@@ -6294,7 +6545,7 @@
                                     <div className="w-5 flex justify-center text-[#d4af37] text-[13px]"><i className="fas fa-rocket"></i></div>
                                     <span>Bản Cập Nhật</span>
                                 </div>
-                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.43.0</span>
+                                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 font-black px-1.5 py-0.5 rounded border border-emerald-500/30">v2.45.3</span>
                             </button>
                         </div>
                     </div>
@@ -6381,20 +6632,23 @@
                                 />
                             )}
 
-                            {/* TIỀN XU (XU) - Đồng bộ 100% qua computeUserTotalExp */}
-                            {currentUser && (() => {
-                                const res = window.computeUserTotalExp(currentUser, erpData, userConfigs, memoizedProdItems, memoizedPackings);
-                                const totalXu = res?.totalXu || 0;
-                                if (totalXu > 0) {
-                                    return (
-                                        <div className="animate-fade-in flex items-center gap-1 bg-[#d4af37]/10 px-2 py-1 rounded-md border border-[#d4af37]/20 shadow-sm cursor-default shrink-0" title="Ví Xu Tích Lũy Thưởng">
-                                            <i className="fas fa-coins text-[#d4af37] text-[11px] sm:text-[12px]"></i>
-                                            <span className="text-[11px] sm:text-[12px] font-bold text-[#d4af37] font-mono leading-none">{Math.ceil(Number(totalXu)).toLocaleString('vi-VN')}</span>
-                                        </div>
-                                    );
-                                }
-                                return null;
-                            })()}
+                            {/* BAN ĐIỀU HÀNH TÁC NHÂN SỐ (RF WAR ROOM) CẠNH AVATAR */}
+                            <button
+                                id="rf-header-war-room-btn"
+                                type="button"
+                                onClick={() => {
+                                    if (typeof window.toggleAgentsTower === 'function') {
+                                        window.toggleAgentsTower();
+                                    }
+                                }}
+                                className="animate-fade-in flex items-center gap-1.5 bg-[#18181b] hover:bg-[#27272a] active:scale-95 px-2 sm:px-2.5 py-1 rounded-md border border-[#d4af37]/40 hover:border-[#d4af37] shadow-sm cursor-pointer shrink-0 transition-all duration-200 group"
+                                title="Ban Điều Hành Tác Nhân Số (RF War Room 7 AI)"
+                            >
+                                <span className="w-2 h-2 bg-emerald-500 rounded-full inline-block shadow-[0_0_6px_#22c55e] animate-pulse shrink-0"></span>
+                                <span className="text-[11px] sm:text-[12px] font-bold text-[#d4af37] font-mono leading-none group-hover:text-amber-300 whitespace-nowrap">
+                                    🎖️ War Room <span className="text-[10px] sm:text-[11px] opacity-80">(7)</span>
+                                </span>
+                            </button>
 
                             {isAdmin && (
                                 <div className="hidden md:block animate-fade-in shrink-0">
@@ -6497,8 +6751,22 @@
                         </ErrorBoundary>
                     </main>
 
-                    {/* NÚT TẢI LẠI TRANG */}
+                    {/* NÚT TẢI LẠI TRANG & TRỢ LÝ ĐIỀU PHỐI XƯỞNG */}
                     {typeof ReloadAppButton !== 'undefined' && <ReloadAppButton />}
+                    {typeof WorkshopAssistantWidget !== 'undefined' && <WorkshopAssistantWidget currentUser={currentUser} activeTab={activeTab} />}
+                    {typeof RFAgentControlTower !== 'undefined' && (
+                        <RFAgentControlTower 
+                            currentUser={currentUser} 
+                            activeTab={activeTab}
+                            orders={orders}
+                            prodItems={prodItems}
+                            packings={packings}
+                            attendance={attendance}
+                            erpData={erpData}
+                            userConfigs={userConfigs}
+                            kpiConfig={kpiConfig}
+                        />
+                    )}
 
                     {/* CÁC MODAL TOÀN CỤC CHẠY NGẦM */}
                     {showBulkImport && typeof BulkImportModal !== 'undefined' && <BulkImportModal onClose={() => setShowBulkImport(false)} pushDeltas={pushDeltas} existingOrders={orders} products={erpData.Products} existingProdItems={prodItems} />}

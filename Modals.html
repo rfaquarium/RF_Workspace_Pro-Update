@@ -1756,19 +1756,39 @@
 
         const toggleQuickNote = (reason) => {
             if (readOnly) return;
-            if (quickNotes.includes(reason)) setQuickNotes(quickNotes.filter(r => r !== reason));
-            else setQuickNotes([...quickNotes, reason]);
+            const isSelected = quickNotes.includes(reason);
+            let nextQuickNotes;
+            if (isSelected) {
+                nextQuickNotes = quickNotes.filter(r => r !== reason);
+            } else {
+                nextQuickNotes = [...quickNotes, reason];
+            }
+            setQuickNotes(nextQuickNotes);
+
+            // Đồng bộ trực tiếp vào ô lý do / mô tả chung để hiển thị rõ ràng 100%
+            setExtraText(prev => {
+                let parts = prev.split(',').map(s => s.trim()).filter(Boolean);
+                if (isSelected) {
+                    parts = parts.filter(p => p !== reason);
+                } else {
+                    if (!parts.includes(reason)) parts.push(reason);
+                }
+                return parts.join(', ');
+            });
+
+            // Nếu đang ghim điểm trên ảnh, tự động gán luôn lý do này vào điểm ghim
+            if (activePin) {
+                updatePinText(reason);
+            }
         };
 
         const handleSave = () => {
             const hasAnyPin = pinsFront.length > 0 || pinsSide.length > 0;
 
-            let finalReason = [];
-            if (quickNotes.length > 0) finalReason.push(quickNotes.join(', '));
-            if (extraText.trim()) finalReason.push(extraText.trim());
+            let finalReasonList = [...new Set([...quickNotes, ...(extraText ? extraText.split(',').map(s => s.trim()).filter(Boolean) : [])])];
 
             let note = "TỪ CHỐI KHUNG";
-            if (finalReason.length > 0) note += `: ${finalReason.join(' | ')}`;
+            if (finalReasonList.length > 0) note += `: ${finalReasonList.join(' | ')}`;
             if (hasAnyPin) note += " (Có ghim lỗi cụ thể trên ảnh)";
 
             const upd = JSON.parse(JSON.stringify(item));
@@ -1901,15 +1921,28 @@
                             <div className="p-3 bg-[#0a0a0a] flex-1 shrink-0">
                                 <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Lý do nhanh (Tùy chọn)</div>
                                 <div className="flex flex-wrap gap-2 mb-3">
-                                    {QUICK_REASONS.map(r => (
-                                        <button
-                                            key={r}
-                                            onClick={() => toggleQuickNote(r)}
-                                            className={`px-3 py-1.5 rounded-full text-[10px] font-bold border transition-all ${quickNotes.includes(r) ? 'bg-rose-600/20 border-rose-500 text-rose-400' : 'bg-[#141414] border-[#333] text-gray-400 hover:border-gray-500'}`}
-                                        >
-                                            {r}
-                                        </button>
-                                    ))}
+                                    {QUICK_REASONS.map(r => {
+                                        const isSelected = quickNotes.includes(r);
+                                        return (
+                                            <button
+                                                key={r}
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    toggleQuickNote(r);
+                                                }}
+                                                className={`px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-sm ${
+                                                    isSelected
+                                                        ? 'bg-rose-600 text-white font-black border-rose-500 shadow-md shadow-rose-900/50 ring-2 ring-rose-400/50 scale-105'
+                                                        : 'bg-[#18181b] border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-white hover:bg-zinc-800'
+                                                }`}
+                                            >
+                                                <i className={`fas ${isSelected ? 'fa-check-circle text-white' : 'fa-circle text-zinc-600 text-[8px]'}`}></i>
+                                                <span>{r}</span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                                 <textarea
                                     value={extraText}

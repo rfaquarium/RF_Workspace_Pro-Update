@@ -15,12 +15,11 @@
  */
 function api_generateMonthlyKPI_All(allStatsMap, pin) {
   var pinToAuth = pin || (allStatsMap && allStatsMap.pin);
-  if (pinToAuth) {
-    var auth = validatePin(pinToAuth);
-    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
-    if (!checkServerPermission(auth, 'HR_EDIT_KPI_TARGET')) {
-      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới có quyền sinh KPI hàng loạt!' };
-    }
+  if (!pinToAuth) return { success: false, error: 'AUTH_REQUIRED', message: 'Yêu cầu mã PIN để thực hiện thao tác!' };
+  var auth = validatePin(pinToAuth);
+  if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+  if (!checkServerPermission(auth, 'HR_EDIT_KPI_TARGET')) {
+    return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới có quyền sinh KPI hàng loạt!' };
   }
   var lock = LockService.getScriptLock();
   try {
@@ -435,12 +434,11 @@ function TOOL_SplitGroupedProductionTasks() {
 // 🧹 DỌN DẸP TOÀN BỘ CÁC KHOẢN PHẠT & CẢNH BÁO SLA ĐÓNG GÓI CŨ
 // =========================================================================
 function api_cleanupAllPackingSlaPenalties(pin) {
-  if (pin) {
-    var auth = validatePin(pin);
-    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
-    if (!checkServerPermission(auth, 'HR_BONUS_PENALTY')) {
-      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Bạn không có quyền xóa phạt SLA!' };
-    }
+  if (!pin) return { success: false, error: 'AUTH_REQUIRED', message: 'Yêu cầu mã PIN để thực hiện thao tác!' };
+  var auth = validatePin(pin);
+  if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+  if (!checkServerPermission(auth, 'HR_BONUS_PENALTY')) {
+    return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Bạn không có quyền xóa phạt SLA!' };
   }
   var lock = LockService.getScriptLock();
   try {
@@ -726,12 +724,11 @@ function api_auditOverdueReturnOrdersSLA(ss) {
 
 function api_saveZaloWebhookConfig(cfg, pin) {
   var pinToAuth = pin || (cfg && cfg.pin);
-  if (pinToAuth) {
-    var auth = validatePin(pinToAuth);
-    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
-    if (!checkServerPermission(auth, 'SYSTEM_CONFIG')) {
-      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới được sửa cấu hình Zalo Bot!' };
-    }
+  if (!pinToAuth) return { success: false, error: 'AUTH_REQUIRED', message: 'Yêu cầu mã PIN để thực hiện thao tác!' };
+  var auth = validatePin(pinToAuth);
+  if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+  if (!checkServerPermission(auth, 'SYSTEM_CONFIG')) {
+    return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới được sửa cấu hình Zalo Bot!' };
   }
   var lock = LockService.getScriptLock();
   try {
@@ -834,12 +831,11 @@ function api_testZaloNotification() {
 
 function api_saveTelegramConfig(cfg, pin) {
   var pinToAuth = pin || (cfg && cfg.pin);
-  if (pinToAuth) {
-    var auth = validatePin(pinToAuth);
-    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
-    if (!checkServerPermission(auth, 'SYSTEM_CONFIG')) {
-      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới được sửa cấu hình Telegram Bot!' };
-    }
+  if (!pinToAuth) return { success: false, error: 'AUTH_REQUIRED', message: 'Yêu cầu mã PIN để thực hiện thao tác!' };
+  var auth = validatePin(pinToAuth);
+  if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+  if (!checkServerPermission(auth, 'SYSTEM_CONFIG')) {
+    return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới được sửa cấu hình Telegram Bot!' };
   }
   var lock = LockService.getScriptLock();
   try {
@@ -926,12 +922,11 @@ function api_testTelegramNotification() {
 
 function api_saveGoogleChatConfig(cfg, pin) {
   var pinToAuth = pin || (cfg && cfg.pin);
-  if (pinToAuth) {
-    var auth = validatePin(pinToAuth);
-    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
-    if (!checkServerPermission(auth, 'SYSTEM_CONFIG')) {
-      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới được sửa cấu hình Google Chat!' };
-    }
+  if (!pinToAuth) return { success: false, error: 'AUTH_REQUIRED', message: 'Yêu cầu mã PIN để thực hiện thao tác!' };
+  var auth = validatePin(pinToAuth);
+  if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+  if (!checkServerPermission(auth, 'SYSTEM_CONFIG')) {
+    return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới được sửa cấu hình Google Chat!' };
   }
   var lock = LockService.getScriptLock();
   try {
@@ -1009,73 +1004,78 @@ function api_testGoogleChatNotification() {
 // MODULE: NTFY.SH PUSH NOTIFICATION (MIỄN PHÍ 100%, KHÔNG CẦN TÀI KHOẢN)
 // =========================================================================
 
-function sendNtfyNotification(title, message, topic) {
-  try {
-    var props = PropertiesService.getScriptProperties();
-    var targetTopic = (topic || props.getProperty('NTFY_TOPIC') || 'rfworkspace').trim();
-    
-    var timeStr = Utilities.formatDate(new Date(), "GMT+7", "HH:mm dd/MM/yyyy");
-    var fullContent = (message || '') + '\n⏰ ' + timeStr;
-    
-    var payloadObj = {
-      topic: targetTopic,
-      title: title || '🔔 RF Workspace Pro',
-      message: fullContent,
-      priority: 4,
-      tags: ['bell', 'package'],
-      click: 'https://webapp-script.vercel.app'
-    };
-    
-    var options = {
-      method: 'post',
-      contentType: 'application/json; charset=UTF-8',
-      payload: JSON.stringify(payloadObj),
-      muteHttpExceptions: true
-    };
-    
-    var res = UrlFetchApp.fetch('https://ntfy.sh', options);
-    var resText = res.getContentText();
-    console.log('ntfy.sh API Response:', resText);
-    return { success: true, response: resText, topic: targetTopic };
-  } catch (e) {
-    console.error('Lỗi sendNtfyNotification:', e);
-    return { success: false, error: e.toString() };
-  }
-}
+// sendNtfyNotification được định nghĩa duy nhất và quản lý tại Code.js
 
 function api_testNtfyNotification(topic) {
   return sendNtfyNotification('TEST THÔNG BÁO RF WORKSPACE', '✅ Kết nối thành công! Thiết bị của bạn đã sẵn sàng nhận thông báo đơn hàng và sản xuất tức thì.', topic);
 }
 
-function api_saveNtfyConfig(config, pin) {
-  var pinToAuth = pin || (config && config.pin);
-  if (pinToAuth) {
-    var auth = validatePin(pinToAuth);
-    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
-    if (!checkServerPermission(auth, 'SYSTEM_CONFIG')) {
-      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới được sửa cấu hình ntfy.sh!' };
-    }
+/**
+ * ⏰ LỊCH BÁO THỨC VÀO CA & LỜI CHÚC CHỦ NHẬT (CLOUD TIER)
+ * - Thứ 2 đến Thứ 7 (07:45): Báo thức giục thợ vào ca kẻo trễ chấm công (Priority: 5)
+ * - Chủ Nhật (08:30): Chúc ngày nghỉ ấm áp bên gia đình, anh Tiến túc trực xưởng (Priority: 3)
+ * Cài đặt Time-driven Trigger chạy hàng ngày lúc 7:00 - 8:00 AM (hoặc 7:00 AM)
+ */
+function trigger_dailyMorningNotice() {
+  var now = new Date();
+  var dayOfWeek = now.getDay(); // 0: Chủ Nhật, 1-6: Thứ 2 đến Thứ 7
+
+  var props = PropertiesService.getScriptProperties();
+  var targetTopic = (props.getProperty('NTFY_TOPIC') || 'rfworkspace').trim();
+
+  var title = "";
+  var message = "";
+  var priority = 3;
+  var tags = [];
+
+  if (dayOfWeek === 0) {
+    // CHỦ NHẬT: Lời chúc ngày nghỉ
+    title = "☕ CHÚC CUỐI TUẦN VUI VẺ - RICHFISH AQUARIUM";
+    message = "🌿 Chúc toàn thể anh em có một ngày Chủ Nhật nghỉ ngơi thật vui vẻ, trọn vẹn và nạp đầy năng lượng bên gia đình! Cứ an tâm tận hưởng nhé, anh Tiến vẫn đang miệt mài làm việc tại xưởng để giữ nhịp cho cả tuần tới!";
+    priority = 3;
+    tags = ["sparkles", "coffee", "heart", "fish"];
+  } else {
+    // THỨ 2 ĐẾN THỨ 7: Báo thức vào ca 07:45
+    title = "⏰ 07:45 RỒI ANH EM ƠI! VÀO CA SÁNG NGAY NÀO!";
+    message = "🚨 Đã 07:45 sáng rồi! Dậy rửa mặt, kiểm tra đồ nghề và bấm chấm công ngay kẻo chạm mốc 08:15 là dính phạt chuyên cần đấy nhé. Đeo găng tay chống cắt, giữ an toàn và bắt tay vào việc thôi anh em!";
+    priority = 5; // Cấp độ 5: Ghi đè chế độ im lặng, rung chuông to dồn dập
+    tags = ["alarm_clock", "warning", "hammer_and_wrench"];
   }
+
+  var payload = {
+    topic: targetTopic,
+    title: title,
+    message: message,
+    priority: priority,
+    tags: tags,
+    click: "https://webapp-script.vercel.app"
+  };
+
   try {
-    var props = PropertiesService.getScriptProperties();
-    if (config && config.topic) {
-      props.setProperty('NTFY_TOPIC', config.topic.trim());
-    }
-    return { success: true, message: 'Đã lưu cấu hình ntfy.sh!' };
+    var res = UrlFetchApp.fetch("https://ntfy.sh", {
+      method: "post",
+      contentType: "application/json; charset=UTF-8",
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+    console.log("Daily morning notice response:", res.getContentText());
+    return { success: true, topic: targetTopic, title: title, message: message };
   } catch (e) {
+    console.error("Lỗi trigger_dailyMorningNotice:", e);
     return { success: false, error: e.toString() };
   }
 }
 
-function api_getNtfyConfig() {
-  try {
-    var props = PropertiesService.getScriptProperties();
-    var topic = props.getProperty('NTFY_TOPIC') || 'rfworkspace';
-    return { success: true, config: { topic: topic } };
-  } catch (e) {
-    return { success: false, error: e.toString() };
-  }
+// Giữ alias tương thích
+function trigger_morningWakeUpCall() {
+  return trigger_dailyMorningNotice();
 }
+
+function api_testMorningWakeUpCall() {
+  return trigger_dailyMorningNotice();
+}
+
+// api_saveNtfyConfig và api_getNtfyConfig được quản lý duy nhất và bảo vệ phân quyền tại Code.js
 
 // =========================================================================
 // MODULE: DISCORD WEBHOOK (MIỄN PHÍ 100% TRỌN ĐỜI)
@@ -1318,7 +1318,9 @@ function setupNightlyArchiveTrigger() {
 function nightlyAutoArchive() {
   try {
     Logger.log('🚀 [Auto-Archive Engine] Bắt đầu quét lưu trữ đơn hàng cũ > 60 ngày...');
-    var res = archiveReconciledOrders(60, 'SYSTEM');
+    var res = typeof archiveReconciledOrdersInternal_ === 'function' 
+      ? archiveReconciledOrdersInternal_(60, 'SYSTEM_TRIGGER') 
+      : archiveReconciledOrders(60, 'SYSTEM');
     Logger.log('🗄️ [Auto-Archive Engine] Kết quả: ' + JSON.stringify(res));
 
     if (res && res.success && res.movedCount > 0) {
@@ -2049,12 +2051,11 @@ function syncBomMaterialSkusWithProducts(options) {
  */
 function api_createCustomKPI(payload, pin) {
   var pinToAuth = pin || (payload && payload.pin);
-  if (pinToAuth) {
-    var auth = validatePin(pinToAuth);
-    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
-    if (!checkServerPermission(auth, 'HR_EDIT_KPI_TARGET')) {
-      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới có quyền tạo chỉ tiêu KPI tùy chỉnh!' };
-    }
+  if (!pinToAuth) return { success: false, error: 'AUTH_REQUIRED', message: 'Yêu cầu mã PIN để thực hiện thao tác!' };
+  var auth = validatePin(pinToAuth);
+  if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+  if (!checkServerPermission(auth, 'HR_EDIT_KPI_TARGET')) {
+    return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới có quyền tạo chỉ tiêu KPI tùy chỉnh!' };
   }
   var lock = LockService.getScriptLock();
   try {

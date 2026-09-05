@@ -289,15 +289,18 @@ function handleApiRequest(payload) {
           lock.waitLock(15000); // Đợi 15s để lấy quyền truy cập độc quyền
           var deltaPayload = typeof payload.data === 'string' ? JSON.parse(payload.data) : payload.data;
           var resData = syncDeltas(deltaPayload, pin);
-          if (resData && resData.error === 'PERMISSION_DENIED') {
+          if (!resData || resData.success === false || resData.error) {
             response.success = false;
-            response.error = 'PERMISSION_DENIED';
-            response.message = resData.message;
+            response.error = (resData && resData.error) || 'SYNC_FAILED';
+            response.message = (resData && resData.message) || 'Lỗi đồng bộ dữ liệu!';
+            response.data = resData;
           } else {
             response.success = true;
             response.data = resData;
           }
         } catch (e) {
+          response.success = false;
+          response.error = 'LOCK_TIMEOUT';
           response.message = 'Hệ thống đang quá tải, vui lòng thử lại sau vài giây! Lỗi: ' + e.message;
         } finally {
           lock.releaseLock();
@@ -709,6 +712,15 @@ function handleApiRequest(payload) {
       var auth = validatePin(pin);
       if (auth && auth.valid) {
         response = api_runDataIntegrityCheck();
+      } else {
+        response.message = 'Xác thực thất bại!';
+      }
+    }
+    else if (action === 'applyAiQcResult') {
+      var pin = payload.pin;
+      var auth = validatePin(pin);
+      if (auth && auth.valid) {
+        response = api_applyAiQcResult(payload.productionId, payload.updatePayload || {});
       } else {
         response.message = 'Xác thực thất bại!';
       }
@@ -1128,12 +1140,11 @@ function api_syncMasterPayroll(payload) {
     if (payload && payload.data) p = payload.data;
 
     var pinToAuth = (p && p.pin) || (payload && payload.pin);
-    if (pinToAuth) {
-      var auth = validatePin(pinToAuth);
-      if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ hoặc hết hạn!' };
-      if (!checkServerPermission(auth, 'HR_PAY_SALARY_ADVANCE')) {
-        return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Kế Toán hoặc Tối Cao mới có quyền đồng bộ bảng lương!' };
-      }
+    if (!pinToAuth) return { success: false, error: 'AUTH_REQUIRED', message: 'Yêu cầu mã PIN để đồng bộ bảng lương!' };
+    var auth = validatePin(pinToAuth);
+    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ hoặc hết hạn!' };
+    if (!checkServerPermission(auth, 'HR_PAY_SALARY_ADVANCE')) {
+      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Kế Toán hoặc Tối Cao mới có quyền đồng bộ bảng lương!' };
     }
 
     var monthStr = p.monthStr || p.filterMonth || Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM");
@@ -1447,8 +1458,7 @@ function readSheet(name, filterFn, ss) {
 // =========================================================================
 function getAppData(pin) {
   var auth = validatePin(pin);
-  if (auth && auth._debugMsg) { return { error: "LỖI HỆ THỐNG: " + auth._debugMsg }; }
-  if (!auth || !auth.valid) { return { isAuthFailed: true, error: "AUTH_FAILED" }; }
+  if (!auth || !auth.valid || auth._debugMsg) { return { isAuthFailed: true, error: "AUTH_FAILED" }; }
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     
@@ -1694,6 +1704,43 @@ function getAppData(pin) {
       }
     });
 
+    // === PHÂN QUYỀN TRUY CẬP ĐỌC DỮ LIỆU (READ RBAC FILTERING) ===
+    var userRole = String(auth.role || '').toUpperCase();
+    var isBoss = auth.isBoss || userRole === 'TỐI CAO';
+    var isAccounting = isBoss || userRole === 'KẾ TOÁN' || userRole === 'QUẢN LÝ KIỂM TOÁN' || userRole === 'KIỂM TOÁN';
+    var isHR = isBoss || isAccounting || userRole === 'QUẢN LÝ NHÂN SỰ' || userRole === 'NHÂN SỰ';
+    var isWarehouse = isBoss || isAccounting || userRole === 'QUẢN LÝ KHO VẬN' || userRole === 'KHO VẬN';
+    var isSales = isBoss || isAccounting || userRole === 'QUẢN LÝ BÁN HÀNG' || userRole === 'BÁN HÀNG' || userRole === 'CỘNG TÁC VIÊN' || userRole === 'CTV';
+    var isProduction = isBoss || isAccounting || userRole === 'QUẢN LÝ SẢN XUẤT' || userRole === 'SẢN XUẤT';
+
+    // 1. Sổ quỹ ngân hàng và báo cáo tài chính nội bộ: Chỉ Kế toán và Tối cao
+    if (!isAccounting) {
+      d.Accounts = [];
+      d.Transactions = [];
+      d.ProfitReports = [];
+      if (!isSales) {
+        d.CTV_Finance = [];
+        d.ctvFinance = [];
+      }
+    }
+
+    // 2. Bảng lương chi tiết và thưởng phạt: Nhân sự thông thường chỉ xem được của chính mình
+    if (!isBoss && !isAccounting && !isHR) {
+      d.monthlySnapshots = (d.monthlySnapshots || []).filter(function(s) {
+        return s.user === auth.user;
+      });
+      d.BonusPenalty = (d.BonusPenalty || []).filter(function(bp) {
+        return bp.user === auth.user;
+      });
+    }
+
+    // 3. Chấm công: Thợ / Nhân viên thông thường chỉ xem lịch sử chấm công của chính mình
+    if (!isBoss && !isHR && !isProduction && !isWarehouse && !isAccounting) {
+      d.attendance = (d.attendance || []).filter(function(a) {
+        return a.user === auth.user;
+      });
+    }
+
     var props = PropertiesService.getScriptProperties();
     d.announcement = props.getProperty('RF_ANNOUNCEMENT') || "Tối nay 20:00 ngày 15/06/2026.\nĐào tạo nâng cao kỹ năng quản lý. Có mặt đúng giờ!";
     d.archiveStats = {
@@ -1875,24 +1922,28 @@ function getArchivedOrders(options, pin) {
 // =========================================================================
 function archiveReconciledOrders(cutoffDays, pin) {
   var days = 60;
+  var effectivePin = pin;
   if (typeof cutoffDays === 'object' && cutoffDays !== null) {
     if (cutoffDays.cutoffDays !== undefined) days = parseInt(cutoffDays.cutoffDays, 10) || 60;
-    if (cutoffDays.pin && !pin) pin = cutoffDays.pin;
+    if (cutoffDays.pin && !effectivePin) effectivePin = cutoffDays.pin;
   } else if (typeof cutoffDays === 'number' || typeof cutoffDays === 'string') {
     days = parseInt(cutoffDays, 10) || 60;
   }
 
-  // Hỗ trợ trigger tự động hoặc gọi nội bộ từ hệ thống
-  if (!pin && typeof ScriptApp !== 'undefined') {
-    pin = 'SYSTEM';
+  if (!effectivePin) {
+    return { success: false, error: 'AUTH_REQUIRED', message: 'Yêu cầu mã PIN để thực hiện lưu trữ đơn!' };
   }
-
-  var auth = validatePin(pin);
+  var auth = validatePin(effectivePin);
   if (!auth || !auth.valid) { return { isAuthFailed: true, error: "AUTH_FAILED" }; }
-  if (pin !== 'SYSTEM' && !checkServerPermission(auth, 'ORDER_ARCHIVE_ACTION')) {
+  if (!checkServerPermission(auth, 'ORDER_ARCHIVE_ACTION')) {
     return { success: false, error: 'PERMISSION_DENIED', message: 'Bạn không có quyền thực hiện lưu trữ đơn hàng!' };
   }
-  
+
+  return archiveReconciledOrdersInternal_(days, auth.user);
+}
+
+function archiveReconciledOrdersInternal_(cutoffDays, operator) {
+  var days = (typeof cutoffDays === 'number' || typeof cutoffDays === 'string') ? (parseInt(cutoffDays, 10) || 60) : 60;
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000);
@@ -2080,7 +2131,10 @@ function api_getArchiveStats(pin) {
  * Chạy Auto-Archive tự động định kỳ (hoặc qua Trigger Cron)
  */
 function api_runAutoArchiveEngine(cutoffDays, pin) {
-  var effectivePin = (typeof pin === 'object' && pin !== null) ? (pin.pin || pin.passcode || '') : (pin || 'SYSTEM');
+  var effectivePin = (typeof pin === 'object' && pin !== null) ? (pin.pin || pin.passcode || '') : pin;
+  if (!effectivePin) {
+    return { success: false, error: 'AUTH_REQUIRED', message: 'Yêu cầu mã PIN để chạy engine lưu trữ!' };
+  }
   var days = cutoffDays || 60;
   return archiveReconciledOrders(days, effectivePin);
 }
@@ -2090,11 +2144,12 @@ function api_runAutoArchiveEngine(cutoffDays, pin) {
  */
 function setupAutoArchiveTrigger(pin) {
   var effectivePin = (typeof pin === 'object' && pin !== null) ? (pin.pin || pin.passcode || '') : pin;
-  if (effectivePin) {
-    var auth = validatePin(effectivePin);
-    if (!auth || !auth.valid || (!auth.isAdmin && !auth.isBoss)) {
-      return { success: false, message: 'Chỉ Quản Trị Viên mới được cài đặt Trigger!' };
-    }
+  if (!effectivePin) {
+    return { success: false, error: 'AUTH_REQUIRED', message: 'Yêu cầu mã PIN để cài đặt Trigger!' };
+  }
+  var auth = validatePin(effectivePin);
+  if (!auth || !auth.valid || (!auth.isAdmin && !auth.isBoss)) {
+    return { success: false, error: 'PERMISSION_DENIED', message: 'Chỉ Quản Trị Viên mới được cài đặt Trigger!' };
   }
   try {
     var triggers = ScriptApp.getProjectTriggers();
@@ -2159,7 +2214,7 @@ function applyDeltasToSheet(sheetName, items, formatter, ss) {
       if (!isMatch && sheetName === 'Orders' && codeColIdx !== -1) {
         var rowCode = String(data[i][codeColIdx] || '').split(' | ')[0].split('|')[0].trim().toUpperCase();
         var itemCode = String(item.orderCode || item.id || '').split(' | ')[0].split('|')[0].trim().toUpperCase();
-        if (rowCode && itemCode && (rowCode === itemCode || rowCode.indexOf(itemCode) === 0 || itemCode.indexOf(rowCode) === 0)) {
+        if (rowCode && itemCode && rowCode === itemCode) {
           isMatch = true;
         }
       }
@@ -2734,7 +2789,15 @@ function syncDeltas(payload, pin) {
   var acquiredLock = false;
   try {
     if (!lock.hasLock()) {
-      lock.waitLock(30000);
+      var lockOk = lock.tryLock(30000);
+      if (!lockOk) {
+        return {
+          success: false,
+          error: 'LOCK_TIMEOUT',
+          message: 'Hệ thống đang bận ghi dữ liệu, vui lòng thử lại sau vài giây!',
+          serverTime: new Date().getTime()
+        };
+      }
       acquiredLock = true;
     }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -3242,7 +3305,7 @@ function syncDeltas(payload, pin) {
             var rowCode = oCodeColIdx !== -1 ? String(oldOrdersData[r][oCodeColIdx] || '').split(' | ')[0].split('|')[0].trim().toUpperCase() : '';
             var incCode = String(incomingOrder.orderCode || incomingOrder.id || '').split(' | ')[0].split('|')[0].trim().toUpperCase();
 
-            var isRowMatch = (incId !== '' && rowId === incId) || (rowCode !== '' && incCode !== '' && (rowCode === incCode || rowCode.indexOf(incCode) === 0 || incCode.indexOf(rowCode) === 0));
+            var isRowMatch = (incId !== '' && rowId === incId) || (rowCode !== '' && incCode !== '' && rowCode === incCode);
             if (isRowMatch) {
               oldStatus = String(oldOrdersData[r][oStatusColIdx]).toUpperCase().trim();
               if (!incomingOrder.orderCode && oCodeColIdx !== -1) incomingOrder.orderCode = oldOrdersData[r][oCodeColIdx];
@@ -3548,17 +3611,22 @@ function syncDeltas(payload, pin) {
 
   } catch (err) {
     Logger.log('Lỗi syncDeltas: ' + err.toString());
+    return {
+      success: false,
+      error: 'SYNC_ERROR',
+      message: 'Lỗi ghi dữ liệu lên hệ thống: ' + (err.message || err.toString()),
+      serverTime: new Date().getTime()
+    };
   } finally {
     if (acquiredLock) {
       try { lock.releaseLock(); } catch (e) { }
     }
   }
 
-  // Để đảm bảo tốc độ phản hồi siêu tốc "Bấm là nhận luôn" và không làm giao diện
-  // nhảy loạn lên, chúng ta chỉ trả về tín hiệu thành công thay vì bắt Frontend tải lại toàn bộ 23 bảng.
-  var d = { success: true };
-  d.serverTime = new Date().getTime();
-  return d;
+  return {
+    success: true,
+    serverTime: new Date().getTime()
+  };
 }
 
 const ADMIN_ROLES = ['TỐI CAO', 'QUẢN LÝ CẤP TRUNG', 'QUẢN LÝ SẢN XUẤT', 'SẢN XUẤT', 'QUẢN LÝ KHO VẬN', 'KHO VẬN', 'BÁN HÀNG', 'QUẢN LÝ BÁN HÀNG', 'QUẢN LÝ NHÂN SỰ', 'NHÂN SỰ', 'KẾ TOÁN', 'QUẢN LÝ KIỂM TOÁN', 'KIỂM TOÁN', 'NHÂN VIÊN', 'CỘNG TÁC VIÊN', 'CTV', 'KHÁCH'];
@@ -3681,20 +3749,27 @@ function getEmptyConfig(debugMsg) {
   return { avatars: {}, titles: {}, salaries: {}, pins: {}, users: [], roles: {}, _debugMsg: debugMsg };
 }
 
+function createInternalSystemAuth_() {
+  return { valid: true, user: 'SYSTEM', role: 'TỐI CAO', title: 'Hệ Thống Tự Động', isAdmin: true, isBoss: true };
+}
+
 function validatePin(pin) {
   if (!pin) { return { valid: false, user: null, role: '', isAdmin: false, isBoss: false }; }
+  // Chặn tuyệt đối việc client gửi chuỗi giả lập hệ thống để chiếm quyền
   if (pin === 'SYSTEM' || pin === 'AUTO_TRIGGER' || pin === 'INTERNAL_ENGINE') {
-    return { valid: true, user: 'SYSTEM', role: 'TỐI CAO', title: 'Hệ Thống Tự Động', isAdmin: true, isBoss: true };
+    return { valid: false, user: null, role: '', isAdmin: false, isBoss: false, error: 'Mã PIN không hợp lệ' };
   }
   var rawPin = pin;
   if (typeof pin === 'object' && pin !== null) {
     rawPin = pin.pin || pin.passcode || pin.token || '';
   }
-  if (!rawPin) { return { valid: false, user: null, role: '', isAdmin: false, isBoss: false }; }
+  if (!rawPin || rawPin === 'SYSTEM' || rawPin === 'AUTO_TRIGGER' || rawPin === 'INTERNAL_ENGINE') {
+    return { valid: false, user: null, role: '', isAdmin: false, isBoss: false, error: 'Mã PIN không hợp lệ' };
+  }
   const config = getUserConfig();
 
   if (config._debugMsg) {
-    return { valid: false, _debugMsg: config._debugMsg };
+    return { valid: false, _debugMsg: "Lỗi nạp cấu hình tài khoản hệ thống" };
   }
 
   var pinStr = String(rawPin).trim().replace(/\.0+$/, '');
@@ -3715,7 +3790,8 @@ function validatePin(pin) {
   }
 
   if (!userInfo) {
-    return { valid: false, _debugMsg: "PIN không tồn tại. Các mã PIN hệ thống đang đọc được là: " + Object.keys(config.pins).join(", ") };
+    // Tuyệt đối không trả danh sách mã PIN trong thông báo lỗi hoặc log
+    return { valid: false, _debugMsg: "Mã PIN không tồn tại hoặc không hợp lệ" };
   }
   const role = userInfo.role || 'THỢ';
 
@@ -3927,6 +4003,65 @@ function validateTableWritePermission(auth, tableName, isDelete, deltaItems) {
     return { allowed: true };
   }
 
+  var TABLE_ALIASES = {
+    'orders': 'Orders',
+    'Orders': 'Orders',
+    'production': 'Production',
+    'Production': 'Production',
+    'prodItems': 'Production',
+    'packings': 'Packings',
+    'Packings': 'Packings',
+    'products': 'Products',
+    'Products': 'Products',
+    'importExport': 'ImportExport',
+    'ImportExport': 'ImportExport',
+    'transactions': 'Transactions',
+    'Transactions': 'Transactions',
+    'accounts': 'Accounts',
+    'Accounts': 'Accounts',
+    'suppliers': 'Suppliers',
+    'Suppliers': 'Suppliers',
+    'bonusPenalty': 'BonusPenalty',
+    'BonusPenalty': 'BonusPenalty',
+    'kpiProgress': 'KPI_Progress',
+    'KPI_Progress': 'KPI_Progress',
+    'attendance': 'Attendance',
+    'Attendance': 'Attendance',
+    'documents': 'Documents',
+    'Documents': 'Documents',
+    'trainings': 'Trainings',
+    'Trainings': 'Trainings',
+    'models3D': 'Models3D',
+    'Models3D': 'Models3D',
+    'bomConfig': 'BOM_Config',
+    'BOM_Config': 'BOM_Config',
+    'configKpi': 'Config_KPI',
+    'Config_KPI': 'Config_KPI',
+    'thongKeTichLuyXu': 'ThongKe_TichLuyXu',
+    'ThongKe_TichLuyXu': 'ThongKe_TichLuyXu',
+    'xuTransactions': 'ThongKe_TichLuyXu',
+    'ctvFinance': 'CTV_Finance',
+    'CTV_Finance': 'CTV_Finance',
+    'ctvTransactions': 'CTV_Finance',
+    'workspaces': 'Workspaces',
+    'Workspaces': 'Workspaces',
+    'configGiaLayout': 'Config_GiaLayout',
+    'Config_GiaLayout': 'Config_GiaLayout',
+    'reimbursements': 'Reimbursements',
+    'Reimbursements': 'Reimbursements',
+    'profitReports': 'ProfitReports',
+    'ProfitReports': 'ProfitReports',
+    'Config_NhanSu': 'Config_NhanSu',
+    'userConfigs': 'Config_NhanSu',
+    'UserConfigs': 'Config_NhanSu',
+    'Tracking_Log': 'Tracking_Log'
+  };
+
+  var targetTable = TABLE_ALIASES[tableName];
+  if (!targetTable) {
+    return { allowed: false, reason: 'Bảng ' + tableName + ' không hợp lệ hoặc chưa được khai báo quyền truy cập' };
+  }
+
   var rawRole = String(auth.role || '').trim().toUpperCase();
   var role = rawRole;
   if (rawRole.indexOf('TỐI CAO') !== -1 || rawRole.indexOf('TOI CAO') !== -1 || rawRole.indexOf('ADMIN') !== -1 || rawRole.indexOf('BOSS') !== -1) role = 'TỐI CAO';
@@ -3939,12 +4074,12 @@ function validateTableWritePermission(auth, tableName, isDelete, deltaItems) {
   else if (rawRole.indexOf('NHÂN VIÊN') !== -1 || rawRole.indexOf('NHAN VIEN') !== -1 || rawRole.indexOf('NHANVIEN') !== -1) role = 'NHÂN VIÊN';
 
   // 1. Cấu hình nhân sự, bảng lương & PIN: DUY NHẤT TỐI CAO
-  if (tableName === 'Config_NhanSu' || tableName === 'UserConfigs') {
+  if (targetTable === 'Config_NhanSu') {
     return { allowed: false, reason: 'Chỉ có Boss Tối Cao mới có quyền sửa đổi Cấu hình Nhân sự, Lương và Mã PIN' };
   }
 
   // 2. Bảng Đơn Hàng (Orders)
-  if (tableName === 'Orders' || tableName === 'orders') {
+  if (targetTable === 'Orders') {
     if (isDelete) {
       return { allowed: false, reason: 'Chỉ có Boss Tối Cao mới có quyền xóa vĩnh viễn đơn hàng' };
     }
@@ -3956,25 +4091,19 @@ function validateTableWritePermission(auth, tableName, isDelete, deltaItems) {
   }
 
   // 3. Bảng Giao Dịch Tài Chính (Transactions)
-  if (tableName === 'Transactions' || tableName === 'transactions') {
+  if (targetTable === 'Transactions') {
     if (isDelete) {
       return { allowed: false, reason: 'Chỉ có Boss Tối Cao mới có quyền xóa giao dịch tài chính' };
     }
     var allowedTxRoles = ['TỐI CAO', 'KẾ TOÁN', 'QUẢN LÝ BÁN HÀNG', 'QUẢN LÝ KHO VẬN', 'CỘNG TÁC VIÊN'];
     if (allowedTxRoles.indexOf(role) === -1) {
-      // Cho phép giao dịch cọc đơn hàng (TX_PRE_) đi kèm khi tạo đơn
-      var isAllPreTx = Array.isArray(deltaItems) && deltaItems.every(function(tx) {
-        return tx && tx.id && String(tx.id).indexOf('TX_PRE_') === 0;
-      });
-      if (!isAllPreTx) {
-        return { allowed: false, reason: 'Chỉ có Kế Toán / Bán Hàng mới có quyền lập/sửa giao dịch tài chính độc lập' };
-      }
+      return { allowed: false, reason: 'Chỉ có Kế Toán / Bán Hàng mới có quyền lập/sửa giao dịch tài chính' };
     }
     return { allowed: true };
   }
 
   // 4. Bảng Tài Khoản / Sổ Quỹ (Accounts)
-  if (tableName === 'Accounts' || tableName === 'accounts') {
+  if (targetTable === 'Accounts') {
     if (isDelete) {
       return { allowed: false, reason: 'Chỉ có Boss Tối Cao mới có quyền xóa tài khoản ngân hàng / sổ quỹ' };
     }
@@ -3985,7 +4114,7 @@ function validateTableWritePermission(auth, tableName, isDelete, deltaItems) {
   }
 
   // 5. Bảng Kho Hàng & Sản Phẩm (Products)
-  if (tableName === 'Products' || tableName === 'products') {
+  if (targetTable === 'Products') {
     if (isDelete) {
       return { allowed: false, reason: 'Chỉ có Boss Tối Cao mới có quyền xóa sản phẩm khỏi kho' };
     }
@@ -3997,7 +4126,7 @@ function validateTableWritePermission(auth, tableName, isDelete, deltaItems) {
   }
 
   // 6. Bảng Xuất Nhập Kho (ImportExport)
-  if (tableName === 'ImportExport' || tableName === 'importExport') {
+  if (targetTable === 'ImportExport') {
     if (isDelete) {
       return { allowed: false, reason: 'Chỉ có Boss Tối Cao mới có quyền xóa nhật ký xuất nhập kho' };
     }
@@ -4008,7 +4137,7 @@ function validateTableWritePermission(auth, tableName, isDelete, deltaItems) {
   }
 
   // 7. Bảng Định Mức BOM (BOM_Config)
-  if (tableName === 'BOM_Config' || tableName === 'bomConfig') {
+  if (targetTable === 'BOM_Config') {
     if (isDelete && role !== 'TỐI CAO') {
       return { allowed: false, reason: 'Chỉ có Boss Tối Cao mới có quyền xóa cấu hình định mức BOM' };
     }
@@ -4020,7 +4149,7 @@ function validateTableWritePermission(auth, tableName, isDelete, deltaItems) {
   }
 
   // 8. Bảng Nhà Cung Cấp (Suppliers)
-  if (tableName === 'Suppliers' || tableName === 'suppliers') {
+  if (targetTable === 'Suppliers') {
     if (role !== 'QUẢN LÝ KHO VẬN' && role !== 'KẾ TOÁN' && role !== 'TỐI CAO') {
       return { allowed: false, reason: 'Chỉ Quản Lý Kho Vận hoặc Kế Toán mới có quyền quản lý Nhà Cung Cấp' };
     }
@@ -4028,39 +4157,44 @@ function validateTableWritePermission(auth, tableName, isDelete, deltaItems) {
   }
 
   // 9. Bảng Chấm Công (Attendance)
-  if (tableName === 'Attendance' || tableName === 'attendance') {
+  if (targetTable === 'Attendance') {
     if (isDelete && role !== 'QUẢN LÝ NHÂN SỰ' && role !== 'TỐI CAO') {
       return { allowed: false, reason: 'Chỉ Quản Lý Nhân Sự / Tối Cao mới có quyền xóa bản ghi chấm công' };
+    }
+    // Kiểm tra quyền sở hữu bản ghi: Thợ / nhân sự thông thường chỉ chấm công cho chính mình
+    if (role !== 'QUẢN LÝ NHÂN SỰ' && role !== 'TỐI CAO') {
+      if (Array.isArray(deltaItems)) {
+        var isAllOwn = deltaItems.every(function(att) {
+          if (!att) return true;
+          return !att.user || String(att.user).trim() === String(auth.user).trim();
+        });
+        if (!isAllOwn) {
+          return { allowed: false, reason: 'Bạn chỉ có quyền sửa đổi bản ghi chấm công của chính mình!' };
+        }
+      }
     }
     return { allowed: true };
   }
 
   // 10. Bảng Thưởng / Phạt (BonusPenalty)
-  if (tableName === 'BonusPenalty' || tableName === 'bonusPenalty') {
+  if (targetTable === 'BonusPenalty') {
     if (isDelete) {
       return { allowed: false, reason: 'Chỉ có Boss Tối Cao mới có quyền xóa bản ghi Thưởng/Phạt' };
     }
-    // Cho phép các bản ghi KPI đi kèm đơn hàng (BP_KPI_)
-    var isAllOrderKPI = Array.isArray(deltaItems) && deltaItems.every(function(bp) {
-      return bp && bp.id && String(bp.id).indexOf('BP_KPI_') === 0;
-    });
-    if (isAllOrderKPI) {
-      return { allowed: true };
-    }
     var allowedPenaltyRoles = ['TỐI CAO', 'QUẢN LÝ SẢN XUẤT', 'QUẢN LÝ KHO VẬN', 'QUẢN LÝ NHÂN SỰ', 'QUẢN LÝ BÁN HÀNG', 'KẾ TOÁN'];
     if (allowedPenaltyRoles.indexOf(role) === -1) {
-      return { allowed: false, reason: 'Vai trò ' + role + ' không có quyền ghi nhận thưởng/phạt độc lập' };
+      return { allowed: false, reason: 'Vai trò ' + role + ' không có quyền ghi nhận thưởng/phạt' };
     }
     return { allowed: true };
   }
 
   // 11. Bảng Sản Xuất (Production) & Đóng Gói (Packings)
-  if (tableName === 'Production' || tableName === 'prodItems' || tableName === 'Packings' || tableName === 'packings') {
+  if (targetTable === 'Production' || targetTable === 'Packings') {
     return { allowed: true };
   }
 
   // 12. Bảng Phân Công Trách Nhiệm (Workspaces)
-  if (tableName === 'Workspaces' || tableName === 'workspaces') {
+  if (targetTable === 'Workspaces') {
     if (role !== 'QUẢN LÝ NHÂN SỰ' && role !== 'TỐI CAO') {
       return { allowed: false, reason: 'Chỉ Quản Lý Nhân Sự mới có quyền phân công khu vực làm việc' };
     }
@@ -4068,22 +4202,40 @@ function validateTableWritePermission(auth, tableName, isDelete, deltaItems) {
   }
 
   // 13. Bảng Tài Chính CTV (CTV_Finance) & Bảng Giá Layout (Config_GiaLayout)
-  if (tableName === 'CTV_Finance' || tableName === 'Config_GiaLayout') {
+  if (targetTable === 'CTV_Finance' || targetTable === 'Config_GiaLayout') {
     if (role !== 'QUẢN LÝ BÁN HÀNG' && role !== 'KẾ TOÁN' && role !== 'TỐI CAO') {
       return { allowed: false, reason: 'Chỉ Quản Lý Bán Hàng hoặc Kế Toán mới có quyền quản lý tài chính CTV' };
     }
     return { allowed: true };
   }
 
-  // 14. Bảng Tài Liệu / Mô Hình 3D
-  if (tableName === 'Documents' || tableName === 'documents' || tableName === 'Models3D' || tableName === 'models3D') {
+  // 14. Bảng Tài Liệu / Mô Hình 3D / Đào tạo
+  if (targetTable === 'Documents' || targetTable === 'Models3D' || targetTable === 'Trainings') {
     if (isDelete) {
-      return { allowed: false, reason: 'Chỉ có Boss Tối Cao mới có quyền xóa tài liệu / mô hình 3D' };
+      return { allowed: false, reason: 'Chỉ có Boss Tối Cao mới có quyền xóa tài liệu / mô hình 3D / đào tạo' };
     }
     return { allowed: true };
   }
 
-  return { allowed: true };
+  // 15. Bảng Tiến Độ KPI & Thống Kê Tích Lũy Xu
+  if (targetTable === 'KPI_Progress' || targetTable === 'ThongKe_TichLuyXu' || targetTable === 'Config_KPI') {
+    var allowedKpiRoles = ['TỐI CAO', 'QUẢN LÝ NHÂN SỰ', 'KẾ TOÁN', 'QUẢN LÝ SẢN XUẤT'];
+    if (allowedKpiRoles.indexOf(role) === -1) {
+      return { allowed: false, reason: 'Vai trò ' + role + ' không có quyền điều chỉnh cấu hình / chỉ tiêu KPI' };
+    }
+    return { allowed: true };
+  }
+
+  if (targetTable === 'Reimbursements') {
+    return { allowed: true };
+  }
+
+  if (targetTable === 'Tracking_Log') {
+    return { allowed: true };
+  }
+
+  // Mặc định từ chối mọi trường hợp chưa được cấp quyền rõ ràng
+  return { allowed: false, reason: 'Bảng ' + targetTable + ' chưa được cấp quyền truy cập ghi cho vai trò ' + role };
 }
 
 function uploadImage(base64Data, fileName) {
@@ -4147,7 +4299,18 @@ function sendNtfyNotification(title, message, topic) {
   }
 }
 
-function api_saveNtfyConfig(config) {
+function api_saveNtfyConfig(config, pin) {
+  var pinToAuth = pin || (config && config.pin);
+  if (!pinToAuth) {
+    return { success: false, error: 'AUTH_REQUIRED', message: 'Yêu cầu mã PIN để lưu cấu hình ntfy.sh!' };
+  }
+  var auth = validatePin(pinToAuth);
+  if (!auth || !auth.valid) {
+    return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+  }
+  if (!checkServerPermission(auth, 'SYSTEM_CONFIG')) {
+    return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới được sửa cấu hình ntfy.sh!' };
+  }
   try {
     var props = PropertiesService.getScriptProperties();
     if (config && config.topic) {
@@ -6975,12 +7138,11 @@ function api_insertManualTask(payload) {
  */
 function api_settleMonthlyDebt(payload, pin) {
   var pinToAuth = pin || (payload && payload.pin);
-  if (pinToAuth) {
-    var auth = validatePin(pinToAuth);
-    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
-    if (!checkServerPermission(auth, 'HR_PAY_SALARY_ADVANCE')) {
-      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Kế Toán hoặc Tối Cao mới có quyền quyết toán nợ lương!' };
-    }
+  if (!pinToAuth) return { success: false, error: 'AUTH_REQUIRED', message: 'Yêu cầu mã PIN để quyết toán nợ lương!' };
+  var auth = validatePin(pinToAuth);
+  if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+  if (!checkServerPermission(auth, 'HR_PAY_SALARY_ADVANCE')) {
+    return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Kế Toán hoặc Tối Cao mới có quyền quyết toán nợ lương!' };
   }
   var lock = LockService.getScriptLock();
   try {
@@ -9039,7 +9201,19 @@ function _processMaterialDeduction_Core(prodId, materialUsageData, ss) {
       }
     }
 
-    // 0. Kiểm tra chống trùng lặp (Idempotency check)
+    // 0. Kiểm tra chống trùng lặp & Nhật ký phục hồi sự cố (Idempotency & Journal Recovery)
+    var journalKey = 'BOM_JOURNAL_' + targetProdIdStr;
+    var scriptProps = (typeof PropertiesService !== 'undefined' && PropertiesService.getScriptProperties) ? PropertiesService.getScriptProperties() : null;
+    var existingJournalStr = scriptProps ? scriptProps.getProperty(journalKey) : null;
+    var existingJournal = null;
+    if (existingJournalStr) {
+      try {
+        existingJournal = JSON.parse(existingJournalStr);
+      } catch (e) {
+        existingJournal = null;
+      }
+    }
+
     var ieData = ieSheet.getDataRange().getValues();
     if (ieData.length > 1) {
       var ieHeaders = ieData[0];
@@ -9047,6 +9221,9 @@ function _processMaterialDeduction_Core(prodId, materialUsageData, ss) {
       for (var k = 1; k < ieData.length; k++) {
         var logId = String(ieData[k][idIdx] || '');
         if (logId === 'IE_BOM_' + targetProdIdStr) {
+          if (scriptProps) {
+            try { scriptProps.deleteProperty(journalKey); } catch (e) {}
+          }
           return { success: true, message: 'Lệnh sản xuất ' + targetProdIdStr + ' đã được trừ vật tư trước đó.' };
         }
       }
@@ -9246,172 +9423,193 @@ function _processMaterialDeduction_Core(prodId, materialUsageData, ss) {
     var totalCost = 0;
     var isProductChanged = false;
 
-    for (var p = 1; p < pData.length; p++) {
-      var pSku = String(pData[p][prSkuIdx] || '').trim();
-      var pName = String(pData[p][prNameIdx] || '').trim();
-      var pSkuUpper = pSku.toUpperCase();
-      var pNameClean = cleanStr(pName);
+    var alreadyDeductedFromJournal = (existingJournal && existingJournal.status === 'PRODUCTS_DEDUCTED');
+    if (alreadyDeductedFromJournal) {
+      totalCost = Number(existingJournal.totalCost) || 0;
+      itemsDeducted = Array.isArray(existingJournal.itemsDeducted) ? existingJournal.itemsDeducted : [];
+      isProductChanged = false;
+      Logger.log('BOM Journal phục hồi: Lệnh ' + targetProdIdStr + ' đã trừ tồn kho trước đó, bỏ qua trừ lại để chống trùng lặp.');
+    } else {
+      for (var p = 1; p < pData.length; p++) {
+        var pSku = String(pData[p][prSkuIdx] || '').trim();
+        var pName = String(pData[p][prNameIdx] || '').trim();
+        var pSkuUpper = pSku.toUpperCase();
+        var pNameClean = cleanStr(pName);
 
-      var deductQty = 0;
-      var bomUnit = '';
-      var matchedKey = null;
+        var deductQty = 0;
+        var bomUnit = '';
+        var matchedKey = null;
 
-      for (var bKey in bomMap) {
-        var bKeyTrim = String(bKey).trim();
-        var bKeyUpper = bKeyTrim.toUpperCase();
-        var bKeyClean = cleanStr(bKeyTrim);
+        for (var bKey in bomMap) {
+          var bKeyTrim = String(bKey).trim();
+          var bKeyUpper = bKeyTrim.toUpperCase();
+          var bKeyClean = cleanStr(bKeyTrim);
 
-        var isAliasMatch = ALIAS_MAP[bKeyUpper] && ALIAS_MAP[bKeyUpper].some(function(alias) {
-          return alias.toUpperCase() === pSkuUpper || cleanStr(alias) === pNameClean;
-        });
+          var isAliasMatch = ALIAS_MAP[bKeyUpper] && ALIAS_MAP[bKeyUpper].some(function(alias) {
+            return alias.toUpperCase() === pSkuUpper || cleanStr(alias) === pNameClean;
+          });
 
-        if (bKeyUpper === pSkuUpper || bKeyTrim.toLowerCase() === pName.toLowerCase() ||
-            isAliasMatch ||
-            (pSkuUpper && bKeyUpper && (bKeyUpper === pSkuUpper || bKeyUpper.indexOf(pSkuUpper) !== -1 || pSkuUpper.indexOf(bKeyUpper) !== -1)) ||
-            (bKeyClean && pNameClean && (bKeyClean === pNameClean || bKeyClean.indexOf(pNameClean) !== -1 || pNameClean.indexOf(bKeyClean) !== -1))) {
-          deductQty = bomMap[bKey].qty;
-          bomUnit = bomMap[bKey].unit;
-          matchedKey = bKey;
-          break;
-        }
-      }
-
-      if (deductQty > 0 && matchedKey) {
-        var curQty = Number(pData[p][prQtyIdx]);
-        if (isNaN(curQty)) curQty = 0;
-        var rawCost = Number(pData[p][prCostIdx]) || 0;
-        var matUnit = String(pData[p][prUnitIdx] || '').toLowerCase().trim();
-        var convRate = (prConvRateIdx !== -1 && Number(pData[p][prConvRateIdx])) ? Number(pData[p][prConvRateIdx]) : 1;
-        var importUnit = (prImportUnitIdx !== -1) ? String(pData[p][prImportUnitIdx] || '').toLowerCase().trim() : '';
-        
-        var bomItem = bomMap[matchedKey] || {};
-        var bomProdUnit = (bomItem.prodUnit || bomUnit || '').toLowerCase().trim();
-        var bomImportUnit = (bomItem.importUnit || '').toLowerCase().trim();
-
-        var matNameLower = pName.toLowerCase();
-        var matUnitClean = matUnit.replace(/[^a-z0-9]/g, '');
-        var prodUnitClean = bomProdUnit.replace(/[^a-z0-9]/g, '');
-
-        var isMatKg = matUnitClean === 'kg' || matUnitClean === 'can' || matUnitClean === 'ki' || matUnitClean === 'kilogram' || matUnitClean === '1kg';
-        var isProdGram = prodUnitClean === 'gam' || prodUnitClean === 'g' || prodUnitClean === 'gram' || prodUnitClean === 'gr' || prodUnitClean === '1g';
-        var isMatGram = matUnitClean === 'gam' || matUnitClean === 'g' || matUnitClean === 'gram' || matUnitClean === 'gr' || matUnitClean === '1g';
-        var isKeo502 = pSku.toLowerCase().indexOf('502') !== -1 || matNameLower.indexOf('502') !== -1 || matNameLower.indexOf('keo') !== -1;
-        var isMatChai = matUnitClean === 'chai' || matNameLower.indexOf('chai') !== -1;
-
-        var convertedDeductQty = deductQty;
-        var displayUnit = matUnit || bomProdUnit || 'kg';
-        var unitPrice = rawCost;
-
-        if (isKeo502) {
-          // Keo 502: 1 chai 162g - vỏ 62g = 100g keo thực tế, giá 22.000đ / 100g = 220đ/gam
-          var totalKeoGrams = bomItem.grams || (isProdGram ? (deductQty > 10 ? deductQty : deductQty * 100) : (deductQty <= 10 ? deductQty * 100 : deductQty));
-          if (isMatChai || matUnitClean === 'chai') {
-            // Kho quản lý bằng CHAI: Trừ số chai thực tế tiêu hao (1 chai = 100g keo)
-            convertedDeductQty = Number((totalKeoGrams / 100).toFixed(3));
-            displayUnit = 'Chai';
-            unitPrice = (rawCost > 0) ? rawCost : 22000;
-          } else {
-            // Kho quản lý bằng GAM: Trừ số gam keo thực tế tiêu hao
-            convertedDeductQty = Number(totalKeoGrams.toFixed(2));
-            displayUnit = 'gam';
-            unitPrice = 220; // 22.000đ / 100g = 220đ/gam
+          if (bKeyUpper === pSkuUpper || bKeyTrim.toLowerCase() === pName.toLowerCase() ||
+              isAliasMatch ||
+              (pSkuUpper && bKeyUpper && (bKeyUpper === pSkuUpper || bKeyUpper.indexOf(pSkuUpper) !== -1 || pSkuUpper.indexOf(bKeyUpper) !== -1)) ||
+              (bKeyClean && pNameClean && (bKeyClean === pNameClean || bKeyClean.indexOf(pNameClean) !== -1 || pNameClean.indexOf(bKeyClean) !== -1))) {
+            deductQty = bomMap[bKey].qty;
+            bomUnit = bomMap[bKey].unit;
+            matchedKey = bKey;
+            break;
           }
-        } else if (isMatKg && isProdGram) {
-          // Kho quản lý bằng KG, BOM xuất bằng GAM -> quy đổi số lượng xuất sang KG (đơn giá giữ nguyên theo KG)
-          convertedDeductQty = Number((deductQty / 1000).toFixed(4));
-          displayUnit = 'kg';
-          unitPrice = rawCost;
-        } else if (isMatGram && (convRate === 1000 || bomImportUnit === '1kg' || bomImportUnit === 'kg' || importUnit === '1kg' || importUnit === 'kg' || rawCost >= 1000)) {
-          // Kho quản lý bằng GAM, nhưng Đơn giá nhập rawCost là giá cho 1 KG (1000g) -> quy đổi Đơn giá sang giá / 1 GAM
-          convertedDeductQty = deductQty;
-          displayUnit = 'gam';
-          var actualConv = (convRate > 1) ? convRate : 1000;
-          unitPrice = Number((rawCost / actualConv).toFixed(2));
-        } else if (isProdGram && !isMatKg && (convRate === 1000 || bomImportUnit === '1kg' || bomImportUnit === 'kg' || rawCost >= 1000)) {
-          // Fallback: Đơn vị xuất là GAM và giá nhập theo KG -> quy đổi Đơn giá sang giá / 1 GAM
-          convertedDeductQty = deductQty;
-          displayUnit = 'gam';
-          var actualConv = (convRate > 1) ? convRate : 1000;
-          unitPrice = Number((rawCost / actualConv).toFixed(2));
-        } else if (prodUnitClean === 'm2' || prodUnitClean === 'm') {
-          convertedDeductQty = Number(deductQty.toFixed(4));
-          displayUnit = 'm²';
-          unitPrice = rawCost;
-        } else if (convRate > 1) {
-          unitPrice = Number((rawCost / convRate).toFixed(2));
         }
 
-        var roundedDeductQty = Math.round(convertedDeductQty * 1000) / 1000;
-        var newQty = Math.round(Math.max(0, curQty - roundedDeductQty) * 1000) / 1000;
+        if (deductQty > 0 && matchedKey) {
+          var curQty = Number(pData[p][prQtyIdx]);
+          if (isNaN(curQty)) curQty = 0;
+          var rawCost = Number(pData[p][prCostIdx]) || 0;
+          var matUnit = String(pData[p][prUnitIdx] || '').toLowerCase().trim();
+          var convRate = (prConvRateIdx !== -1 && Number(pData[p][prConvRateIdx])) ? Number(pData[p][prConvRateIdx]) : 1;
+          var importUnit = (prImportUnitIdx !== -1) ? String(pData[p][prImportUnitIdx] || '').toLowerCase().trim() : '';
+          
+          var bomItem = bomMap[matchedKey] || {};
+          var bomProdUnit = (bomItem.prodUnit || bomUnit || '').toLowerCase().trim();
+          var bomImportUnit = (bomItem.importUnit || '').toLowerCase().trim();
 
-        pData[p][prQtyIdx] = newQty;
-        isProductChanged = true;
+          var matNameLower = pName.toLowerCase();
+          var matUnitClean = matUnit.replace(/[^a-z0-9]/g, '');
+          var prodUnitClean = bomProdUnit.replace(/[^a-z0-9]/g, '');
 
-        var lineTotal = Math.round(roundedDeductQty * unitPrice);
-        totalCost += lineTotal;
+          var isMatKg = matUnitClean === 'kg' || matUnitClean === 'can' || matUnitClean === 'ki' || matUnitClean === 'kilogram' || matUnitClean === '1kg';
+          var isProdGram = prodUnitClean === 'gam' || prodUnitClean === 'g' || prodUnitClean === 'gram' || prodUnitClean === 'gr' || prodUnitClean === '1g';
+          var isMatGram = matUnitClean === 'gam' || matUnitClean === 'g' || matUnitClean === 'gram' || matUnitClean === 'gr' || matUnitClean === '1g';
+          var isKeo502 = pSku.toLowerCase().indexOf('502') !== -1 || matNameLower.indexOf('502') !== -1 || matNameLower.indexOf('keo') !== -1;
+          var isMatChai = matUnitClean === 'chai' || matNameLower.indexOf('chai') !== -1;
+
+          var convertedDeductQty = deductQty;
+          var displayUnit = matUnit || bomProdUnit || 'kg';
+          var unitPrice = rawCost;
+
+          if (isKeo502) {
+            // Keo 502: 1 chai 162g - vỏ 62g = 100g keo thực tế, giá 22.000đ / 100g = 220đ/gam
+            var totalKeoGrams = bomItem.grams || (isProdGram ? (deductQty > 10 ? deductQty : deductQty * 100) : (deductQty <= 10 ? deductQty * 100 : deductQty));
+            if (isMatChai || matUnitClean === 'chai') {
+              // Kho quản lý bằng CHAI: Trừ số chai thực tế tiêu hao (1 chai = 100g keo)
+              convertedDeductQty = Number((totalKeoGrams / 100).toFixed(3));
+              displayUnit = 'Chai';
+              unitPrice = (rawCost > 0) ? rawCost : 22000;
+            } else {
+              // Kho quản lý bằng GAM: Trừ số gam keo thực tế tiêu hao
+              convertedDeductQty = Number(totalKeoGrams.toFixed(2));
+              displayUnit = 'gam';
+              unitPrice = 220; // 22.000đ / 100g = 220đ/gam
+            }
+          } else if (isMatKg && isProdGram) {
+            // Kho quản lý bằng KG, BOM xuất bằng GAM -> quy đổi số lượng xuất sang KG (đơn giá giữ nguyên theo KG)
+            convertedDeductQty = Number((deductQty / 1000).toFixed(4));
+            displayUnit = 'kg';
+            unitPrice = rawCost;
+          } else if (isMatGram && (convRate === 1000 || bomImportUnit === '1kg' || bomImportUnit === 'kg' || importUnit === '1kg' || importUnit === 'kg' || rawCost >= 1000)) {
+            // Kho quản lý bằng GAM, nhưng Đơn giá nhập rawCost là giá cho 1 KG (1000g) -> quy đổi Đơn giá sang giá / 1 GAM
+            convertedDeductQty = deductQty;
+            displayUnit = 'gam';
+            var actualConv = (convRate > 1) ? convRate : 1000;
+            unitPrice = Number((rawCost / actualConv).toFixed(2));
+          } else if (isProdGram && !isMatKg && (convRate === 1000 || bomImportUnit === '1kg' || bomImportUnit === 'kg' || rawCost >= 1000)) {
+            // Fallback: Đơn vị xuất là GAM và giá nhập theo KG -> quy đổi Đơn giá sang giá / 1 GAM
+            convertedDeductQty = deductQty;
+            displayUnit = 'gam';
+            var actualConv = (convRate > 1) ? convRate : 1000;
+            unitPrice = Number((rawCost / actualConv).toFixed(2));
+          } else if (prodUnitClean === 'm2' || prodUnitClean === 'm') {
+            convertedDeductQty = Number(deductQty.toFixed(4));
+            displayUnit = 'm²';
+            unitPrice = rawCost;
+          } else if (convRate > 1) {
+            unitPrice = Number((rawCost / convRate).toFixed(2));
+          }
+
+          var roundedDeductQty = Math.round(convertedDeductQty * 1000) / 1000;
+          var newQty = Math.round(Math.max(0, curQty - roundedDeductQty) * 1000) / 1000;
+
+          pData[p][prQtyIdx] = newQty;
+          isProductChanged = true;
+
+          var lineTotal = Math.round(roundedDeductQty * unitPrice);
+          totalCost += lineTotal;
+          itemsDeducted.push({
+            sku: pSku,
+            name: pName || pSku,
+            qty: roundedDeductQty,
+            deductedQty: roundedDeductQty,
+            unit: displayUnit,
+            price: unitPrice,
+            costPrice: unitPrice,
+            amount: Math.round(lineTotal)
+          });
+
+          delete bomMap[matchedKey];
+        }
+      }
+
+      // 5b. Xử lý các hạng mục Dịch vụ (như Mài CNC) hoặc các mã BOM còn lại chưa có trong kho
+      for (var remainKey in bomMap) {
+        var itemObj = bomMap[remainKey];
+        if (!itemObj) continue;
+        
+        var sQty = Math.round((Number(itemObj.qty) || 0) * 1000) / 1000;
+        var sPrice = Number(itemObj.defaultPrice || itemObj.price || 0);
+        if (remainKey === 'DICHVU-MAI-CNC' || itemObj.isService) {
+          sPrice = sPrice || 25000;
+        } else if (remainKey.includes('KINH5LI') || remainKey.includes('KINH-5LI')) {
+          sPrice = sPrice || 150000;
+        } else if (remainKey.includes('KINH8LI') || remainKey.includes('KINH-8LI')) {
+          sPrice = sPrice || 240000;
+        } else if (remainKey.includes('KEO-WACKER')) {
+          sPrice = sPrice || 55000;
+        }
+
+        var sLineAmt = Math.round(sQty * sPrice);
+        totalCost += sLineAmt;
+        
+        var displaySkuName = remainKey;
+        if (remainKey.startsWith('NLSX-')) {
+          displaySkuName = remainKey.replace('NLSX-KINH-5LI', 'NL-BE-KINH5LI')
+                                    .replace('NLSX-KINH-8LI', 'NL-BE-KINH8LI')
+                                    .replace('NLSX-MAI-CNC', 'DICHVU-MAI-CNC')
+                                    .replace('NLSX-KEO-WACKER', 'NL-BE-KEO-WACKER')
+                                    .replace('NLSX-RF', 'NL-LAY-SX-RF')
+                                    .replace('NLSX-LUASANMIENG', 'NL-LAY-LUASANMIENG')
+                                    .replace('NLSX-TAIMEO', 'NL-LAY-TAIMEO')
+                                    .replace('NLSX-REU-A04', 'NL-LAY-REU-A04')
+                                    .replace('NLSX-502-1CHAI', 'NL-LAY-KEO-502');
+        }
+
         itemsDeducted.push({
-          sku: pSku,
-          name: pName || pSku,
-          qty: roundedDeductQty,
-          deductedQty: roundedDeductQty,
-          unit: displayUnit,
-          price: unitPrice,
-          costPrice: unitPrice,
-          amount: Math.round(lineTotal)
+          sku: displaySkuName,
+          name: itemObj.name || displaySkuName,
+          qty: sQty,
+          deductedQty: itemObj.isService ? 0 : sQty,
+          unit: itemObj.unit || 'cái',
+          price: sPrice,
+          costPrice: sPrice,
+          amount: sLineAmt,
+          isService: !!itemObj.isService
         });
-
-        delete bomMap[matchedKey];
-      }
-    }
-
-    if (isProductChanged) {
-      pRange.setValues(pData);
-    }
-
-    // 5b. Xử lý các hạng mục Dịch vụ (như Mài CNC) hoặc các mã BOM còn lại chưa có trong kho
-    for (var remainKey in bomMap) {
-      var itemObj = bomMap[remainKey];
-      if (!itemObj) continue;
-      
-      var sQty = Math.round((Number(itemObj.qty) || 0) * 1000) / 1000;
-      var sPrice = Number(itemObj.defaultPrice || itemObj.price || 0);
-      if (remainKey === 'DICHVU-MAI-CNC' || itemObj.isService) {
-        sPrice = sPrice || 25000;
-      } else if (remainKey.includes('KINH5LI') || remainKey.includes('KINH-5LI')) {
-        sPrice = sPrice || 150000;
-      } else if (remainKey.includes('KINH8LI') || remainKey.includes('KINH-8LI')) {
-        sPrice = sPrice || 240000;
-      } else if (remainKey.includes('KEO-WACKER')) {
-        sPrice = sPrice || 55000;
       }
 
-      var sLineAmt = Math.round(sQty * sPrice);
-      totalCost += sLineAmt;
-      
-      var displaySkuName = remainKey;
-      if (remainKey.startsWith('NLSX-')) {
-        displaySkuName = remainKey.replace('NLSX-KINH-5LI', 'NL-BE-KINH5LI')
-                                  .replace('NLSX-KINH-8LI', 'NL-BE-KINH8LI')
-                                  .replace('NLSX-MAI-CNC', 'DICHVU-MAI-CNC')
-                                  .replace('NLSX-KEO-WACKER', 'NL-BE-KEO-WACKER')
-                                  .replace('NLSX-RF', 'NL-LAY-SX-RF')
-                                  .replace('NLSX-LUASANMIENG', 'NL-LAY-LUASANMIENG')
-                                  .replace('NLSX-TAIMEO', 'NL-LAY-TAIMEO')
-                                  .replace('NLSX-REU-A04', 'NL-LAY-REU-A04')
-                                  .replace('NLSX-502-1CHAI', 'NL-LAY-KEO-502');
+      if (isProductChanged) {
+        if (scriptProps) {
+          try {
+            scriptProps.setProperty(journalKey, JSON.stringify({
+              status: 'PRODUCTS_DEDUCTED',
+              targetProdIdStr: targetProdIdStr,
+              totalCost: totalCost,
+              itemsDeducted: itemsDeducted,
+              timestamp: new Date().toISOString()
+            }));
+          } catch (jpErr) {
+            Logger.log('Lỗi lưu BOM journal: ' + jpErr.toString());
+          }
+        }
+        pRange.setValues(pData);
       }
-
-      itemsDeducted.push({
-        sku: displaySkuName,
-        name: itemObj.name || displaySkuName,
-        qty: sQty,
-        deductedQty: itemObj.isService ? 0 : sQty,
-        unit: itemObj.unit || 'cái',
-        price: sPrice,
-        costPrice: sPrice,
-        amount: sLineAmt,
-        isService: !!itemObj.isService
-      });
     }
 
     // 6. Ghi Log vào ImportExport với targetType chuẩn xác 100%
@@ -9500,6 +9698,12 @@ function _processMaterialDeduction_Core(prodId, materialUsageData, ss) {
           Logger.log('Lỗi cập nhật Orders.cogs: ' + cogsErr.toString());
         }
       }
+    }
+
+    if (scriptProps) {
+      try {
+        scriptProps.deleteProperty(journalKey);
+      } catch (e) {}
     }
 
     return {
@@ -12676,12 +12880,11 @@ function updateSellingPriceForSpecificSizes() {
  * API CẬP NHẬT TRẠNG THÁI NGHỈ PHÉP / CHẤM CÔNG VÀ ĐỒNG BỘ PHẠT
  */
 function api_updateLeaveStatus(attendanceId, newStatus, penaltyAmount, note, pin) {
-  if (pin) {
-    var auth = validatePin(pin);
-    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
-    if (!checkServerPermission(auth, 'HR_EDIT_ATTENDANCE')) {
-      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Quản Lý Nhân Sự hoặc Tối Cao mới có quyền duyệt đơn nghỉ phép!' };
-    }
+  if (!pin) return { success: false, error: 'AUTH_REQUIRED', message: 'Yêu cầu mã PIN để duyệt đơn nghỉ phép!' };
+  var auth = validatePin(pin);
+  if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+  if (!checkServerPermission(auth, 'HR_EDIT_ATTENDANCE')) {
+    return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Quản Lý Nhân Sự hoặc Tối Cao mới có quyền duyệt đơn nghỉ phép!' };
   }
   var lock = LockService.getScriptLock();
   try {
@@ -12779,12 +12982,11 @@ function api_updateLeaveStatus(attendanceId, newStatus, penaltyAmount, note, pin
  */
 function api_giftXuToAllStaff(payload, pin) {
   var pinToAuth = pin || (payload && payload.pin);
-  if (pinToAuth) {
-    var auth = validatePin(pinToAuth);
-    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
-    if (!checkServerPermission(auth, 'HR_CONFIG_STAFF')) {
-      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới có quyền tặng Xu toàn bộ nhân viên!' };
-    }
+  if (!pinToAuth) return { success: false, error: 'AUTH_REQUIRED', message: 'Yêu cầu mã PIN để thực hiện thao tác!' };
+  var auth = validatePin(pinToAuth);
+  if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+  if (!checkServerPermission(auth, 'HR_CONFIG_STAFF')) {
+    return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới có quyền tặng Xu toàn bộ nhân viên!' };
   }
   var lock = LockService.getScriptLock();
   try {
@@ -12848,12 +13050,11 @@ function api_giftXuToAllStaff(payload, pin) {
  * =========================================================================
  */
 function api_migrateXuFromBonusPenaltyToThongKeTichLuyXu(pin) {
-  if (pin) {
-    var auth = validatePin(pin);
-    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
-    if (!checkServerPermission(auth, 'HR_CONFIG_STAFF')) {
-      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới có quyền di dời dữ liệu Xu!' };
-    }
+  if (!pin) return { success: false, error: 'AUTH_REQUIRED', message: 'Yêu cầu mã PIN để thực hiện thao tác!' };
+  var auth = validatePin(pin);
+  if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+  if (!checkServerPermission(auth, 'HR_CONFIG_STAFF')) {
+    return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới có quyền di dời dữ liệu Xu!' };
   }
   var lock = LockService.getScriptLock();
   try {
@@ -12970,12 +13171,11 @@ function api_migrateXuFromBonusPenaltyToThongKeTichLuyXu(pin) {
  * =========================================================================
  */
 function api_repairAndRestoreTasksFromXuSheet(pin) {
-  if (pin) {
-    var auth = validatePin(pin);
-    if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
-    if (!checkServerPermission(auth, 'HR_CONFIG_STAFF')) {
-      return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới có quyền phục hồi nhiệm vụ!' };
-    }
+  if (!pin) return { success: false, error: 'AUTH_REQUIRED', message: 'Yêu cầu mã PIN để thực hiện thao tác!' };
+  var auth = validatePin(pin);
+  if (!auth || !auth.valid) return { success: false, error: 'AUTH_FAILED', message: 'Mã PIN không hợp lệ!' };
+  if (!checkServerPermission(auth, 'HR_CONFIG_STAFF')) {
+    return { success: false, error: 'PERMISSION_DENIED', message: 'Từ chối quyền: Chỉ Boss Tối Cao mới có quyền phục hồi nhiệm vụ!' };
   }
   var lock = LockService.getScriptLock();
   try {
@@ -13593,6 +13793,91 @@ function api_toggleOrderUrgent(orderId, isUrgent, pin) {
     };
   } catch (err) {
     return { success: false, message: 'Lỗi bật/tắt hỏa tốc: ' + err.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// =========================================================================
+// 🤖 HÀM TIẾP NHẬN KẾT QUẢ AI KCS THẨM ĐỊNH TỰ ĐỘNG TỪ CLIENT-SIDE
+// =========================================================================
+/**
+ * Cập nhật kết quả thẩm định ảnh từ AI KCS Inspector vào bảng Production
+ * @param {string} productionId - ID lệnh sản xuất
+ * @param {Object} updatePayload - Dữ liệu cập nhật {qc_status, qc_note, p1_status, p2_status, status}
+ * @returns {Object} {success, message}
+ */
+function api_applyAiQcResult(productionId, updatePayload) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Production');
+    if (!sheet) return { success: false, message: "Không tìm thấy sheet Production" };
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return { success: false, message: "Bảng Production trống" };
+
+    var headers = data[0];
+    var colId = headers.indexOf('id');
+    var colQcStatus = headers.indexOf('qc_status');
+    var colQcNote = headers.indexOf('qc_note');
+    var colP1Status = headers.indexOf('p1_status');
+    var colP2Status = headers.indexOf('p2_status');
+    var colStatus = headers.indexOf('status');
+
+    if (colId === -1 || colQcStatus === -1) {
+      return { success: false, message: "Thiếu cột id hoặc qc_status trong Schema Production!" };
+    }
+
+    for (var r = 1; r < data.length; r++) {
+      if (String(data[r][colId]).trim() === String(productionId).trim()) {
+        var rowIdx = r + 1;
+        if (updatePayload.qc_status && colQcStatus !== -1) {
+          sheet.getRange(rowIdx, colQcStatus + 1).setValue(updatePayload.qc_status);
+        }
+        if (updatePayload.qc_note && colQcNote !== -1) {
+          sheet.getRange(rowIdx, colQcNote + 1).setValue(updatePayload.qc_note);
+        }
+        if (updatePayload.p1_status && colP1Status !== -1) {
+          sheet.getRange(rowIdx, colP1Status + 1).setValue(updatePayload.p1_status);
+        }
+        if (updatePayload.p2_status && colP2Status !== -1) {
+          sheet.getRange(rowIdx, colP2Status + 1).setValue(updatePayload.p2_status);
+        }
+        if (updatePayload.status && colStatus !== -1) {
+          sheet.getRange(rowIdx, colStatus + 1).setValue(updatePayload.status);
+        }
+
+        // Tự động ghi nhận log vào Tracking_Log
+        try {
+          var logSheet = ss.getSheetByName('Tracking_Log');
+          if (logSheet) {
+            var nowStr = Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd HH:mm:ss");
+            logSheet.appendRow([
+              nowStr,
+              'AI KCS Inspector',
+              'Thẩm định ' + (updatePayload.qc_status || 'Xong') + ' cho lệnh #' + productionId,
+              'Gemini 3.6 Flash',
+              updatePayload.qc_note || ''
+            ]);
+          }
+        } catch (logErr) {
+          console.warn("Lỗi ghi log KCS: ", logErr);
+        }
+
+        return { 
+          success: true, 
+          productionId: productionId,
+          qc_status: updatePayload.qc_status,
+          message: "Đã cập nhật kết quả AI KCS thành công!" 
+        };
+      }
+    }
+    return { success: false, message: "Không tìm thấy lệnh sản xuất ID: " + productionId };
+  } catch (err) {
+    Logger.log("Lỗi api_applyAiQcResult: " + err.toString());
+    return { success: false, message: "Lỗi hệ thống: " + err.toString() };
   } finally {
     lock.releaseLock();
   }

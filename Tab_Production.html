@@ -1773,7 +1773,7 @@
                 .trim();
         };
 
-        let isLocked = c.req.some(rk => ((item.phases || {})[rk] || {}).status !== 'Done') || item.qc_status === 'Yêu cầu làm lại';
+        let isLocked = c.req.some(rk => ((item.phases || {})[rk] || {}).status !== 'Done') || item.qc_status === 'Yêu cầu làm lại' || item.qc_status === 'Need_Repair';
 
         const isOwner = !data.user || String(data.user).trim() === '' || isStaffMatch(data.user, currentUser);
         const isPending = data.status !== 'In Progress' && data.status !== 'Done';
@@ -1980,10 +1980,14 @@
 
             const p1 = upd.phases['phase1']?.status || 'Pending';
             const p2 = upd.phases['phase2']?.status || 'Pending';
-            const isAllDone = (p1 === 'Done' && p2 === 'Done');
+            const isAllDone = isTwoPhaseProduct ? (p1 === 'Done' && p2 === 'Done') : (p1 === 'Done');
             if (!isAllDone && upd.status === 'Pending') upd.status = 'In Progress';
             if (isAllDone) {
-                upd.status = 'Kiểm Định';
+                upd.status = 'Done';
+                upd.qc_status = 'Đã duyệt';
+                if (order && order.id) {
+                    checkAndToggleOrderReadiness(order, prodItems, erpProducts);
+                }
             }
 
             // GHI NHẬN HỘP ĐEN CỤC BỘ (BLACKBOX LOG) TRÊN MÁY THỢ
@@ -2043,6 +2047,47 @@
                 const safeDateFull = typeof getLocalISODate === 'function' ? getLocalISODate() : new Date().toISOString();
                 const currentDateTime = safeDateFull.slice(0, 16).replace('T', ' ');
 
+                // 🤖 GỌI THẨM ĐỊNH AI KCS TỰ ĐỘNG (NẾU MÁY TRẠM SERVER ĐANG BẬT)
+                let aiKcsResult = null;
+                try {
+                    const kcsPayload = {
+                        orderId: String(item.id || ''),
+                        orderCode: String(item.orderId ? ('#' + item.orderId) : ('PROD_' + item.id)),
+                        productName: String(item.name || 'Bể kính / Layout'),
+                        size: String(item.size || 'Tiêu chuẩn'),
+                        phase: String(c.n || (c.k === 'phase1' ? 'Phase 1' : 'Phase 2')),
+                        specs: String(item.note || 'Đúng quy cách, keo sạch không bọt khí, đúng góc 90 độ'),
+                        photoUrl: url,
+                        worker: String(currentUser || '')
+                    };
+                    const kcsBaseUrl = (typeof window !== 'undefined' && (window.RF_AI_SERVICE_URL || (window.localStorage && window.localStorage.getItem('rf_ai_service_url')))) || ('http' + '://' + '127.0.0.1:8000');
+                    const kcsApiKey = (typeof window !== 'undefined' && (window.RF_AI_API_KEY || (window.localStorage && window.localStorage.getItem('rf_ai_api_key')))) || 'rf-kcs-internal-2026';
+                    const kcsResp = await fetch((kcsBaseUrl + '/api/inspect'), {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-RF-API-KEY': kcsApiKey
+                        },
+                        body: JSON.stringify(kcsPayload)
+                    });
+                    if (kcsResp.ok) {
+                        aiKcsResult = await kcsResp.json();
+                    }
+                } catch (kcsErr) {
+                    console.warn('Máy trạm AI KCS ngoại tuyến hoặc lỗi kết nối. Chuyển sang duyệt thủ công:', kcsErr);
+                }
+
+                const mapAiQcStatusToErp = (aiStatus, passedKpi) => {
+                    const s = String(aiStatus || '').trim().toLowerCase();
+                    if (s === 'pass' || s === 'passed' || s === 'đã duyệt' || s === 'đạt' || passedKpi === true) {
+                        return 'Đã duyệt';
+                    }
+                    if (s === 'need_repair' || s === 'failed' || s === 'yêu cầu làm lại' || s === 'từ chối' || passedKpi === false) {
+                        return 'Yêu cầu làm lại';
+                    }
+                    return aiStatus || 'Khung đã nộp';
+                };
+
                 const upd = JSON.parse(JSON.stringify(item));
                 if (customMaterialData) {
                     upd.materialUsageData = customMaterialData;
@@ -2059,9 +2104,26 @@
                         endTime: currentDateTime,
                         photo: url
                     };
-                    upd.qc_status = 'Khung đã nộp';
+                    upd.qc_status = (aiKcsResult && (aiKcsResult.erp_qc_status || (aiKcsResult.inspection && mapAiQcStatusToErp(aiKcsResult.inspection.qc_status, aiKcsResult.inspection.passed_kpi)))) || 'Khung đã nộp';
+                    upd.qc_note = (aiKcsResult && aiKcsResult.inspection)
+                        ? `[AI-KCS ${aiKcsResult.inspection.confidence_score || 0}%]: ${aiKcsResult.inspection.kcs_note || ''}`
+                        : (upd.qc_note || '');
                     upd.qc_front_photo = url;
                     upd.status = 'In Progress';
+
+                    if (aiKcsResult && aiKcsResult.inspection && !aiKcsResult.inspection.passed_kpi) {
+                        if (typeof window.triggerRealtimeWarRoom === 'function') {
+                            window.triggerRealtimeWarRoom(`Khâu 1 của sản phẩm "${item.name}" vừa bị AI KCS từ chối: "${aiKcsResult.inspection.kcs_note || 'Chưa đạt chuẩn'}". Ban Điều Hành hãy cho hướng giải quyết?`);
+                        }
+                        if (typeof window.openWorkshopAssistant === 'function') {
+                            window.openWorkshopAssistant({
+                                message: `Khâu 1 của sản phẩm "${item.name}" vừa bị AI KCS báo lỗi: "${aiKcsResult.inspection.kcs_note || ''}". Hướng dẫn tôi cách xử lý khắc phục?`,
+                                phase: 'Khâu 1',
+                                product: item.name || '',
+                                defect: aiKcsResult.inspection.kcs_note || ''
+                            });
+                        }
+                    }
                 } else {
                     upd.phases[c.k] = {
                         ...upd.phases[c.k],
@@ -2072,6 +2134,28 @@
                         endTime: currentDateTime,
                         photo: url
                     };
+
+                    if (aiKcsResult && aiKcsResult.inspection) {
+                        const insp = aiKcsResult.inspection;
+                        upd.qc_status = aiKcsResult.erp_qc_status || mapAiQcStatusToErp(insp.qc_status, insp.passed_kpi);
+                        upd.qc_note = `[AI-KCS ${insp.confidence_score || 0}%]: ${insp.kcs_note || ''}`;
+                        if (insp.passed_kpi) {
+                            triggerToast(`✅ AI KCS: Đạt chuẩn (${insp.confidence_score}%)! Đã duyệt tự động.`, 'fa-shield-alt', 'success');
+                        } else {
+                            triggerToast(`⚠️ AI KCS TỪ CHỐI: ${insp.kcs_note || 'Chưa đạt chuẩn'}`, 'fa-exclamation-triangle', 'warning');
+                            if (typeof window.triggerRealtimeWarRoom === 'function') {
+                                window.triggerRealtimeWarRoom(`Sản phẩm "${item.name}" bị AI KCS từ chối (${insp.qc_status || 'Need_Repair'}): "${insp.kcs_note || 'Chưa đạt chuẩn'}". Ban Điều Hành chỉ đạo xử lý khẩn cấp!`);
+                            }
+                            if (typeof window.openWorkshopAssistant === 'function') {
+                                window.openWorkshopAssistant({
+                                    message: `Sản phẩm "${item.name}" vừa bị AI KCS đánh giá Chưa Đạt (${insp.qc_status || 'Need_Repair'}): "${insp.kcs_note || ''}". Hãy chỉ dẫn tôi cách khắc phục chi tiết?`,
+                                    phase: c.n || 'Khâu sản xuất',
+                                    product: item.name || '',
+                                    defect: insp.kcs_note || ''
+                                });
+                            }
+                        }
+                    }
 
                     // BỂ KÍNH: TỰ ĐỘNG SINH MÃ SERIAL 4 SỐ GÓC ĐÁY BỂ KHI THỢ GỌT KEO (KHÂU 2) HOÀN THÀNH
                     if (isGlassProduct && (c.k === 'phase2' || configs.length === 1)) {
@@ -2138,10 +2222,14 @@
 
                 const p1 = upd.phases['phase1']?.status || 'Pending';
                 const p2 = upd.phases['phase2']?.status || 'Pending';
-                const isAllDone = (p1 === 'Done' && p2 === 'Done');
+                const isAllDone = isTwoPhaseProduct ? (p1 === 'Done' && p2 === 'Done') : (p1 === 'Done');
                 if (!isAllDone && upd.status === 'Pending') upd.status = 'In Progress';
                 if (isAllDone) {
-                    upd.status = 'Kiểm Định';
+                    upd.status = 'Done';
+                    upd.qc_status = 'Đã duyệt';
+                    if (order && order.id) {
+                        checkAndToggleOrderReadiness(order, prodItems, erpProducts);
+                    }
                 }
 
                 // TỰ ĐỘNG GỌI TRỪ VẬT TƯ BOM KÈM DỮ LIỆU QUYẾT TOÁN THỰC TẾ (CHỈ KHI ĐỦ CẢ 2 KHÂU DONE)
@@ -3573,7 +3661,7 @@
         const p1Status = _item.phases?.phase1?.status || 'Pending';
         const p2Status = _item.phases?.phase2?.status || 'Pending';
         const isAnyInProgress = p1Status === 'In Progress' || p2Status === 'In Progress';
-        const isPhase2Pending = p1Status === 'Done' && p2Status === 'Pending' && _item.status !== 'Done' && _item.status !== 'Đã Huỷ' && _item.qc_status !== 'Yêu cầu làm lại';
+        const isPhase2Pending = p1Status === 'Done' && p2Status === 'Pending' && _item.status !== 'Done' && _item.status !== 'Đã Huỷ' && _item.qc_status !== 'Yêu cầu làm lại' && _item.qc_status !== 'Need_Repair';
         const isReadyForInspection = _item.status === 'Kiểm Định' || (p1Status === 'Done' && p2Status === 'Done' && _item.status !== 'Done' && _item.status !== 'Đã Huỷ');
 
         const isBothDone = (p1Status === 'Done' && p2Status === 'Done');
@@ -4187,6 +4275,35 @@
                                                     <option key={c.k} value={c.k}>{c.n} (Thợ: {_item.phases?.[c.k]?.user || 'Chưa có'})</option>
                                                 ))}
                                             </select>
+                                            <div className="flex flex-wrap gap-1.5 mb-2">
+                                                {['Sai bố cục / Tỷ lệ', 'Rễ đơ / Sai hướng', 'Ghép đá lộ mí', 'Không giống mẫu', 'Form chưa bay', 'Làm quá ẩu'].map(r => (
+                                                    <button
+                                                        key={r}
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            setReworkReason(prev => {
+                                                                let parts = prev ? prev.split(',').map(s => s.trim()).filter(Boolean) : [];
+                                                                if (parts.includes(r)) parts = parts.filter(p => p !== r);
+                                                                else parts.push(r);
+                                                                return parts.join(', ');
+                                                            });
+                                                            if (!reworkPhase) {
+                                                                setReworkPhase(configs[configs.length - 1]?.k || 'phase2');
+                                                            }
+                                                        }}
+                                                        className={`px-2.5 py-1 rounded-full text-[9px] font-black border transition-all flex items-center gap-1 cursor-pointer active:scale-95 ${
+                                                            (reworkReason || '').includes(r)
+                                                                ? 'bg-rose-600 text-white border-rose-500 shadow-sm'
+                                                                : 'bg-[#18181b] border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-white'
+                                                        }`}
+                                                    >
+                                                        <i className={`fas ${(reworkReason || '').includes(r) ? 'fa-check text-white' : 'fa-circle text-zinc-600 text-[6px]'}`}></i>
+                                                        <span>{r}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
                                             <textarea
                                                 value={reworkReason}
                                                 onChange={e => setReworkReason(e.target.value)}

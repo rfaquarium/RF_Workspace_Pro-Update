@@ -14,20 +14,48 @@
  * ==============================================================================
  */
 
+const SHOPEE_CANONICAL_EXCHANGE_RATES = {
+  'PHP': 440,    // Philippines Peso
+  'PH': 440,
+  'MYR': 5600,   // Malaysia Ringgit (chuẩn hóa thống nhất 5600)
+  'MY': 5600,
+  'THB': 710,    // Thai Baht (chuẩn hóa thống nhất 710)
+  'TH': 710,
+  'SGD': 18800,  // Singapore Dollar (chuẩn hóa thống nhất 18800)
+  'SG': 18800,
+  'IDR': 1.6,    // Indonesian Rupiah
+  'BRL': 4500,   // Brazilian Real
+  'BR': 4500,
+  'TWD': 800,    // New Taiwan Dollar
+  'TW': 800,
+  'USD': 25400,  // US Dollar (chuẩn hóa thống nhất 25400)
+  'VND': 1
+};
+
+function getShopeeExchangeRate(currency) {
+  if (!currency) return 1;
+  const key = String(currency).trim().toUpperCase();
+  try {
+    const props = (typeof PropertiesService !== 'undefined' && PropertiesService.getScriptProperties) ? PropertiesService.getScriptProperties() : null;
+    if (props) {
+      const dynamicConfig = props.getProperty('SHOPEE_EXCHANGE_RATES');
+      if (dynamicConfig) {
+        const parsed = JSON.parse(dynamicConfig);
+        if (parsed && parsed[key]) return Number(parsed[key]);
+      }
+    }
+  } catch (e) {
+    // fallback
+  }
+  return SHOPEE_CANONICAL_EXCHANGE_RATES[key] || 1;
+}
+
 const ShopeeSyncEngine = {
   /**
-   * Bảng tỷ giá chuẩn quy đổi ngoại tệ sàn TMĐT sang VNĐ
+   * Bảng tỷ giá chuẩn quy đổi ngoại tệ sàn TMĐT sang VNĐ (nguồn chuẩn hóa duy nhất)
    */
-  EXCHANGE_RATES: {
-    'PHP': 440,    // Philippines Peso
-    'MYR': 5500,   // Malaysia Ringgit
-    'THB': 700,    // Thai Baht
-    'SGD': 18500,  // Singapore Dollar
-    'IDR': 1.6,    // Indonesian Rupiah
-    'BRL': 4500,   // Brazilian Real
-    'USD': 25000,  // US Dollar
-    'VND': 1
-  },
+  EXCHANGE_RATES: SHOPEE_CANONICAL_EXCHANGE_RATES,
+  getExchangeRate: getShopeeExchangeRate,
 
   /**
    * Quét và nạp toàn bộ đơn hàng mới từ Shopee Open Platform qua API v2
@@ -104,7 +132,7 @@ const ShopeeSyncEngine = {
         orders.forEach(rawOrder => {
           const orderSn = rawOrder.order_sn;
           const currency = (rawOrder.currency || 'VND').toUpperCase();
-          const rate = this.EXCHANGE_RATES[currency] || 1;
+          const rate = getShopeeExchangeRate(currency);
           const totalRaw = Number(rawOrder.total_amount) || 0;
           const status = (rawOrder.order_status || '').toString().trim().toUpperCase();
           const nowStr = Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd HH:mm:ss');
@@ -133,6 +161,8 @@ const ShopeeSyncEngine = {
             const isAlreadyDeducted = existingOrder.inventory_deducted === true || String(existingOrder.inventory_deducted).toUpperCase() === 'TRUE';
             const updatePayload = {
               order_status: status,
+              exchange_rate: rate,
+              total_amount_vnd: Math.round(totalRaw * rate),
               updated_at: nowStr
             };
             if (status === 'READY_TO_SHIP' && !existingOrder.ready_to_ship_time) {
@@ -153,13 +183,16 @@ const ShopeeSyncEngine = {
               const existingItem = ShopeeDbService.findWhere('DB_ORDER_ITEMS', 'item_row_id', rowId);
 
               if (!existingItem) {
+                const itemUnitPrice = Number(item.model_discounted_price || item.unit_price || 0);
                 ShopeeDbService.insert('DB_ORDER_ITEMS', {
                   item_row_id: rowId,
                   order_sn: orderSn,
                   sku: sku,
                   product_name: pName,
                   quantity: Number(item.model_quantity_purchased || item.quantity || 1),
-                  unit_price_origin: Number(item.model_discounted_price || item.unit_price || 0),
+                  unit_price_origin: itemUnitPrice,
+                  exchange_rate: rate,
+                  unit_price_vnd: Math.round(itemUnitPrice * rate),
                   item_status: status === 'READY_TO_SHIP' ? 'DEDUCTED' : 'PENDING',
                   inventory_note: 'Đồng bộ tự động qua Shopee API v2'
                 });

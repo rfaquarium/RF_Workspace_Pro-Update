@@ -4,5 +4,14 @@
         "**/.git": true,
         "**/.tmp.driveupload": true,
         "**/scratch": false
-    }
+    },
+    "python.defaultInterpreterPath": "C:\\Users\\ADMIN\\RF_Workspace_Pro\\venv\\Scripts\\python.exe",
+    "python.pythonPath": "${workspaceFolder}/venv/Scripts/python.exe",
+    "python.venvPath": "${workspaceFolder}",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/venv/Lib/site-packages"
+    ],
+    "python.autoComplete.extraPaths": [
+        "${workspaceFolder}/venv/Lib/site-packages"
+    ]
 }

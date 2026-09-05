@@ -755,7 +755,7 @@ const modalsOrdersContent = fs.readFileSync(modalsOrdersPath, 'utf8');
 
 // 15.1 Version Sync Checks
 assert('App_Main.html: Contains Royal v2.43.0 in RELEASES', appMainContent.includes("version: 'Royal v2.43.0'"));
-assert('App_Main.html: Sidebar badge displays v2.43.0', appMainContent.includes('>v2.43.0</span>'));
+assert('App_Main.html: Sidebar badge displays version >= v2.43.0', />v2\.(4[3-9]|\d{2,})\.\d+<\/span>/.test(appMainContent));
 assert('CHANGELOG.md: Documents v2.43.0 release notes', changelogContent.includes('## [v2.43.0] - 2026-09-05'));
 assert('Modals_Orders.html: Configures MAX_CONCURRENT_PACKINGS = 6', modalsOrdersContent.includes('MAX_CONCURRENT_PACKINGS = 6'));
 assert('Modals_Orders.html: Old single-order find blocker is removed', !modalsOrdersContent.includes("const activePacking = (erpData?.Packings || []).find(p => p.user === currentUser && p.status === 'Packing');"));
@@ -821,6 +821,365 @@ testPackings[packIndexToDone].status = 'Done'; // Hương finished packing ORD_0
 
 const resAfterDone = simulateStartPacking(huongUser, { id: 'ORD_007', orderCode: 'CODE_007' }, testPackings);
 assert('Concurrency: Auto-release slot - Diệu Hương can start ORD_007 after completing ORD_002', resAfterDone.success === true && resAfterDone.count === 6);
+
+// 16. TEST ROYAL V2.43.1 PRODUCTION AUTO-PASS & 1-TOUCH REJECT REASONS
+console.log('\n--- 16. Testing Royal v2.43.1 Auto-Pass Production & 1-Touch Reasons ---');
+const modalsPath = path.join(__dirname, 'Modals.html');
+const modalsContent = fs.readFileSync(modalsPath, 'utf8');
+const prodPath = path.join(__dirname, 'Tab_Production.html');
+const prodContent = fs.readFileSync(prodPath, 'utf8');
+
+// 16.1 Version Sync Checks
+assert('App_Main.html: Contains Royal v2.43.1 in RELEASES', fs.readFileSync(appMainPath, 'utf8').includes("version: 'Royal v2.43.1'"));
+assert('App_Main.html: Sidebar badge displays version >= v2.43.1', />v2\.(4[3-9]|\d{2,})\.\d+<\/span>/.test(fs.readFileSync(appMainPath, 'utf8')));
+assert('CHANGELOG.md: Documents v2.43.1 release notes', fs.readFileSync(changelogPath, 'utf8').includes('## [v2.43.1] - 2026-09-05'));
+assert('Modals.html: ImageAnnotationModal has check-circle icon', modalsContent.includes('fa-check-circle text-white'));
+assert('Tab_Production.html: showReworkForm has quick reasons chips', prodContent.includes("['Sai bố cục / Tỷ lệ', 'Rễ đơ / Sai hướng'"));
+assert('Tab_Production.html: Eliminates upd.status = Kiểm Định in phase finish', !prodContent.includes("upd.status = 'Kiểm Định';"));
+
+// 16.2 Functional Test: Production Auto-Pass to Done & Ready
+function simulatePhaseCompletion(prodItem, order, completedPhaseKey) {
+    const upd = JSON.parse(JSON.stringify(prodItem));
+    upd.phases[completedPhaseKey].status = 'Done';
+
+    const p1 = upd.phases['phase1']?.status || 'Pending';
+    const p2 = upd.phases['phase2']?.status || 'Pending';
+    const isAllDone = (p1 === 'Done' && p2 === 'Done');
+
+    let orderStatus = order.status;
+    if (isAllDone) {
+        upd.status = 'Done';
+        upd.qc_status = 'Đã duyệt';
+        orderStatus = 'Sẵn Sàng Đóng Gói';
+    } else {
+        upd.status = 'In Progress';
+    }
+
+    return { upd, orderStatus };
+}
+
+const mockOrder = { id: 'ORD_999', orderCode: 'ORD_999', status: 'Chờ Sản Xuất' };
+const mockProd = {
+    id: 'PRD_999',
+    name: 'Layout Nature 40x23x25',
+    status: 'In Progress',
+    phases: {
+        phase1: { status: 'Done', user: 'Nguyễn Văn Tiến' },
+        phase2: { status: 'In Progress', user: 'Huỳnh Đức Tâm' }
+    }
+};
+
+// When Phase 2 completes, product must be Done and Order must be Sẵn Sàng Đóng Gói
+const resAutoPass = simulatePhaseCompletion(mockProd, mockOrder, 'phase2');
+assert('Auto-Pass: Completed product status is Done', resAutoPass.upd.status === 'Done');
+assert('Auto-Pass: Completed product qc_status is Đã duyệt', resAutoPass.upd.qc_status === 'Đã duyệt');
+assert('Auto-Pass: Linked order moves to Sẵn Sàng Đóng Gói directly', resAutoPass.orderStatus === 'Sẵn Sàng Đóng Gói');
+
+// 16.3 Functional Test: 1-Touch Quick Reasons Selection & Textarea Sync
+function simulateToggleReason(reason, currentNotes, currentText) {
+    const isSelected = currentNotes.includes(reason);
+    let nextNotes = isSelected ? currentNotes.filter(r => r !== reason) : [...currentNotes, reason];
+    let parts = currentText ? currentText.split(',').map(s => s.trim()).filter(Boolean) : [];
+    if (isSelected) {
+        parts = parts.filter(p => p !== reason);
+    } else {
+        if (!parts.includes(reason)) parts.push(reason);
+    }
+    return { nextNotes, nextText: parts.join(', ') };
+}
+
+let notes = [];
+let text = '';
+
+// Step 1: Select "Sai bố cục / Tỷ lệ"
+let step1 = simulateToggleReason('Sai bố cục / Tỷ lệ', notes, text);
+assert('Quick Reasons: Selecting reason adds to notes array', step1.nextNotes.includes('Sai bố cục / Tỷ lệ'));
+assert('Quick Reasons: Selecting reason auto-fills textarea text', step1.nextText === 'Sai bố cục / Tỷ lệ');
+
+// Step 2: Select "Form chưa bay"
+let step2 = simulateToggleReason('Form chưa bay', step1.nextNotes, step1.nextText);
+assert('Quick Reasons: Adding 2nd reason joins with comma', step2.nextText === 'Sai bố cục / Tỷ lệ, Form chưa bay');
+assert('Quick Reasons: Notes array contains both reasons', step2.nextNotes.length === 2);
+
+// Step 3: Deselect "Sai bố cục / Tỷ lệ"
+let step3 = simulateToggleReason('Sai bố cục / Tỷ lệ', step2.nextNotes, step2.nextText);
+assert('Quick Reasons: Deselecting removes from notes array', step3.nextNotes.length === 1 && step3.nextNotes[0] === 'Form chưa bay');
+assert('Quick Reasons: Deselecting removes from textarea text', step3.nextText === 'Form chưa bay');
+
+// 17. TEST ROYAL V2.43.2 CONTINUOUS MULTI-ORDER PACKING & ZOMBIE PACKINGS FILTER
+console.log('\n--- 17. Testing Royal v2.43.2 Continuous Multi-Order Packing Flow ---');
+
+// 17.1 Version & Syntax Integrity Checks
+assert('App_Main.html: Contains Royal v2.43.2 in RELEASES', fs.readFileSync(appMainPath, 'utf8').includes("version: 'Royal v2.43.2'"));
+assert('App_Main.html: Sidebar badge displays version >= v2.43.2', />v2\.(4[3-9]|\d{2,})\.\d+<\/span>/.test(fs.readFileSync(appMainPath, 'utf8')));
+assert('CHANGELOG.md: Documents v2.43.2 release notes', fs.readFileSync(changelogPath, 'utf8').includes('## [v2.43.2] - 2026-09-05'));
+const v2432ModalsOrders = fs.readFileSync(modalsOrdersPath, 'utf8');
+assert('Modals_Orders.html: Implements isUserMatch helper for resilient name matching', v2432ModalsOrders.includes('const isUserMatch = React.useCallback('));
+assert('Modals_Orders.html: Implements isOrderFinished filter against zombie packings', v2432ModalsOrders.includes('isOrderFinished'));
+assert('Modals_Orders.html: Renders ĐANG GÓI 6/6 tactile pill when limit reached', v2432ModalsOrders.includes("'ĐANG GÓI 6/6'"));
+assert('Modals_Orders.html: OrderCardV2 has Đang đóng badge in header', v2432ModalsOrders.includes('Đang đóng'));
+const currentTabOrders = fs.readFileSync(path.join(__dirname, 'Tab_Orders.html'), 'utf8');
+assert('Tab_Orders.html: Tra cứu latestPackMap hỗ trợ khoá kép id và orderCode', currentTabOrders.includes('latestPackMap[oIdStr]'));
+
+// 17.2 Logic Simulation: Continuous Multi-Order Packing & Out-of-Order Completion
+function simulateIsUserMatch(userA, userB) {
+    if (!userA || !userB) return false;
+    const a = String(userA).trim().toLowerCase();
+    const b = String(userB).trim().toLowerCase();
+    if (a === b) return true;
+    const aParts = a.split(/\s+/);
+    const bParts = b.split(/\s+/);
+    const aLast = aParts[aParts.length - 1];
+    const bLast = bParts[bParts.length - 1];
+    return a.includes(b) || b.includes(a) || (aLast && aLast.length > 1 && aLast === bLast);
+}
+
+assert('isUserMatch: Matches Diệu Hương with Nguyễn Thị Diệu Hương', simulateIsUserMatch('Diệu Hương', 'Nguyễn Thị Diệu Hương'));
+assert('isUserMatch: Matches Dương with Nguyễn Hoàng Dương', simulateIsUserMatch('Dương', 'Nguyễn Hoàng Dương'));
+assert('isUserMatch: Distinguishes between Hương and Dương', !simulateIsUserMatch('Diệu Hương', 'Nguyễn Hoàng Dương'));
+
+// Simulate Zombie Filter
+const mockOrdersDatabase = [
+    { id: 'ORD_OLD_1', orderCode: 'OLD_001', status: 'Đã Bàn Giao' },
+    { id: 'ORD_OLD_2', orderCode: 'OLD_002', status: 'Đơn Huỷ' },
+    { id: 'ORD_ACTIVE_1', orderCode: 'ACT_001', status: 'Sẵn Sàng Đóng Gói' },
+    { id: 'ORD_ACTIVE_2', orderCode: 'ACT_002', status: 'Sẵn Sàng Đóng Gói' },
+    { id: 'ORD_ACTIVE_3', orderCode: 'ACT_003', status: 'Sẵn Sàng Đóng Gói' },
+    { id: 'ORD_ACTIVE_4', orderCode: 'ACT_004', status: 'Sẵn Sàng Đóng Gói' }
+];
+
+const mockPackingsWithZombies = [
+    { id: 'PK_OLD_1', orderId: 'ORD_OLD_1', user: 'Diệu Hương', status: 'Packing' }, // Zombie (order already Đã Bàn Giao)
+    { id: 'PK_OLD_2', orderId: 'ORD_OLD_2', user: 'Nguyễn Thị Diệu Hương', status: 'Packing' }, // Zombie (order already Đơn Huỷ)
+];
+
+function getActivePackingsClean(packingsList, allOrders, currentUser) {
+    const isOrderFinished = (ordId) => {
+        if (!ordId) return false;
+        const sId = String(ordId).trim().toLowerCase();
+        const matchedOrder = allOrders.find(o => {
+            const oId = String(o.id || '').trim().toLowerCase();
+            const oCode = String(o.orderCode || '').trim().toLowerCase();
+            return oId === sId || oCode === sId || oCode.includes(sId);
+        });
+        if (!matchedOrder) return false;
+        const st = String(matchedOrder.status || matchedOrder._effectiveStatus || '').toUpperCase().trim();
+        return st === 'ĐÃ BÀN GIAO' || st === 'HOÀN THÀNH' || st === 'ĐỐI SOÁT THÀNH CÔNG' || st === 'ĐƠN HUỶ' || st.includes('HUỶ') || st === 'HÀNG HOÀN';
+    };
+
+    return packingsList.filter(p => {
+        if (p.status !== 'Packing') return false;
+        if (!simulateIsUserMatch(p.user, currentUser)) return false;
+        if (isOrderFinished(p.orderId)) return false;
+        return true;
+    });
+}
+
+// Check that zombie packings are cleanly ignored
+const filteredInitial = getActivePackingsClean(mockPackingsWithZombies, mockOrdersDatabase, 'Diệu Hương');
+assert('Zombie Filter: Ignores past packings of delivered/canceled orders (Active count is 0)', filteredInitial.length === 0);
+
+// Continuous Packing Simulation:
+let livePackings = [...mockPackingsWithZombies];
+
+// 1. Hương clicks "BẮT ĐẦU" on Order 1 -> Photo taken -> Order 1 enters Packing
+livePackings.push({ id: 'PK_LIVE_1', orderId: 'ORD_ACTIVE_1', user: 'Nguyễn Thị Diệu Hương', status: 'Packing' });
+let activeCount1 = getActivePackingsClean(livePackings, mockOrdersDatabase, 'Diệu Hương').length;
+assert('Continuous Packing: Order 1 started without completing previous orders (Active: 1/6)', activeCount1 === 1);
+
+// 2. Hương clicks "BẮT ĐẦU" on Order 2 -> Photo taken -> Order 2 enters Packing
+livePackings.push({ id: 'PK_LIVE_2', orderId: 'ORD_ACTIVE_2', user: 'Diệu Hương', status: 'Packing' });
+let activeCount2 = getActivePackingsClean(livePackings, mockOrdersDatabase, 'Diệu Hương').length;
+assert('Continuous Packing: Order 2 started immediately while Order 1 is still Packing (Active: 2/6)', activeCount2 === 2);
+
+// 3. Hương clicks "BẮT ĐẦU" on Order 3 -> Photo taken -> Order 3 enters Packing
+livePackings.push({ id: 'PK_LIVE_3', orderId: 'ORD_ACTIVE_3', user: 'Nguyễn Thị Diệu Hương', status: 'Packing' });
+let activeCount3 = getActivePackingsClean(livePackings, mockOrdersDatabase, 'Diệu Hương').length;
+assert('Continuous Packing: Order 3 started immediately (Active: 3/6)', activeCount3 === 3);
+
+// 4. Check that Order 4 is still ready to start (isReadyPack && !isPacking)
+const order4HasPacking = livePackings.some(p => p.orderId === 'ORD_ACTIVE_4' && p.status === 'Packing');
+assert('Continuous Packing: Order 4 remains ready with BẮT ĐẦU button intact', order4HasPacking === false);
+
+// 5. Hương boxes Order 2 first and takes parcel photo -> Order 2 completed
+const pack2 = livePackings.find(p => p.orderId === 'ORD_ACTIVE_2');
+pack2.status = 'Done';
+const order2 = mockOrdersDatabase.find(o => o.id === 'ORD_ACTIVE_2');
+order2.status = 'Chờ Bàn Giao';
+
+let activeCountAfterDone2 = getActivePackingsClean(livePackings, mockOrdersDatabase, 'Diệu Hương').length;
+assert('Out-of-order Completion: Order 2 completed independently, active count drops to 2', activeCountAfterDone2 === 2);
+
+// 6. Verify Order 1 and Order 3 are still in Packing state
+const pack1 = livePackings.find(p => p.orderId === 'ORD_ACTIVE_1');
+const pack3 = livePackings.find(p => p.orderId === 'ORD_ACTIVE_3');
+assert('Out-of-order Completion: Order 1 is still in Packing state', pack1.status === 'Packing');
+assert('Out-of-order Completion: Order 3 is still in Packing state', pack3.status === 'Packing');
+
+// 7. Resilient Attendance Checkin matching & Admin Bypass
+const mockAttendanceList = [
+    { id: 'ATT_1', user: 'Nguyễn Thị Diệu Hương', timeIn: '08:00', timeOut: null },
+    { id: 'ATT_2', user: 'Nguyễn Hoàng Dương', timeIn: '08:05', timeOut: null }
+];
+
+const checkAttendancePermission = (attList, curUser, isBoss, isAdmin) => {
+    return isBoss || isAdmin || (attList || []).some(a =>
+        simulateIsUserMatch(a.user, curUser) && a.timeIn && !a.timeOut
+    );
+};
+
+assert('Attendance Checkin: Diệu Hương matches Nguyễn Thị Diệu Hương checkin', checkAttendancePermission(mockAttendanceList, 'Diệu Hương', false, false) === true);
+assert('Attendance Checkin: Hương matches Nguyễn Thị Diệu Hương checkin', checkAttendancePermission(mockAttendanceList, 'Hương', false, false) === true);
+assert('Attendance Checkin: Admin bypasses attendance checkin requirement', checkAttendancePermission([], 'Admin', false, true) === true);
+assert('Attendance Checkin: Boss bypasses attendance checkin requirement', checkAttendancePermission([], 'Rich Fish', true, false) === true);
+assert('Attendance Checkin: Unchecked staff without active checkin is rejected', checkAttendancePermission(mockAttendanceList, 'Trần Văn Chưa Vào Ca', false, false) === false);
+
+assert('Modals_Orders.html: OrderCardV2 receives orders array prop', v2432ModalsOrders.includes('filterStatus, orders'));
+assert('Modals_Orders.html: hasActiveCheckin uses isUserMatch & isBoss/isAdmin bypass', v2432ModalsOrders.includes('isBoss || isAdmin || (attendance || []).some'));
+assert('Tab_Orders.html: passes orders={orders} to RFOrderWrapper', currentTabOrders.includes('orders={orders}'));
+assert('Modals_Orders.html: chameleonConfig includes isMaxPackingReached in deps', v2432ModalsOrders.includes('getProducerOrigin, isMaxPackingReached'));
+
+// 18. TEST ROYAL V2.43.3 HALLMARK TOUCH ERGONOMICS & POKA-YOKE CONFIRMATION MODAL
+console.log('\n--- 18. Testing Royal v2.43.3 Touch Ergonomics & Poka-Yoke Confirmation ---');
+
+const appMainV2433 = fs.readFileSync(appMainPath, 'utf8');
+const changelogV2433 = fs.readFileSync(changelogPath, 'utf8');
+const modalsOrdersV2433 = fs.readFileSync(modalsOrdersPath, 'utf8');
+
+assert('App_Main.html: Contains Royal v2.43.3 in RELEASES', appMainV2433.includes("version: 'Royal v2.43.3'"));
+assert('App_Main.html: Sidebar badge displays version >= v2.43.3', />v2\.(4[3-9]|\d{2,})\.\d+<\/span>/.test(appMainV2433));
+assert('CHANGELOG.md: Documents v2.43.3 release notes', changelogV2433.includes('## [v2.43.3] - 2026-09-05'));
+
+assert('Modals_Orders.html: Implements actionBtnRef and showActionMenu state', modalsOrdersV2433.includes('actionBtnRef') && modalsOrdersV2433.includes('showActionMenu'));
+assert('Modals_Orders.html: Implements confirmAction state for Poka-Yoke protection', modalsOrdersV2433.includes('confirmAction'));
+assert('Modals_Orders.html: Quick action bar uses large ergonomic touch targets (w-7.5 h-7.5)', modalsOrdersV2433.includes('w-7.5 h-7.5 rounded-lg flex items-center justify-center'));
+assert('Modals_Orders.html: Action menu rendered via React Portal into document.body', modalsOrdersV2433.includes('showActionMenu && ReactDOM.createPortal'));
+assert('Modals_Orders.html: Action menu separates Vùng kiểm soát', modalsOrdersV2433.includes('Vùng kiểm soát'));
+assert('Modals_Orders.html: Poka-Yoke confirmation modal rendered via React Portal', modalsOrdersV2433.includes('confirmAction && ReactDOM.createPortal'));
+assert('Modals_Orders.html: Confirmation modal includes safe cancel button', modalsOrdersV2433.includes('Huỷ bỏ (Giữ lại đơn)'));
+
+// Simulation of 2-layer Poka-Yoke Return Guard:
+let pokaYokeTestOrder = { id: 'ORD_TEST_SAFE', orderCode: 'TEST_001', status: 'Sẵn Sàng Đóng Gói' };
+let modalState = null;
+
+function clickReturnInMenu(order) {
+    // Step 1: Click in menu DOES NOT change order status; it opens the confirmation modal
+    modalState = {
+        type: 'RETURN',
+        title: 'XÁC NHẬN CHUYỂN HÀNG HOÀN',
+        orderId: order.id
+    };
+}
+
+function cancelModal() {
+    // Step 2a: User cancels or clicks outside -> order stays untouched!
+    modalState = null;
+}
+
+function confirmModal(order) {
+    // Step 2b: User explicitly confirms -> order changes status!
+    if (modalState && modalState.type === 'RETURN' && modalState.orderId === order.id) {
+        order.status = 'Hàng Hoàn';
+        modalState = null;
+    }
+}
+
+// Test Layer 1: Misclick in menu
+clickReturnInMenu(pokaYokeTestOrder);
+assert('Poka-Yoke Layer 1: Clicking Return opens modal without changing order status', pokaYokeTestOrder.status === 'Sẵn Sàng Đóng Gói' && modalState !== null);
+
+// Test Layer 2: Accidental tap is cancelled
+cancelModal();
+assert('Poka-Yoke Layer 2: Cancelling modal preserves order in original status', pokaYokeTestOrder.status === 'Sẵn Sàng Đóng Gói' && modalState === null);
+
+// Test Layer 3: Deliberate confirmation executes transition
+clickReturnInMenu(pokaYokeTestOrder);
+confirmModal(pokaYokeTestOrder);
+assert('Poka-Yoke Layer 3: Explicit confirmation transitions order to Hàng Hoàn', pokaYokeTestOrder.status === 'Hàng Hoàn' && modalState === null);
+
+// 19. TEST ROYAL V2.44.0 RF WORKSHOP ASSISTANT (QUẢN ĐỐC ẢO XƯỞNG)
+console.log('\n--- 19. Testing Royal v2.44.0 RF Workshop Assistant (AI Quản Đốc Xưởng) ---');
+
+const appMainV2440 = fs.readFileSync(appMainPath, 'utf8');
+const changelogV2440 = fs.readFileSync(changelogPath, 'utf8');
+const componentsV2440 = fs.readFileSync(path.join(__dirname, 'Components.html'), 'utf8');
+const serverKcsV2440 = fs.readFileSync(path.join(__dirname, 'server_kcs.py'), 'utf8');
+const agentAssistantPath = path.join(__dirname, 'agent_assistant.py');
+const tabProdV2440 = fs.readFileSync(path.join(__dirname, 'Tab_Production.html'), 'utf8');
+
+assert('App_Main.html: Contains Royal v2.44.0 in RELEASES', appMainV2440.includes("version: 'Royal v2.44.0'"));
+assert('App_Main.html: Sidebar badge displays version >= v2.44.0', />v2\.(4[4-9]|\d{2,})\.\d+<\/span>/.test(appMainV2440));
+assert('CHANGELOG.md: Documents v2.44.0 release notes', changelogV2440.includes('## [v2.44.0] - 2026-09-05'));
+assert('agent_assistant.py: Exists and implements ask_assistant', fs.existsSync(agentAssistantPath));
+assert('server_kcs.py: Implements /api/assistant/chat endpoint', serverKcsV2440.includes('/api/assistant/chat'));
+assert('Components.html: Defines WorkshopAssistantWidget', componentsV2440.includes('WorkshopAssistantWidget'));
+assert('App_Main.html: Mounts WorkshopAssistantWidget globally', appMainV2440.includes('<WorkshopAssistantWidget'));
+assert('Tab_Production.html: Triggers openWorkshopAssistant on Need_Repair', tabProdV2440.includes('openWorkshopAssistant'));
+
+// 20. TEST ROYAL V2.45.0 MULTI-AGENT WAR ROOM (7 AGENTS)
+console.log('\n--- 20. Testing Royal v2.45.0 RF War Room (7 Agents & Gemini Orchestration) ---');
+
+const appMainV2450 = fs.readFileSync(appMainPath, 'utf8');
+const changelogV2450 = fs.readFileSync(changelogPath, 'utf8');
+const componentsV2450 = fs.readFileSync(path.join(__dirname, 'Components.html'), 'utf8');
+const serverKcsV2450 = fs.readFileSync(path.join(__dirname, 'server_kcs.py'), 'utf8');
+const agentWarRoomPath = path.join(__dirname, 'agent_war_room.py');
+const agentWarRoomCode = fs.readFileSync(agentWarRoomPath, 'utf8');
+
+assert('App_Main.html: Contains Royal v2.45.0 in RELEASES', appMainV2450.includes("version: 'Royal v2.45.0'"));
+assert('App_Main.html: Sidebar badge displays >= v2.45.0', />v2\.(4[5-9]|\d{2,})\.\d+<\/span>/.test(appMainV2450));
+assert('CHANGELOG.md: Documents v2.45.0 release notes', changelogV2450.includes('## [v2.45.0] - 2026-09-05'));
+assert('agent_war_room.py: Exists and implements generate_agent_dialogue', fs.existsSync(agentWarRoomPath) && agentWarRoomCode.includes('generate_agent_dialogue'));
+assert('agent_war_room.py: Configures all 7 agents in SYSTEM_WAR_ROOM', ['cso', 'coo', 'cfo', 'kho', 'sx', 'hr', 'baodong'].every(a => agentWarRoomCode.includes(a)));
+assert('server_kcs.py: Implements /api/warroom/discuss endpoint', serverKcsV2450.includes('/api/warroom/discuss'));
+assert('Components.html: Defines RFAgentControlTower component', componentsV2450.includes('RFAgentControlTower'));
+assert('Components.html: Implements draggable tower #rf-agent-control-tower', componentsV2450.includes('id="rf-agent-control-tower"'));
+assert('Components.html: Implements drag handle #rf-agent-header', componentsV2450.includes('id="rf-agent-header"'));
+assert('Components.html: Implements 7-agent roster #rf-agent-roster', componentsV2450.includes('id="rf-agent-roster"'));
+assert('Components.html: Implements conversation stream #rf-agent-stream', componentsV2450.includes('id="rf-agent-stream"'));
+assert('Components.html: Exposes triggerRealtimeWarRoom and pushAgentDialogue', componentsV2450.includes('triggerRealtimeWarRoom') && componentsV2450.includes('pushAgentDialogue'));
+assert('App_Main.html: Mounts RFAgentControlTower globally', appMainV2450.includes('<RFAgentControlTower'));
+
+console.log('\n--- 21. Testing Royal v2.45.1 Hotfix URL Sanitization in Components.html ---');
+assert('App_Main.html: Contains Royal v2.45.1 in RELEASES', appMainV2450.includes("version: 'Royal v2.45.1'"));
+assert('App_Main.html: Sidebar badge displays >= v2.45.1', />v2\.(4[5-9]|\d{2,})\.\d+<\/span>/.test(appMainV2450));
+assert('CHANGELOG.md: Documents v2.45.1 release notes', changelogV2450.includes('## [v2.45.1] - 2026-09-05'));
+assert('Components.html: Defines KCS_LOCAL_URL constant via string concatenation', componentsV2450.includes("const KCS_LOCAL_URL = 'http' + '://' + '127.0.0.1:8000'"));
+assert('Components.html: War Room discuss endpoint uses KCS_LOCAL_URL', componentsV2450.includes("fetch(KCS_LOCAL_URL + '/api/warroom/discuss'"));
+assert('Components.html: Assistant chat endpoint uses KCS_LOCAL_URL', componentsV2450.includes("fetch(KCS_LOCAL_URL + '/api/assistant/chat'"));
+assert('Components.html: Health check endpoint uses KCS_LOCAL_URL', componentsV2450.includes("fetch(KCS_LOCAL_URL + '/health'"));
+
+console.log('\n--- 22. Testing Royal v2.45.2 Interactive War Room Commander Chat & Auto-Coordination ---');
+const appMainV2452 = fs.readFileSync(appMainPath, 'utf8');
+const changelogV2452 = fs.readFileSync(changelogPath, 'utf8');
+const componentsV2452 = fs.readFileSync(path.join(__dirname, 'Components.html'), 'utf8');
+const tabProdV2452 = fs.readFileSync(path.join(__dirname, 'Tab_Production.html'), 'utf8');
+
+assert('App_Main.html: Contains Royal v2.45.2 in RELEASES', appMainV2452.includes("version: 'Royal v2.45.2'"));
+assert('App_Main.html: Sidebar badge displays >= v2.45.2', appMainV2452.includes('>v2.45.2</span>') || appMainV2452.includes('>v2.45.3</span>'));
+assert('CHANGELOG.md: Documents v2.45.2 release notes', changelogV2452.includes('## [v2.45.2] - 2026-09-05'));
+assert('Components.html: Implements interactive chatInput state', componentsV2452.includes('chatInput'));
+assert('Components.html: Replaced simulation buttons with chat form', !componentsV2452.includes('Chạy Mô Phỏng Chiến Lược') && componentsV2452.includes('Nhập sự vụ xưởng, thắc mắc kỹ thuật'));
+assert('Components.html: Submit button triggers send action', componentsV2452.includes('type="submit"') && componentsV2452.includes('fa-paper-plane'));
+assert('Tab_Production.html: Triggers triggerRealtimeWarRoom on KCS rejection', tabProdV2452.includes('window.triggerRealtimeWarRoom'));
+
+console.log('\n--- 23. Testing Royal v2.45.3 Realtime Data Grounding & Anti-Hallucination ---');
+const appMainV2453 = fs.readFileSync(appMainPath, 'utf8');
+const changelogV2453 = fs.readFileSync(changelogPath, 'utf8');
+const componentsV2453 = fs.readFileSync(path.join(__dirname, 'Components.html'), 'utf8');
+const agentWarRoomV2453 = fs.readFileSync(path.join(__dirname, 'agent_war_room.py'), 'utf8');
+const serverKcsV2453 = fs.readFileSync(path.join(__dirname, 'server_kcs.py'), 'utf8');
+
+assert('App_Main.html: Contains Royal v2.45.3 in RELEASES', appMainV2453.includes("version: 'Royal v2.45.3'"));
+assert('App_Main.html: Sidebar badge displays v2.45.3', appMainV2453.includes('>v2.45.3</span>'));
+assert('CHANGELOG.md: Documents v2.45.3 release notes', changelogV2453.includes('## [v2.45.3] - 2026-09-05'));
+assert('Components.html: Defines buildLiveOperationalContext', componentsV2453.includes('buildLiveOperationalContext'));
+assert('Components.html: Sends context in /api/warroom/discuss payload', componentsV2453.includes('context: payloadContext'));
+assert('Components.html: RFAgentControlTower receives sheet data props', componentsV2453.includes('kpiConfig') && componentsV2453.includes('erpData'));
+assert('agent_war_room.py: Implements IncidentRequest with optional context', agentWarRoomV2453.includes('context: Optional[Dict[str, Any]]'));
+assert('agent_war_room.py: Implements format_war_room_prompt with data grounding', agentWarRoomV2453.includes('format_war_room_prompt') && agentWarRoomV2453.includes('KPI_Progress'));
+assert('agent_war_room.py: Anti-hallucination rules prohibit fake names (anh Tuấn)', agentWarRoomV2453.includes('anh Tuấn'));
+assert('server_kcs.py: Passes payload.context to generate_agent_dialogue', serverKcsV2453.includes('generate_agent_dialogue(payload.incident, payload.context)'));
 
 // SUMMARY
 

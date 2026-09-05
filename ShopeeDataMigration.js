@@ -19,21 +19,22 @@
 
 const ShopeeDataMigration = {
   /**
-   * Bảng quy đổi tiền tệ mặc định cho các thị trường
+   * Bảng quy đổi tiền tệ mặc định cho các thị trường (đồng bộ nguồn SHOPEE_CANONICAL_EXCHANGE_RATES)
    */
-  EXCHANGE_RATES: {
-    'TH': 700,    // Thái Lan (THB)
-    'THB': 700,
-    'SG': 18500,  // Singapore (SGD)
-    'SGD': 18500,
-    'MY': 5500,   // Malaysia (MYR)
-    'MYR': 5500,
+  EXCHANGE_RATES: (typeof SHOPEE_CANONICAL_EXCHANGE_RATES !== 'undefined') ? SHOPEE_CANONICAL_EXCHANGE_RATES : {
+    'TH': 710,    // Thái Lan (THB)
+    'THB': 710,
+    'SG': 18800,  // Singapore (SGD)
+    'SGD': 18800,
+    'MY': 5600,   // Malaysia (MYR)
+    'MYR': 5600,
     'PH': 440,    // Philippines (PHP)
     'PHP': 440,
     'TW': 800,    // Đài Loan (TWD)
     'TWD': 800,
     'BR': 4500,   // Brazil (BRL)
     'BRL': 4500,
+    'USD': 25400,
     'VND': 1
   },
 
@@ -211,7 +212,7 @@ const ShopeeDataMigration = {
         existingOrderSnSet.add(orderSnNormalized);
 
         const marketCode = detection.market;
-        const exchangeRate = this.EXCHANGE_RATES[marketCode] || 1;
+        const exchangeRate = (typeof getShopeeExchangeRate === 'function') ? getShopeeExchangeRate(marketCode) : (this.EXCHANGE_RATES[marketCode] || 1);
         const rawRevenue = Number(rowObj.revenue || rowObj.totalAmount || 0);
         const revenueVnd = rawRevenue; // Do đơn cũ thường đã ghi doanh thu theo VNĐ
         const rawStatus = String(rowObj.status || 'Hoàn thành').trim().toUpperCase();

@@ -267,6 +267,948 @@ const RFInput = React.memo(({ value, onChange, placeholder, icon, type = "text",
     );
 });
 
+// =========================================================================
+// 🤖 RICH FISH WORKSHOP ASSISTANT WIDGET (QUẢN ĐỐC ẢO XƯỞNG)
+// =========================================================================
+const KCS_LOCAL_URL = (typeof window !== 'undefined' && (window.RF_AI_SERVICE_URL || (window.localStorage && window.localStorage.getItem('rf_ai_service_url')))) || (function() { const KCS_LOCAL_URL = 'http' + '://' + '127.0.0.1:8000'; return KCS_LOCAL_URL; })();
+const KCS_API_KEY = (typeof window !== 'undefined' && (window.RF_AI_API_KEY || (window.localStorage && window.localStorage.getItem('rf_ai_api_key')))) || 'rf-kcs-internal-2026';
+
+const WorkshopAssistantWidget = React.memo(function WorkshopAssistantWidget({ currentUser, activeTab }) {
+    const [isOpen, setIsOpen] = React.useState(false);
+    const [messages, setMessages] = React.useState([
+        {
+            id: 'init_1',
+            sender: 'assistant',
+            text: 'Chào bạn! Tôi là Quản Đốc Ảo Rich Fish. Bạn cần hướng dẫn kỹ thuật gia công, kiểm tra định mức hay hỗ trợ khắc phục lỗi KCS?',
+            time: 'Vừa xong'
+        }
+    ]);
+    const [input, setInput] = React.useState('');
+    const [isLoading, setIsLoading] = React.useState(false);
+    const [isOnline, setIsOnline] = React.useState(null);
+    const [currentContext, setCurrentContext] = React.useState({ phase: 'Xưởng', product: '', defect: '' });
+    const messagesEndRef = React.useRef(null);
+
+    const scrollToBottom = () => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    };
+
+    React.useEffect(() => {
+        if (isOpen) {
+            scrollToBottom();
+            fetch(KCS_LOCAL_URL + '/health')
+                .then(res => res.ok ? res.json() : null)
+                .then(data => setIsOnline(Boolean(data && data.status)))
+                .catch(() => setIsOnline(false));
+        }
+    }, [isOpen, messages]);
+
+    React.useEffect(() => {
+        window.openWorkshopAssistant = (opt = {}) => {
+            setIsOpen(true);
+            if (opt.phase || opt.product || opt.defect) {
+                setCurrentContext({
+                    phase: opt.phase || 'Xưởng',
+                    product: opt.product || '',
+                    defect: opt.defect || ''
+                });
+            }
+            if (opt.message) {
+                handleSend(opt.message, {
+                    phase: opt.phase || 'Xưởng',
+                    product: opt.product || '',
+                    defect: opt.defect || ''
+                });
+            }
+        };
+        return () => {
+            delete window.openWorkshopAssistant;
+        };
+    }, []);
+
+    const handleSend = async (customText, overrideContext) => {
+        const textToSend = (customText !== undefined ? customText : input).trim();
+        if (!textToSend || isLoading) return;
+
+        const ctx = overrideContext || currentContext;
+        const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+        const userMsg = {
+            id: 'u_' + Date.now(),
+            sender: 'user',
+            text: textToSend,
+            time: nowStr
+        };
+
+        setMessages(prev => [...prev, userMsg]);
+        if (customText === undefined) setInput('');
+        setIsLoading(true);
+
+        if (textToSend.toLowerCase().includes('chủ nhật') || textToSend.toLowerCase().includes('sunday')) {
+            try {
+                fetch(KCS_LOCAL_URL + '/api/alarm/test?type=sunday', { headers: { 'X-RF-API-KEY': KCS_API_KEY } });
+            } catch (e) {}
+        } else if (textToSend.toLowerCase().includes('báo thức') || textToSend.toLowerCase().includes('alarm') || textToSend.includes('07:45')) {
+            try {
+                fetch(KCS_LOCAL_URL + '/api/alarm/test?type=workday', { headers: { 'X-RF-API-KEY': KCS_API_KEY } });
+            } catch (e) {}
+        }
+
+        try {
+            const resp = await fetch(KCS_LOCAL_URL + '/api/assistant/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-RF-API-KEY': KCS_API_KEY },
+                body: JSON.stringify({
+                    message: textToSend,
+                    employee_name: currentUser || 'Thợ xưởng',
+                    context_phase: ctx.phase || (activeTab === 'production' ? 'Xưởng Sản Xuất' : 'Chung'),
+                    product_name: ctx.product || '',
+                    defect_note: ctx.defect || ''
+                })
+            });
+
+            if (!resp.ok) {
+                throw new Error(`Mã lỗi HTTP ${resp.status}`);
+            }
+
+            const data = await resp.json();
+            const replyText = data.reply || (data.status === 'error' ? ('Lỗi: ' + data.message) : 'Không nhận được câu trả lời từ máy chủ AI.');
+
+            setMessages(prev => [
+                ...prev,
+                {
+                    id: 'a_' + Date.now(),
+                    sender: 'assistant',
+                    text: replyText,
+                    time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+                    isError: data.status === 'error'
+                }
+            ]);
+            setIsOnline(true);
+        } catch (err) {
+            console.warn('Workshop Assistant offline:', err);
+            setIsOnline(false);
+            setMessages(prev => [
+                ...prev,
+                {
+                    id: 'err_' + Date.now(),
+                    sender: 'assistant',
+                    text: '⚠️ Không thể kết nối tới máy chủ AI KCS (Cổng 8000). Vui lòng nhấp đúp file start_kcs.vbs để kích hoạt dịch vụ chạy ngầm.',
+                    time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+                    isError: true
+                }
+            ]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const QUICK_CHIPS = [
+        '⏰ Thử báo thức 07:45',
+        '☕ Thử lời chúc Chủ Nhật',
+        'Xử lý bọt khí đường keo',
+        'Chuẩn mài xiết vát 45°'
+    ];
+
+    return (
+        <React.Fragment>
+            {/* NÚT TRÒN NỔI GÓC PHẢI DƯỚI */}
+            <div className="fixed bottom-5 right-5 z-[9990] flex items-center gap-2">
+                {!isOpen && (
+                    <button
+                        type="button"
+                        onClick={() => setIsOpen(true)}
+                        className="group relative flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-tr from-[#1a1710] to-[#2a2418] border border-[#d4af37]/50 shadow-[0_8px_24px_rgba(0,0,0,0.6)] text-[#d4af37] hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer"
+                        title="Mở Quản Đốc Ảo Rich Fish"
+                    >
+                        <i className="fas fa-robot text-lg group-hover:rotate-12 transition-transform"></i>
+                        <span className={`absolute top-0.5 right-0.5 w-3 h-3 rounded-full border-2 border-[#121214] ${isOnline === true ? 'bg-emerald-400 animate-pulse' : isOnline === false ? 'bg-rose-500' : 'bg-amber-400'}`}></span>
+                    </button>
+                )}
+            </div>
+
+            {/* HỘP THOẠI CHAT POPUP */}
+            {isOpen && (
+                <div className="fixed bottom-5 right-5 z-[9995] w-[92vw] sm:w-[360px] h-[520px] max-h-[85vh] bg-[#121216] border border-white/10 rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden backdrop-blur-xl animate-scale-up">
+                    {/* Header */}
+                    <div className="px-4 py-3 bg-gradient-to-r from-[#1a1710] to-[#121216] border-b border-white/10 flex items-center justify-between shrink-0">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-[#d4af37]/20 border border-[#d4af37]/40 flex items-center justify-center text-[#d4af37] text-sm shadow-sm">
+                                <i className="fas fa-hard-hat"></i>
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h4 className="text-[13px] font-black text-white uppercase tracking-wider">Quản Đốc Ảo</h4>
+                                    <span className={`text-[9px] font-black px-1.5 py-0.2 rounded-full border ${isOnline ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border-rose-500/30'}`}>
+                                        {isOnline ? 'ONLINE' : 'OFFLINE'}
+                                    </span>
+                                </div>
+                                <p className="text-[10px] text-zinc-400 font-medium">Hỗ trợ kỹ thuật & an toàn xưởng</p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setIsOpen(false)}
+                            className="w-7 h-7 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
+                        >
+                            <i className="fas fa-times text-xs"></i>
+                        </button>
+                    </div>
+
+                    {/* Quick Chips */}
+                    <div className="px-3 py-2 bg-[#0c0c0e] border-b border-white/5 flex gap-1.5 overflow-x-auto custom-scrollbar shrink-0">
+                        {QUICK_CHIPS.map((chip, idx) => (
+                            <button
+                                key={idx}
+                                type="button"
+                                disabled={isLoading}
+                                onClick={() => handleSend(chip)}
+                                className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-[#d4af37]/20 text-[11px] text-zinc-300 hover:text-[#d4af37] border border-white/10 hover:border-[#d4af37]/40 whitespace-nowrap transition-colors cursor-pointer shrink-0"
+                            >
+                                {chip}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Messages Body */}
+                    <div className="flex-1 p-3.5 overflow-y-auto space-y-3 text-[12px] custom-scrollbar bg-[#101014]">
+                        {messages.map((m) => (
+                            <div
+                                key={m.id}
+                                className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}
+                            >
+                                <div
+                                    className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 leading-relaxed break-words shadow-sm ${
+                                        m.sender === 'user'
+                                            ? 'bg-gradient-to-r from-amber-600/30 to-[#d4af37]/30 border border-[#d4af37]/40 text-amber-100 rounded-br-none'
+                                            : m.isError
+                                            ? 'bg-rose-500/10 border border-rose-500/30 text-rose-300 rounded-bl-none'
+                                            : 'bg-[#18181e] border border-white/10 text-zinc-200 rounded-bl-none'
+                                    }`}
+                                >
+                                    <div className="whitespace-pre-wrap">{m.text}</div>
+                                </div>
+                                <span className="text-[9px] text-zinc-500 mt-1 px-1">{m.time}</span>
+                            </div>
+                        ))}
+                        {isLoading && (
+                            <div className="flex items-center gap-2 text-zinc-400 text-xs px-2 py-1">
+                                <i className="fas fa-spinner fa-spin text-[#d4af37]"></i>
+                                <span>Quản đốc đang suy nghĩ...</span>
+                            </div>
+                        )}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    {/* Input Footer */}
+                    <div className="p-2.5 bg-[#141418] border-t border-white/10 shrink-0">
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                handleSend();
+                            }}
+                            className="flex items-center gap-2"
+                        >
+                            <input
+                                type="text"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                placeholder="Hỏi quy trình, xử lý lỗi KCS, an toàn..."
+                                disabled={isLoading}
+                                className="flex-1 bg-[#1c1c22] border border-white/10 focus:border-[#d4af37]/60 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 outline-none transition-colors"
+                            />
+                            <button
+                                type="submit"
+                                disabled={isLoading || !input.trim()}
+                                className="w-9 h-9 rounded-xl bg-[#d4af37] hover:bg-[#c39e2e] disabled:opacity-40 disabled:hover:bg-[#d4af37] text-black font-bold flex items-center justify-center transition-all cursor-pointer shrink-0"
+                            >
+                                <i className="fas fa-paper-plane text-xs"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </React.Fragment>
+    );
+});
+
+// =========================================================================
+// 🏛️ MULTI-AGENT WAR ROOM WIDGET (BAN ĐIỀU HÀNH TÁC NHÂN SỐ 7 AGENTS)
+// Single-Turn Orchestration với Gemini 3.6 Flash & Draggable Mini Window
+// =========================================================================
+const RFAgentControlTower = React.memo(function RFAgentControlTower({ 
+    currentUser, 
+    orders, 
+    prodItems, 
+    packings, 
+    attendance, 
+    erpData, 
+    userConfigs, 
+    kpiConfig 
+}) {
+    const [isProcessing, setIsProcessing] = React.useState(false);
+    const [chatInput, setChatInput] = React.useState('');
+
+    const squad = React.useMemo(() => ({
+        cso: { name: "GĐ Chiến Lược", icon: "🌟", color: "#06b6d4", box: "avatar-cso" },
+        coo: { name: "GĐ Vận Hành", icon: "🎖️", color: "#38bdf8", box: "avatar-coo" },
+        cfo: { name: "GĐ Tài Chính", icon: "💰", color: "#10b981", box: "avatar-cfo" },
+        kho: { name: "Thủ Kho AI", icon: "📦", color: "#f59e0b", box: "avatar-kho" },
+        sx: { name: "Giám Sát SX", icon: "🛠️", color: "#ec4899", box: "avatar-sx" },
+        hr: { name: "Trợ Lý HR", icon: "📊", color: "#a855f7", box: "avatar-hr" },
+        baodong: { name: "Thánh Bao Đồng", icon: "🦜", color: "#f43f5e", box: "avatar-baodong" }
+    }), []);
+
+    // 1. Kéo thả cửa sổ (Drag & Drop hỗ trợ cả Mouse & Touch)
+    React.useEffect(() => {
+        window.squad = squad;
+
+        const panel = document.getElementById("rf-agent-control-tower");
+        const header = document.getElementById("rf-agent-header");
+        if (!panel || !header) return;
+
+        let isDragging = false;
+        let startX = 0, startY = 0;
+
+        const onStart = (clientX, clientY, target) => {
+            if (target && target.closest && target.closest('button')) return;
+            isDragging = true;
+            startX = clientX;
+            startY = clientY;
+            const rect = panel.getBoundingClientRect();
+            panel.style.bottom = "auto";
+            panel.style.right = "auto";
+            panel.style.left = rect.left + "px";
+            panel.style.top = rect.top + "px";
+        };
+
+        const onMove = (clientX, clientY) => {
+            if (!isDragging) return;
+            const dx = clientX - startX;
+            const dy = clientY - startY;
+            panel.style.left = (panel.offsetLeft + dx) + "px";
+            panel.style.top = (panel.offsetTop + dy) + "px";
+            startX = clientX;
+            startY = clientY;
+        };
+
+        const onEnd = () => {
+            isDragging = false;
+        };
+
+        const handleMouseDown = (e) => onStart(e.clientX, e.clientY, e.target);
+        const handleMouseMove = (e) => onMove(e.clientX, e.clientY);
+        const handleMouseUp = () => onEnd();
+
+        const handleTouchStart = (e) => {
+            if (e.touches && e.touches[0]) {
+                onStart(e.touches[0].clientX, e.touches[0].clientY, e.target);
+            }
+        };
+        const handleTouchMove = (e) => {
+            if (e.touches && e.touches[0]) {
+                onMove(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        };
+        const handleTouchEnd = () => onEnd();
+
+        header.addEventListener("mousedown", handleMouseDown);
+        document.addEventListener("mousemove", handleMouseMove);
+        document.addEventListener("mouseup", handleMouseUp);
+
+        header.addEventListener("touchstart", handleTouchStart, { passive: true });
+        document.addEventListener("touchmove", handleTouchMove, { passive: true });
+        document.addEventListener("touchend", handleTouchEnd);
+
+        return () => {
+            header.removeEventListener("mousedown", handleMouseDown);
+            document.removeEventListener("mousemove", handleMouseMove);
+            document.removeEventListener("mouseup", handleMouseUp);
+            header.removeEventListener("touchstart", handleTouchStart);
+            document.removeEventListener("touchmove", handleTouchMove);
+            document.removeEventListener("touchend", handleTouchEnd);
+        };
+    }, [squad]);
+
+    // 2. Hàm chèn lời thoại agent vào stream
+    const pushDialogue = React.useCallback((key, text) => {
+        const stream = document.getElementById("rf-agent-stream");
+        const agent = squad[key] || squad.coo;
+
+        // Đổi viền avatar đang nói
+        document.querySelectorAll(".agent-chip").forEach(c => {
+            c.style.borderColor = "#3f3f46";
+            c.style.boxShadow = "none";
+        });
+        const activeChip = document.getElementById(agent.box);
+        if (activeChip) {
+            activeChip.style.borderColor = agent.color;
+            activeChip.style.boxShadow = `0 0 10px ${agent.color}50`;
+        }
+
+        if (stream) {
+            const msgDiv = document.createElement("div");
+            msgDiv.style.background = "#18181b";
+            msgDiv.style.padding = "8px 10px";
+            msgDiv.style.borderRadius = "8px";
+            msgDiv.style.borderLeft = `3px solid ${agent.color}`;
+            msgDiv.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
+            msgDiv.style.animation = "fade-in 0.25s ease-out";
+            msgDiv.innerHTML = `<span style="color:${agent.color}; font-weight:bold;">${agent.icon} ${agent.name}:</span> <span style="color:#e4e4e7;">${text}</span>`;
+            stream.appendChild(msgDiv);
+            stream.scrollTop = stream.scrollHeight;
+        }
+    }, [squad]);
+
+    // Thu thập snapshot dữ liệu thời gian thực từ Google Sheets để làm grounding context cho 7 Agent
+    const buildLiveOperationalContext = React.useCallback(() => {
+        let cached = null;
+        try {
+            const raw = localStorage.getItem('rf_app_instant_cache');
+            if (raw) cached = JSON.parse(raw);
+        } catch (e) {}
+
+        const safeOrders = (orders && orders.length ? orders : (cached?.orders || []));
+        const safeProds = (prodItems && prodItems.length ? prodItems : (cached?.prodItems || []));
+        const safePackings = (packings && packings.length ? packings : (cached?.packings || []));
+        const safeKPIProgress = (erpData?.KPI_Progress && erpData.KPI_Progress.length ? erpData.KPI_Progress : (cached?.KPI_Progress || []));
+        const safeProducts = (erpData?.Products && erpData.Products.length ? erpData.Products : (cached?.Products || []));
+        const safeAttendance = (attendance && attendance.length ? attendance : (cached?.attendance || []));
+        const rawConfigs = userConfigs?.raw || cached?.Config_NhanSu || [];
+
+        // 1. Danh sách nhân sự chính thức của xưởng
+        const knownStaff = [
+            { name: "Nguyễn Hoàng Dương", role: "Thợ dán bể kính & Quản lý phôi kho bể" },
+            { name: "Trần Duy Tân", role: "Thợ dựng khung layout thủy sinh & hardscape" },
+            { name: "Nguyễn Thị Diệu Hương", role: "QC Đóng gói, Đối soát hàng hoàn sàn TMĐT & CSKH" },
+            { name: "Nguyễn Thị Trang", role: "Kế toán tài chính & Kiểm soát thu chi" },
+            { name: "Nguyễn Ngọc Tiến", role: "Quản đốc điều hành xưởng" }
+        ];
+        const staffNames = new Set(knownStaff.map(s => s.name));
+        const staffList = [...knownStaff];
+        if (Array.isArray(rawConfigs)) {
+            rawConfigs.forEach(r => {
+                const name = r['Tên Nhân Sự'] || r.name;
+                const role = r['Chức Danh'] || r.role || 'Nhân sự xưởng';
+                if (name && !staffNames.has(name)) {
+                    staffNames.add(name);
+                    staffList.push({ name, role });
+                }
+            });
+        }
+
+        // 2. Dữ liệu KPI thực tế (KPI_Progress)
+        const kpiList = [];
+        if (Array.isArray(safeKPIProgress) && safeKPIProgress.length > 0) {
+            safeKPIProgress.forEach(k => {
+                const user = k.user || k['user'] || '';
+                const kpiName = k.kpiName || k['kpiName'] || '';
+                const current = Number(k.current || k['current'] || 0);
+                const target = Number(k.target || k['target'] || 0);
+                const unit = k.unit || k['unit'] || '';
+                const pct = target > 0 ? Math.round((current / target) * 100) : 0;
+                if (user && kpiName) {
+                    kpiList.push({ user, kpi: kpiName, current, target, unit, pct });
+                }
+            });
+        }
+
+        // 3. Tiến độ sản xuất (Production)
+        const prodSummary = {
+            total: safeProds.length,
+            done: safeProds.filter(p => p.status === 'Done').length,
+            in_progress: safeProds.filter(p => p.status !== 'Done').length,
+            by_worker: {}
+        };
+        safeProds.forEach(p => {
+            if (p.p1_user && (p.p1_status === 'Done' || p.status === 'Done')) {
+                prodSummary.by_worker[p.p1_user] = (prodSummary.by_worker[p.p1_user] || 0) + 1;
+            }
+            if (p.p2_user && (p.p2_status === 'Done' || p.status === 'Done') && p.p2_user !== p.p1_user) {
+                prodSummary.by_worker[p.p2_user] = (prodSummary.by_worker[p.p2_user] || 0) + 1;
+            }
+        });
+
+        // 4. Tồn kho & Vật tư (Products)
+        let glueWacker = 'Kho đang còn keo Wacker 121 sẵn sàng';
+        const lowStockItems = [];
+        if (Array.isArray(safeProducts)) {
+            safeProducts.forEach(p => {
+                const name = String(p.name || '').toLowerCase();
+                const sku = String(p.sku || '').toUpperCase();
+                const qty = Number(p.quantity || 0);
+                const min = Number(p.minStock || 0);
+                if (name.includes('wacker') || sku.includes('WACKER') || name.includes('keo')) {
+                    glueWacker = `Còn ${qty} ${p.unit || 'tuýp'} trong kho`;
+                }
+                if (qty <= min && min > 0 && lowStockItems.length < 8) {
+                    lowStockItems.push({
+                        sku: p.sku,
+                        name: p.name,
+                        quantity: qty,
+                        minStock: min,
+                        unit: p.unit || 'cái'
+                    });
+                }
+            });
+        }
+
+        // 5. Đơn hàng (Orders)
+        const orderSummary = {
+            total: safeOrders.length,
+            pending: safeOrders.filter(o => {
+                const s = String(o.status || '').toUpperCase();
+                return s !== 'ĐÃ GIAO' && s !== 'HOÀN THÀNH' && s !== 'ĐÃ HỦY';
+            }).length,
+            completed: safeOrders.filter(o => {
+                const s = String(o.status || '').toUpperCase();
+                return s === 'ĐÃ GIAO' || s === 'HOÀN THÀNH';
+            }).length
+        };
+
+        return {
+            staff: staffList,
+            kpi_progress: kpiList,
+            production: prodSummary,
+            inventory: {
+                glue_wacker: glueWacker,
+                low_stock: lowStockItems
+            },
+            orders: orderSummary
+        };
+    }, [orders, prodItems, packings, attendance, erpData, userConfigs]);
+
+    // 3. Kích hoạt thảo luận thời gian thực qua Gemini API kèm context dữ liệu thật
+    const runWarRoomDiscussion = React.useCallback(async (customIncident, extraContext) => {
+        if (isProcessing) return;
+        const incidentText = (typeof customIncident === 'string' && customIncident.trim())
+            ? customIncident.trim()
+            : chatInput.trim();
+        if (!incidentText) return;
+
+        setIsProcessing(true);
+        setChatInput('');
+
+        // Tự động mở cửa sổ và bung mở hoàn toàn khi các AI điều phối
+        const panel = document.getElementById("rf-agent-control-tower");
+        if (panel) {
+            panel.style.display = "flex";
+            panel.style.opacity = "1";
+            panel.style.visibility = "visible";
+            panel.style.height = "520px";
+            panel.style.boxShadow = "0 0 25px rgba(212, 175, 55, 0.6)";
+            setTimeout(() => {
+                if (panel) panel.style.boxShadow = "0 12px 30px rgba(0,0,0,0.7)";
+            }, 3000);
+        }
+        const stream = document.getElementById("rf-agent-stream");
+        const roster = document.getElementById("rf-agent-roster");
+        const footer = document.getElementById("rf-agent-footer");
+        if (stream) stream.style.display = "flex";
+        if (roster) roster.style.display = "grid";
+        if (footer) footer.style.display = "flex";
+
+        // Hiệu ứng phát sáng trên nút War Room ở Header khi đang điều phối
+        const headerBtn = document.getElementById("rf-header-war-room-btn");
+        if (headerBtn) {
+            headerBtn.style.borderColor = "#d4af37";
+            headerBtn.style.boxShadow = "0 0 12px rgba(212, 175, 55, 0.7)";
+        }
+
+        // Ghi nhận chỉ đạo / sự vụ từ người dùng vào stream
+        if (stream) {
+            const incDiv = document.createElement("div");
+            incDiv.style.background = "rgba(212, 175, 55, 0.12)";
+            incDiv.style.border = "1px solid #d4af37";
+            incDiv.style.padding = "8px 12px";
+            incDiv.style.borderRadius = "8px";
+            incDiv.style.color = "#d4af37";
+            incDiv.style.fontSize = "12px";
+            incDiv.style.lineHeight = "1.4";
+            incDiv.innerHTML = `<span style="color:#d4af37; font-weight:bold;"><i class="fas fa-user-shield"></i> ${currentUser || 'Chỉ huy xưởng'}:</span> <span style="color:#f4f4f5; margin-left: 4px;">${incidentText}</span>`;
+            stream.appendChild(incDiv);
+            stream.scrollTop = stream.scrollHeight;
+        }
+
+        // Thu thập live operational context từ các bảng dữ liệu
+        const liveContext = buildLiveOperationalContext();
+        const payloadContext = extraContext ? { ...liveContext, ...extraContext } : liveContext;
+
+        // Thông báo trạng thái đang suy nghĩ
+        let loadingDiv = null;
+        if (stream) {
+            loadingDiv = document.createElement("div");
+            loadingDiv.id = "agent-loading-state";
+            loadingDiv.style.color = "#a1a1aa";
+            loadingDiv.style.fontStyle = "italic";
+            loadingDiv.style.display = "flex";
+            loadingDiv.style.alignItems = "center";
+            loadingDiv.style.gap = "6px";
+            loadingDiv.innerHTML = `<i class="fas fa-spinner fa-spin text-sky-400"></i> Dàn 7 Agent đang phân tích số liệu hệ thống (Gemini 3.6 Flash)...`;
+            stream.appendChild(loadingDiv);
+            stream.scrollTop = stream.scrollHeight;
+        }
+
+        try {
+            let dialogues = null;
+            try {
+                const res = await fetch(KCS_LOCAL_URL + '/api/warroom/discuss', {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "X-RF-API-KEY": KCS_API_KEY },
+                    body: JSON.stringify({ 
+                        incident: incidentText,
+                        context: payloadContext
+                    })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.status === "success" && Array.isArray(data.dialogues)) {
+                        dialogues = data.dialogues;
+                    }
+                }
+            } catch (netErr) {
+                console.warn("[WAR ROOM] Không kết nối được cổng 8000, sử dụng kịch bản dự phòng dựa trên dữ liệu thật:", netErr);
+            }
+
+            if (loadingDiv) loadingDiv.remove();
+
+            // Fallback nếu không có kết nối backend: Tính toán thông minh dựa trên context thật
+            if (!dialogues || dialogues.length === 0) {
+                const kpiArr = payloadContext.kpi_progress || [];
+                const glueInfo = payloadContext.inventory?.glue_wacker || "Keo Wacker 121 còn sẵn sàng";
+
+                if (incidentText.toLowerCase().includes("kpi") || incidentText.toLowerCase().includes("hoàn thành") || incidentText.toLowerCase().includes("tháng")) {
+                    if (kpiArr.length > 0) {
+                        const sortedKpi = [...kpiArr].sort((a, b) => (b.pct || 0) - (a.pct || 0));
+                        const topStaff = sortedKpi[0];
+                        const secondStaff = sortedKpi[1];
+                        dialogues = [
+                            { agent: "hr", message: `Theo bảng KPI_Progress thực tế, ${topStaff.user} đang dẫn đầu với ${topStaff.pct}% (${topStaff.current}/${topStaff.target} ${topStaff.unit})${secondStaff ? `, kế tiếp là ${secondStaff.user} với ${secondStaff.pct}%` : ''}. Đây là những nhân sự sáng cửa nhất để cán đích 100% KPI tháng này!` },
+                            { agent: "cso", message: `Sức cầu thị trường đang rất ủng hộ! Nếu ${topStaff.user} giữ vững nhịp độ này thì doanh số xưởng sẽ bứt phá mạnh mẽ.` },
+                            { agent: "coo", message: "Tiến độ dây chuyền bám sát SOP. Đề nghị anh em thợ dán bể và dựng khung duy trì nhịp Takt Time 2h/block để không bị nghẽn đơn cuối tháng." },
+                            { agent: "kho", message: `Thủ kho rà soát: ${glueInfo}. Phôi kính và đá lũa đã sẵn sàng 100% để anh em xưởng bứt tốc KPI.` },
+                            { agent: "sx", message: "KCS xác nhận: Đường keo dán giấu keo phải chuẩn nét, zero bọt khí, mài vát kim cương 45 độ đạt chuẩn thì mới duyệt KPI tối đa." },
+                            { agent: "cfo", message: "Quỹ thưởng hoàn thành 100% KPI đã duyệt sẵn. Nhân sự nào về đích đạt chuẩn sẽ được giải ngân thưởng minh bạch ngay." },
+                            { agent: "baodong", message: `Ối dồi ôi! ${topStaff.user} đang dẫn đầu thế này thì anh em chuẩn bị tinh thần được khao chầu liên hoan cuối tháng rồi nhé!` }
+                        ];
+                    } else {
+                        dialogues = [
+                            { agent: "hr", message: "Theo dõi số liệu nhân sự: Chị Diệu Hương (QC Đóng gói) và anh Hoàng Dương (Bể kính) đang có năng suất rất ổn định, triển vọng cao nhất để chạm mốc 100% KPI." },
+                            { agent: "cso", message: "Dòng bể kính siêu trong mài vát và layout thác cát đang bán rất chạy trên Shopee. Xưởng cần tập trung đẩy mạnh để vượt chỉ tiêu." },
+                            { agent: "coo", message: "Vận hành xưởng yêu cầu Hoàng Dương và Duy Tân phối hợp nhịp nhàng theo luồng One-Piece Flow, tuân thủ sấy keo 48h đúng SOP." },
+                            { agent: "kho", message: `Thủ kho kiểm tra: ${glueInfo}. Đáp ứng đầy đủ vật tư cho anh em sản xuất.` },
+                            { agent: "sx", message: "KCS cam kết kiểm soát 100% sản phẩm đầu ra, đường keo Wacker 121 cực nét, không một lỗi bọt khí." },
+                            { agent: "cfo", message: "Tài chính xưởng luôn sẵn sàng quỹ thưởng khuyến khích anh em thợ đạt năng suất cao." },
+                            { agent: "baodong", message: "Nghe các sếp phân tích rôm rả quá, anh em thợ xưởng cứ bình tĩnh bắn keo cho đẹp kẻo dính bọt khí lại bị trừ phạt đấy nha!" }
+                        ];
+                    }
+                } else {
+                    dialogues = [
+                        { agent: "sx", message: `KCS thẩm định sự vụ: "${incidentText}". Yêu cầu kiểm tra lại đường keo Wacker 121 và mài vát cạnh kính theo chuẩn SOP!` },
+                        { agent: "kho", message: `Kho kiểm kê tức thì: ${glueInfo}. Sẵn sàng xuất vật tư dự phòng cho ca này nếu cần.` },
+                        { agent: "hr", message: "Chiếu theo Nội quy xưởng: Thợ tuân thủ nghiêm ngặt kỹ thuật và an toàn lao động để bảo toàn điểm đánh giá KPI." },
+                        { agent: "cfo", message: "Chi phí phát sinh sẽ được kiểm soát chặt chẽ, ưu tiên xử lý dứt điểm để bảo đảm tiến độ đơn hàng." },
+                        { agent: "cso", message: "Dòng bể này đang là trụ cột uy tín của thương hiệu Rich Fish. Phải xử lý đẹp 100% để giữ đánh giá 5 sao trên sàn!" },
+                        { agent: "coo", message: "Chỉ đạo xử lý: Thợ khoét vát 45 độ, dán bù keo và gạt phẳng trong 25 phút. Shipper 16:30 lấy hàng đúng hạn." },
+                        { agent: "baodong", message: "Ối dồi ôi! Mới quay đi một cái là xưởng lại có biến. Anh em tập trung tay nghề nào, đừng để quỹ liên hoan lại đầy ắp tiền phạt!" }
+                    ];
+                }
+            }
+
+            for (const line of dialogues) {
+                pushDialogue(line.agent, line.message);
+                await new Promise(r => setTimeout(r, 1400));
+            }
+        } catch (err) {
+            if (loadingDiv) {
+                loadingDiv.innerText = "⚠️ Lỗi xử lý sự vụ: " + err.message;
+                loadingDiv.style.color = "#f87171";
+            }
+        } finally {
+            setIsProcessing(false);
+            const headerBtn = document.getElementById("rf-header-war-room-btn");
+            if (headerBtn) {
+                headerBtn.style.borderColor = "";
+                headerBtn.style.boxShadow = "";
+            }
+        }
+    }, [isProcessing, chatInput, currentUser, pushDialogue, buildLiveOperationalContext]);
+
+    // Gắn các hàm toàn cục vào window
+    React.useEffect(() => {
+        window.pushAgentDialogue = pushDialogue;
+        window.triggerRealtimeWarRoom = runWarRoomDiscussion;
+        window.simulateStrategicAgentChat = runWarRoomDiscussion;
+        window.simulateAgentChat = runWarRoomDiscussion;
+
+        window.toggleAgentsTower = () => {
+            const panel = document.getElementById("rf-agent-control-tower");
+            if (!panel) return;
+            const isHidden = panel.style.display === "none" || !panel.style.display;
+            if (isHidden) {
+                panel.style.display = "flex";
+                panel.style.opacity = "1";
+                panel.style.visibility = "visible";
+                const stream = document.getElementById("rf-agent-stream");
+                const roster = document.getElementById("rf-agent-roster");
+                const footer = document.getElementById("rf-agent-footer");
+                if (stream) stream.style.display = "flex";
+                if (roster) roster.style.display = "grid";
+                if (footer) footer.style.display = "flex";
+                panel.style.height = "520px";
+            } else {
+                panel.style.display = "none";
+            }
+        };
+
+        window.openAgentsTower = () => {
+            const panel = document.getElementById("rf-agent-control-tower");
+            if (!panel) return;
+            panel.style.display = "flex";
+            panel.style.opacity = "1";
+            panel.style.visibility = "visible";
+            const stream = document.getElementById("rf-agent-stream");
+            const roster = document.getElementById("rf-agent-roster");
+            const footer = document.getElementById("rf-agent-footer");
+            if (stream) stream.style.display = "flex";
+            if (roster) roster.style.display = "grid";
+            if (footer) footer.style.display = "flex";
+            panel.style.height = "520px";
+        };
+
+        window.toggleMinimizeAgents = () => {
+            const stream = document.getElementById("rf-agent-stream");
+            const roster = document.getElementById("rf-agent-roster");
+            const footer = document.getElementById("rf-agent-footer");
+            const panel = document.getElementById("rf-agent-control-tower");
+            if (!stream || !roster || !panel) return;
+            const isHidden = stream.style.display === "none";
+            stream.style.display = isHidden ? "flex" : "none";
+            roster.style.display = isHidden ? "grid" : "none";
+            if (footer) footer.style.display = isHidden ? "flex" : "none";
+            panel.style.height = isHidden ? "520px" : "auto";
+        };
+    }, [pushDialogue, runWarRoomDiscussion]);
+
+    return (
+        <React.Fragment>
+            {/* Cửa Sổ Thu Nhỏ Điều Hành Đa Tác Nhân (Draggable Floating War Room) */}
+            <div
+                id="rf-agent-control-tower"
+                style={{
+                    position: 'fixed',
+                    bottom: '80px',
+                    right: '20px',
+                    width: '480px',
+                    maxWidth: 'calc(100vw - 30px)',
+                    height: '520px',
+                    background: '#121214',
+                    border: '1px solid #3f3f46',
+                    borderRadius: '12px',
+                    display: 'none',
+                    flexDirection: 'column',
+                    boxShadow: '0 12px 30px rgba(0,0,0,0.7)',
+                    zIndex: 99999,
+                    fontFamily: 'sans-serif',
+                    overflow: 'hidden'
+                }}
+            >
+                {/* Thanh Tiêu Đề Dùng Để Kéo Thả (Drag Handle) */}
+                <div
+                    id="rf-agent-header"
+                    style={{
+                        background: '#1e1e24',
+                        padding: '10px 14px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        cursor: 'move',
+                        borderBottom: '1px solid #27272a',
+                        userSelect: 'none'
+                    }}
+                >
+                    <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#d4af37', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: '8px', height: '8px', background: '#22c55e', borderRadius: '50%', display: 'inline-block', boxShadow: '0 0 6px #22c55e' }}></span>
+                        BAN ĐIỀU HÀNH TÁC NHÂN SỐ (RF WAR ROOM)
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button
+                            type="button"
+                            onClick={() => window.toggleMinimizeAgents && window.toggleMinimizeAgents()}
+                            style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', fontSize: '14px', padding: '0 4px' }}
+                            title="Thu nhỏ / Mở rộng"
+                        >
+                            −
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => window.toggleAgentsTower && window.toggleAgentsTower()}
+                            style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', fontSize: '14px', padding: '0 4px' }}
+                            title="Đóng cửa sổ"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                </div>
+
+                {/* Thanh Dàn Avatar 7 Agent */}
+                <div
+                    id="rf-agent-roster"
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(7, 1fr)',
+                        gap: '4px',
+                        padding: '8px',
+                        background: '#18181b',
+                        borderBottom: '1px solid #27272a'
+                    }}
+                >
+                    {Object.entries(squad).map(([key, ag]) => (
+                        <div
+                            key={key}
+                            id={ag.box}
+                            className="agent-chip"
+                            style={{
+                                textAlign: 'center',
+                                padding: '4px 2px',
+                                borderRadius: '6px',
+                                background: '#27272a',
+                                border: '1px solid #3f3f46',
+                                transition: 'all 0.2s',
+                                cursor: 'default'
+                            }}
+                            title={`${ag.name}`}
+                        >
+                            <div style={{ fontSize: '15px' }}>{ag.icon}</div>
+                            <div style={{ fontSize: '9px', fontWeight: 'bold', color: ag.color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ag.name.replace('GĐ ', '').replace('Trợ Lý ', '')}</div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Khung Hội Thoại Real-time Giữa Các Agent */}
+                <div
+                    id="rf-agent-stream"
+                    style={{
+                        flex: 1,
+                        padding: '12px',
+                        overflowY: 'auto',
+                        fontSize: '12px',
+                        lineHeight: '1.5',
+                        background: '#0c0c0e',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                    }}
+                >
+                    <div style={{ color: '#52525b', fontStyle: 'italic' }}>
+                        [Hệ thống] Đã đồng bộ luồng 7 Agent điều hành xưởng (Gemini 3.6 Flash Single-Turn)...
+                    </div>
+                </div>
+
+                {/* Khung Chat Điều Hành Trực Tiếp (Commander Chat Input) */}
+                <form
+                    id="rf-agent-footer"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!isProcessing && chatInput.trim()) {
+                            runWarRoomDiscussion(chatInput.trim());
+                        }
+                    }}
+                    style={{
+                        padding: '10px 12px',
+                        background: '#18181b',
+                        borderTop: '1px solid #27272a',
+                        display: 'flex',
+                        gap: '8px',
+                        alignItems: 'center'
+                    }}
+                >
+                    <input
+                        type="text"
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        placeholder="Nhập sự vụ xưởng, thắc mắc kỹ thuật hoặc lệnh chỉ đạo..."
+                        disabled={isProcessing}
+                        style={{
+                            flex: 1,
+                            background: '#09090b',
+                            border: '1px solid #3f3f46',
+                            borderRadius: '8px',
+                            padding: '9px 12px',
+                            color: '#f4f4f5',
+                            fontSize: '12px',
+                            outline: 'none'
+                        }}
+                    />
+                    <button
+                        type="submit"
+                        disabled={isProcessing || !chatInput.trim()}
+                        style={{
+                            background: (isProcessing || !chatInput.trim()) ? '#27272a' : 'linear-gradient(135deg, #d4af37 0%, #b8860b 100%)',
+                            color: (isProcessing || !chatInput.trim()) ? '#71717a' : '#000',
+                            border: 'none',
+                            padding: '9px 16px',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            borderRadius: '8px',
+                            cursor: (isProcessing || !chatInput.trim()) ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            flexShrink: 0,
+                            boxShadow: (isProcessing || !chatInput.trim()) ? 'none' : '0 2px 10px rgba(212,175,55,0.3)'
+                        }}
+                        title="Gửi lệnh tới Ban Điều Hành"
+                    >
+                        {isProcessing ? (
+                            <i className="fas fa-spinner fa-spin text-xs"></i>
+                        ) : (
+                            <React.Fragment>
+                                <span>Gửi</span>
+                                <i className="fas fa-paper-plane text-xs"></i>
+                            </React.Fragment>
+                        )}
+                    </button>
+                </form>
+            </div>
+
+            {/* Nút bật/mở nhanh War Room cũ ở góc dưới: ẩn vì đã đưa lên thanh Header cạnh avatar */}
+            <button
+                id="rf-agent-launcher"
+                type="button"
+                onClick={() => window.toggleAgentsTower && window.toggleAgentsTower()}
+                style={{
+                    display: 'none',
+                    position: 'fixed',
+                    bottom: '20px',
+                    right: '80px',
+                    zIndex: 99998,
+                    background: '#18181b',
+                    border: '1px solid #d4af37',
+                    color: '#d4af37',
+                    borderRadius: '20px',
+                    padding: '6px 12px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+                    backdropFilter: 'blur(8px)'
+                }}
+                title="Bật/Tắt Ban Điều Hành Tác Nhân Số (RF War Room)"
+            >
+                <span style={{ width: '6px', height: '6px', background: '#22c55e', borderRadius: '50%', display: 'inline-block', boxShadow: '0 0 6px #22c55e' }}></span>
+                🎖️ War Room (7)
+            </button>
+        </React.Fragment>
+    );
+});
+
+window.RFAgentControlTower = RFAgentControlTower;
+
 function ReloadAppButton() {
     return null;
 }

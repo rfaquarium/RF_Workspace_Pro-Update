@@ -1886,6 +1886,10 @@
                 if (p.orderId) {
                     const pOrd = String(p.orderId).trim();
                     if (!map[pOrd]) map[pOrd] = p;
+                    if (pOrd.includes(' | ')) {
+                        const baseCode = pOrd.split(' | ')[0].trim();
+                        if (!map[baseCode]) map[baseCode] = p;
+                    }
                 }
             });
             return map;
@@ -3263,13 +3267,17 @@
                                             {!isCollapsed && (
                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
                                                     {groupOrders.map(({ order: o, originalIdx }) => {
-                                                        const latestPack = latestPackMap[o.id];
+                                                        const oIdStr = String(o.id || '').trim();
+                                                        const oCodeStr = String(o.orderCode || '').trim();
+                                                        const baseCodeStr = oCodeStr.split(' | ')[0].trim();
+                                                        const latestPack = latestPackMap[oIdStr] || (oCodeStr ? latestPackMap[oCodeStr] : null) || (baseCodeStr ? latestPackMap[baseCodeStr] : null);
                                                         const matchedProds = getMatchedProds(o);
                                                         return (
                                                             <RFOrderWrapper
                                                                 key={o.id}
                                                                 attendance={attendance}
                                                                 order={o}
+                                                                orders={orders}
                                                                 prods={matchedProds}
                                                                 pack={latestPack}
                                                                 packings={packings}

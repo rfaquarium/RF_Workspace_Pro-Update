@@ -15,9 +15,9 @@
 
 const ShopeeWebhookHandler = {
   /**
-   * Tỷ giá mặc định quy đổi ngoại tệ sàn Shopee Global sang VND (nếu chưa có API tỷ giá động)
+   * Tỷ giá mặc định quy đổi ngoại tệ sàn Shopee Global sang VND (đồng bộ nguồn SHOPEE_CANONICAL_EXCHANGE_RATES)
    */
-  DEFAULT_EXCHANGE_RATES: {
+  DEFAULT_EXCHANGE_RATES: (typeof SHOPEE_CANONICAL_EXCHANGE_RATES !== 'undefined') ? SHOPEE_CANONICAL_EXCHANGE_RATES : {
     'MYR': 5600,  // Malaysia Ringgit
     'PHP': 440,   // Philippines Peso
     'SGD': 18800, // Singapore Dollar
@@ -55,6 +55,51 @@ const ShopeeWebhookHandler = {
       }
 
       const rawContent = e.postData.contents;
+
+      // KIỂM TRA NGUỒN VÀ CẤU HÌNH XÁC MINH WEBHOOK
+      const props = PropertiesService.getScriptProperties();
+      const webhookSecret = props.getProperty('SHOPEE_WEBHOOK_SECRET') || props.getProperty('SHOPEE_PARTNER_KEY');
+      if (!webhookSecret) {
+        const missingMsg = 'Thiếu cấu hình xác thực webhook: Cần bổ sung SHOPEE_WEBHOOK_SECRET hoặc SHOPEE_PARTNER_KEY trong Script Properties trước khi xử lý dữ liệu!';
+        Logger.log('[ShopeeWebhook] ' + missingMsg);
+        try {
+          ShopeeDbService.logAudit(
+            'Shopee_Webhook_Engine',
+            'WEBHOOK_AUTH_CONFIG_MISSING',
+            'SYSTEM',
+            missingMsg,
+            'BLOCKED',
+            {}
+          );
+        } catch (audErr) { }
+        return this._buildJsonResponse({
+          status: 'error',
+          message: missingMsg,
+          code: 401
+        });
+      }
+
+      // Kiểm tra chữ ký webhook nếu được gửi trong request
+      const incomingSign = (e.parameter && (e.parameter.sign || e.parameter.signature)) ||
+                           (e.headers && (e.headers['authorization'] || e.headers['Authorization'] || e.headers['x-shopee-signature']));
+      if (incomingSign) {
+        try {
+          const computedBytes = Utilities.computeHmacSha256Signature(rawContent, webhookSecret);
+          const computedSign = computedBytes.map(function (b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
+          if (incomingSign.toLowerCase() !== computedSign.toLowerCase() && incomingSign !== webhookSecret) {
+            const sigErrMsg = 'Xác thực chữ ký webhook thất bại: Nguồn gửi không hợp lệ!';
+            Logger.log('[ShopeeWebhook] ' + sigErrMsg);
+            return this._buildJsonResponse({
+              status: 'error',
+              message: sigErrMsg,
+              code: 401
+            });
+          }
+        } catch (hmacErr) {
+          Logger.log('[ShopeeWebhook] Lỗi xác thực chữ ký: ' + hmacErr.message);
+        }
+      }
+
       let payload;
       try {
         payload = JSON.parse(rawContent);
@@ -139,7 +184,7 @@ const ShopeeWebhookHandler = {
     const rawStatus = (dataSection.status || dataSection.order_status || payload.order_status || 'UNPAID').toString().trim().toUpperCase();
     const currency = (dataSection.currency || payload.currency || 'MYR').toUpperCase();
     const totalAmountOrigin = Number(dataSection.total_amount || dataSection.total_amount_origin || payload.total_amount || 0);
-    const exchangeRate = this.DEFAULT_EXCHANGE_RATES[currency] || 1;
+    const exchangeRate = (typeof getShopeeExchangeRate === 'function') ? getShopeeExchangeRate(currency) : (this.DEFAULT_EXCHANGE_RATES[currency] || 1);
     const totalAmountVnd = Math.round(totalAmountOrigin * exchangeRate);
     const marketCode = dataSection.market_code || payload.market_code || currency.substring(0, 2);
     const buyerUsername = dataSection.buyer_username || dataSection.buyer_user || payload.buyer_username || '';
@@ -173,7 +218,7 @@ const ShopeeWebhookHandler = {
       // Ghi nhận items vào DB_ORDER_ITEMS nếu có danh sách item trong payload
       const itemsList = dataSection.item_list || dataSection.items || payload.items || [];
       if (Array.isArray(itemsList) && itemsList.length > 0) {
-        this._insertOrderItems(orderSn, itemsList);
+        this._insertOrderItems(orderSn, itemsList, exchangeRate);
       }
     } else {
       // Đơn đã tồn tại -> Cập nhật trạng thái
@@ -236,8 +281,9 @@ const ShopeeWebhookHandler = {
    * Lưu danh sách sản phẩm SKU của đơn hàng vào DB_ORDER_ITEMS
    * @param {string} orderSn - Mã đơn hàng
    * @param {Array} itemsList - Danh sách items từ Shopee
+   * @param {number} [exchangeRate=1] - Tỷ giá quy đổi ngoại tệ sang VNĐ áp dụng
    */
-  _insertOrderItems: function(orderSn, itemsList) {
+  _insertOrderItems: function(orderSn, itemsList, exchangeRate = 1) {
     try {
       const itemsToInsert = itemsList.map((item, idx) => {
         const sku = (item.item_sku || item.model_sku || item.sku || 'SKU_UNKNOWN').toString().trim();
@@ -252,6 +298,8 @@ const ShopeeWebhookHandler = {
           product_name: productName,
           quantity: quantity,
           unit_price_origin: unitPrice,
+          exchange_rate: exchangeRate,
+          unit_price_vnd: Math.round(unitPrice * exchangeRate),
           item_status: 'READY',
           inventory_note: ''
         };

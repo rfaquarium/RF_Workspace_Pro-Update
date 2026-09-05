@@ -4513,12 +4513,28 @@
     function OrderCardV2({
         attendance, order, prods, pack, packings, erpProducts, erpData, isAdmin, currentUser, pushDeltas,
         prodItems, userConfigs, triggerToast, isSelected, onToggleSelect, kpiConfig, idx_num,
-        handleCancelOrder, handleConfirmStockIn, openReturnModal, onEditOrder, filterStatus
+        handleCancelOrder, handleConfirmStockIn, openReturnModal, onEditOrder, filterStatus, orders
     }) {
         const [optimisticOrder, setOptimisticOrder] = React.useState(null);
         const [optimisticPack, setOptimisticPack] = React.useState(null);
         const [sosTarget, setSosTarget] = React.useState(null);
         const [assignStockTarget, setAssignStockTarget] = React.useState(null);
+        const actionBtnRef = React.useRef(null);
+        const [showActionMenu, setShowActionMenu] = React.useState(false);
+        const [menuPos, setMenuPos] = React.useState({ top: 0, right: 0 });
+        const [confirmAction, setConfirmAction] = React.useState(null);
+
+        const handleOpenMenu = (e) => {
+            e.stopPropagation();
+            if (actionBtnRef.current) {
+                const rect = actionBtnRef.current.getBoundingClientRect();
+                const spaceBelow = window.innerHeight - rect.bottom;
+                const top = spaceBelow < 320 ? Math.max(10, rect.top - 310) : rect.bottom + 6;
+                const right = Math.max(12, window.innerWidth - rect.right);
+                setMenuPos({ top, right });
+            }
+            setShowActionMenu(prev => !prev);
+        };
 
         React.useEffect(() => {
             setOptimisticOrder(null);
@@ -4526,6 +4542,8 @@
             setGoodsFile(null);
             setBoxFile(null);
             setWhFile(null);
+            setShowActionMenu(false);
+            setConfirmAction(null);
         }, [order?.status, order?.isCarriedToWH, order?.id]);
         React.useEffect(() => { setOptimisticPack(null); }, [pack?.status, pack?.id, pack?.photo]);
 
@@ -4971,16 +4989,48 @@
         const packUser = packRecord?.user || packRecord?.updatedBy;
         const whUser = whRecord?.user || (typeof _order.isCarriedToWH === 'string' ? _order.isCarriedToWH : null);
 
+        const isUserMatch = React.useCallback((userA, userB) => {
+            if (!userA || !userB) return false;
+            const a = String(userA).trim().toLowerCase();
+            const b = String(userB).trim().toLowerCase();
+            if (a === b) return true;
+            const aParts = a.split(/\s+/);
+            const bParts = b.split(/\s+/);
+            const aLast = aParts[aParts.length - 1];
+            const bLast = bParts[bParts.length - 1];
+            return a.includes(b) || b.includes(a) || (aLast && aLast.length > 1 && aLast === bLast);
+        }, []);
+
         const currentPackingTask = optimisticPacks.find(p => p.status === 'Packing' && (!p.note || !p.note.includes('kho'))) || _pack;
         const isPacking = currentPackingTask?.status === 'Packing';
-        const isPackOwner = currentPackingTask?.user === currentUser;
+        const isPackOwner = Boolean(currentPackingTask?.user && isUserMatch(currentPackingTask.user, currentUser));
 
         const userActivePackings = React.useMemo(() => {
-            const cUser = (currentUser || '').trim().toLowerCase();
-            return (allPackingsList || erpData?.Packings || []).filter(p => (p.user || '').trim().toLowerCase() === cUser && p.status === 'Packing');
-        }, [allPackingsList, erpData?.Packings, currentUser]);
+            const list = allPackingsList || erpData?.Packings || [];
+            const allOrders = (typeof orders !== 'undefined' && orders) ? orders : (erpData?.Orders || window.GLOBAL_ALL_ORDERS || []);
+            
+            const isOrderFinished = (ordId) => {
+                if (!ordId) return false;
+                const sId = String(ordId).trim().toLowerCase();
+                const matchedOrder = allOrders.find(o => {
+                    const oId = String(o.id || '').trim().toLowerCase();
+                    const oCode = String(o.orderCode || '').trim().toLowerCase();
+                    return oId === sId || oCode === sId || oCode.includes(sId);
+                });
+                if (!matchedOrder) return false;
+                const st = String(matchedOrder.status || matchedOrder._effectiveStatus || '').toUpperCase().trim();
+                return st === 'ĐÃ BÀN GIAO' || st === 'HOÀN THÀNH' || st === 'ĐỐI SOÁT THÀNH CÔNG' || st === 'ĐƠN HUỶ' || st.includes('HUỶ') || st === 'HÀNG HOÀN';
+            };
+
+            return list.filter(p => {
+                if (p.status !== 'Packing') return false;
+                if (!isUserMatch(p.user, currentUser)) return false;
+                if (isOrderFinished(p.orderId)) return false;
+                return true;
+            });
+        }, [allPackingsList, erpData?.Packings, erpData?.Orders, currentUser, isUserMatch]);
         const isMaxPackingReached = userActivePackings.length >= 6;
-        const isPackingOtherOrder = false; // RF v2.43.0: Hỗ trợ đóng gói đồng thời tối đa 6 đơn
+        const isPackingOtherOrder = false; // RF v2.43.2: Cho phép chụp đóng gói liên tục nhiều đơn cùng lúc (tối đa 6 đơn)
 
         const requiredCheckIds = React.useMemo(() => {
             const ids = [];
@@ -5404,8 +5454,8 @@
                     if (triggerToast) triggerToast(`Đã chuyển đơn ${_order.orderCode || _order.id} sang Hàng Hoàn Chờ Xử!`, 'fa-undo', 'warning');
                     pushDeltas({ orders: [newOrder], packings: [dummyPack] }, 'Đã chuyển sang Hàng Hoàn!', 'fa-undo').catch(() => { });
                 } else if (act === 'START') {
-                    const hasActiveCheckin = (attendance || []).some(a =>
-                        String(a.user).trim() === currentUser.trim() &&
+                    const hasActiveCheckin = isBoss || isAdmin || (attendance || []).some(a =>
+                        isUserMatch(a.user, currentUser) &&
                         a.timeIn && !a.timeOut
                     );
                     if (!hasActiveCheckin) {
@@ -5414,10 +5464,27 @@
                     }
 
                     const currentPackingsList = allPackingsList || erpData?.Packings || [];
-                    const userActivePackings = currentPackingsList.filter(p =>
-                        (p.user || '').trim().toLowerCase() === (currentUser || '').trim().toLowerCase() &&
-                        p.status === 'Packing'
-                    );
+                    const allOrdersList = (typeof orders !== 'undefined' && orders) ? orders : (erpData?.Orders || window.GLOBAL_ALL_ORDERS || []);
+                    
+                    const isOrderFinished = (ordId) => {
+                        if (!ordId) return false;
+                        const sId = String(ordId).trim().toLowerCase();
+                        const matchedOrder = allOrdersList.find(o => {
+                            const oId = String(o.id || '').trim().toLowerCase();
+                            const oCode = String(o.orderCode || '').trim().toLowerCase();
+                            return oId === sId || oCode === sId || oCode.includes(sId);
+                        });
+                        if (!matchedOrder) return false;
+                        const st = String(matchedOrder.status || matchedOrder._effectiveStatus || '').toUpperCase().trim();
+                        return st === 'ĐÃ BÀN GIAO' || st === 'HOÀN THÀNH' || st === 'ĐỐI SOÁT THÀNH CÔNG' || st === 'ĐƠN HUỶ' || st.includes('HUỶ') || st === 'HÀNG HOÀN';
+                    };
+
+                    const userActivePackings = currentPackingsList.filter(p => {
+                        if (p.status !== 'Packing') return false;
+                        if (!isUserMatch(p.user, currentUser)) return false;
+                        if (isOrderFinished(p.orderId)) return false;
+                        return true;
+                    });
 
                     // Chống bấm trùng cùng 1 đơn hàng đang trong danh sách đóng gói của nhân sự
                     const orderIdStr = String(_order.id || '').trim();
@@ -5448,7 +5515,7 @@
 
                     const newPack = { id: 'PK' + Date.now(), orderId: _order.id, user: currentUser, date: safeDateOnly, start: currentFullTime, status: 'Packing', photo: gUrl };
                     setOptimisticPack(newPack);
-                    pushDeltas({ packings: [newPack] }, `Đã bắt đầu tính giờ đóng gói (${userActivePackings.length + 1}/${MAX_CONCURRENT_PACKINGS})!`, 'fa-box').catch(() => { });
+                    pushDeltas({ packings: [newPack] }, `Đã bắt đầu đóng gói #${_order.orderCode || _order.id} (${userActivePackings.length + 1}/${MAX_CONCURRENT_PACKINGS})!`, 'fa-box').catch(() => { });
                     setProcessing(false);
                 } else if (act === 'DONE') {
                     if (!targetBoxFile) { triggerToast('Vui lòng chụp ảnh kiện hàng đã đóng kín!', 'fa-camera', 'danger'); return; }
@@ -5728,32 +5795,50 @@
                     };
                 }
 
+                if (isMaxPackingReached) {
+                    return {
+                        label: 'ĐANG GÓI 6/6',
+                        bg: 'bg-zinc-800 text-amber-400 border border-amber-500/40 shadow-sm cursor-not-allowed opacity-90',
+                        icon: 'fas fa-hand-paper',
+                        onClick: (e) => {
+                            e.stopPropagation();
+                            triggerToast('Bạn đang đóng tối đa 6 đơn cùng lúc! Vui lòng chụp kiện hoàn tất bớt đơn trước khi nhận thêm.', 'fa-hand-paper', 'warning');
+                        }
+                    };
+                }
+
                 return {
-                    label: 'BẮT ĐẦU',
-                    bg: 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-emerald-400/40 shadow-md',
+                    label: processing ? 'ĐANG TẢI ẢNH...' : 'BẮT ĐẦU',
+                    bg: processing
+                        ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-500/30 animate-pulse'
+                        : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-emerald-400/40 shadow-md',
                     icon: processing ? 'fas fa-spinner fa-spin' : 'fas fa-camera',
-                    isFileUpload: true,
+                    isFileUpload: !processing,
                     onFileChange: (e) => {
-                        const file = e.target.files[0];
+                        const file = e.target.files && e.target.files[0];
                         if (file) {
                             setGoodsFile(file);
                             handleAct('START', file);
                         }
+                        try { e.target.value = ''; } catch (_) { }
                     }
                 };
             }
             if (isPacking && (isPackOwner || isBoss || isAdmin)) {
                 return {
-                    label: 'CHỤP KIỆN HÀNG',
-                    bg: 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white border border-amber-400/40',
-                    icon: processing ? 'fas fa-spinner fa-spin' : 'fas fa-camera',
-                    isFileUpload: true,
+                    label: processing ? 'ĐANG LƯU KIỆN...' : 'CHỤP KIỆN HÀNG',
+                    bg: processing
+                        ? 'bg-amber-900/60 text-amber-300 border border-amber-500/30 animate-pulse'
+                        : 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white border border-amber-400/40 shadow-md',
+                    icon: processing ? 'fas fa-spinner fa-spin' : 'fas fa-box-check',
+                    isFileUpload: !processing,
                     onFileChange: (e) => {
-                        const file = e.target.files[0];
+                        const file = e.target.files && e.target.files[0];
                         if (file) {
                             setBoxFile(file);
                             handleAct('DONE', file);
                         }
+                        try { e.target.value = ''; } catch (_) { }
                     }
                 };
             }
@@ -5792,7 +5877,7 @@
                 };
             }
             return null;
-        }, [isReturn, isReadyPack, isPacking, isPackOwner, isPendingHandover, isDone, _order.isCarriedToWH, processing, effectiveProds, getProducerOrigin]);
+        }, [isReturn, isReadyPack, isPacking, isPackOwner, isPendingHandover, isDone, _order.isCarriedToWH, processing, effectiveProds, getProducerOrigin, isMaxPackingReached]);
 
         return (
             <div className={`bg-[#121214] rounded-2xl relative overflow-hidden transition-all ${
@@ -6083,88 +6168,327 @@
                 )}
 
                 <div className="absolute top-2 right-2 flex items-center gap-1 z-30">
-                    {/* CỤM NÚT PHỤ (ICON PILLS SIÊU NHỎ) */}
-                    <div className="flex items-center gap-0.5 bg-black/40 p-0.5 rounded-lg border border-white/10 backdrop-blur-sm">
-                        {/* NÚT BẬT/TẮT HỎA TỐC ⚡ (1-CHẠM) */}
+                    <div className="flex items-center gap-1 bg-[#13141a]/90 p-1 rounded-xl border border-white/15 backdrop-blur-md shadow-lg">
+                        {/* 1. NÚT HỎA TỐC ⚡ */}
                         <button
                             type="button"
                             onClick={handleToggleUrgent}
                             title={isUrgent ? "Đang bật HỎA TỐC (Bấm để tắt)" : "Bật HỎA TỐC / Ưu tiên làm ngay"}
-                            className={`w-6 h-6 rounded flex items-center justify-center transition-all cursor-pointer ${
+                            className={`w-7.5 h-7.5 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
                                 isUrgent 
-                                    ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.6)] bg-amber-400/20' 
-                                    : 'text-zinc-500 hover:text-amber-400'
+                                    ? 'text-amber-300 bg-amber-400/25 border border-amber-400/50 shadow-[0_0_10px_rgba(251,191,36,0.35)]' 
+                                    : 'text-zinc-400 hover:text-amber-400 hover:bg-white/10'
                             }`}
                         >
-                            <i className="fas fa-bolt text-[10px]"></i>
+                            <i className="fas fa-bolt text-xs"></i>
                         </button>
-                        {currentRole === 'KẾ TOÁN' && (isReturn || String(_order.status).includes('Hoàn')) && (
-                            <button onClick={fetchAppealEvidence} title="Lấy Hồ Sơ Khiếu Nại" className="w-6 h-6 text-[#cf1322] hover:bg-[#cf1322]/20 rounded flex items-center justify-center transition-colors"><i className={isFetchingAppeal ? "fas fa-spinner fa-spin text-[9px]" : "fas fa-file-download text-[9px]"}></i></button>
-                        )}
+
+                        {/* 2. NÚT IN HÓA ĐƠN / BILL 📄 */}
                         <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setShowInvoiceModal(true); }}
                             title="In / Xem Hoá Đơn Bán Hàng"
-                            className="w-6 h-6 text-emerald-400 hover:bg-emerald-500/20 rounded flex items-center justify-center transition-colors cursor-pointer"
+                            className="w-7.5 h-7.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/15 transition-all flex items-center justify-center cursor-pointer active:scale-95"
                         >
-                            <i className="fas fa-file-invoice text-[10px]"></i>
+                            <i className="fas fa-file-invoice text-xs"></i>
                         </button>
+
+                        {/* 3. NÚT CHI TIẾT ĐƠN ℹ️ */}
                         <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setShowDetailModal(true); }}
-                            title="Xem Chi Tiết"
-                            className="w-6 h-6 text-blue-400 hover:bg-blue-500/20 rounded flex items-center justify-center transition-colors cursor-pointer"
+                            title="Xem Chi Tiết Đơn Hàng"
+                            className="w-7.5 h-7.5 rounded-lg text-sky-400 hover:text-sky-300 hover:bg-sky-500/15 transition-all flex items-center justify-center cursor-pointer active:scale-95"
                         >
-                            <i className="fas fa-info-circle text-[10px]"></i>
+                            <i className="fas fa-info-circle text-xs"></i>
                         </button>
 
-                        {isGuiXeShipping && (isAdmin || currentRole === 'BÁN HÀNG' || currentRole === 'QUẢN LÝ BÁN HÀNG' || isBossRole || currentRole === 'TỐI CAO') && (
-                            <button disabled={hasShippingCode} onClick={(e) => {
-                                e.stopPropagation();
-                                const tracking = window.prompt('Nhập SĐT Nhà Xe:', shippingCode || '');
-                                if (tracking !== null) {
-                                    const newOrderCode = tracking.trim() ? `${mainOrderCode} | MVĐ: ${tracking.trim()}` : mainOrderCode;
-                                    const newOrder = { ..._order, orderCode: newOrderCode };
-                                    setOptimisticOrder(newOrder);
-                                    pushDeltas({ orders: [newOrder] }, 'Đã cập nhật SĐT Nhà Xe!', 'fa-bus').then(() => {
-                                        if (tracking.trim() && typeof showCopyModal === 'function') {
-                                            const msg = `Dạ Rich Fish Aquarium gửi anh/chị thông tin nhà xe: ${tracking.trim()}. Anh/chị chú ý điện thoại để nhận hàng giúp shop nhé!`;
-                                            showCopyModal(msg);
-                                        }
-                                    }).catch(() => { });
-                                }
-                            }} title="Nhập SĐT Xe" className="w-6 h-6 text-emerald-400 hover:bg-emerald-500/20 rounded flex items-center justify-center transition-colors"><i className="fas fa-bus text-[9px]"></i></button>
-                        )}
-
-                        {isGHNShipping && (isAdmin || isCTV || currentRole === 'BÁN HÀNG' || currentRole === 'QUẢN LÝ BÁN HÀNG' || isBossRole || currentRole === 'TỐI CAO') && (
-                            <button
-                                onClick={(e) => { e.stopPropagation(); setShowGHNModal(true); }}
-                                title={hasShippingCode ? "Đã Đẩy GHN" : "Đẩy GHN"}
-                                className="w-6 h-6 text-orange-400 hover:bg-orange-500/20 rounded flex items-center justify-center transition-colors"
-                            >
-                                <i className="fas fa-paper-plane text-[9px]"></i>
-                            </button>
-                        )}
-                        <button onClick={() => {
-                            if (isCTV && shippingCode) {
-                                window.alert('Đơn hàng đã được đẩy qua đơn vị vận chuyển, bạn không thể tự sửa. Vui lòng nhắn bộ phận CSKH để được hỗ trợ!');
-                            } else {
-                                if (window.confirm('ĐÂY LÀ THAO TÁC SẼ LÀM SAI DỮ LIỆU BẠN VẪN MUỐN SỬA?\n\nMọi thao tác sửa đều được ghi lại để đảm bảo dữ liệu chính xác.')) {
-                                    onEditOrder && onEditOrder();
-                                }
-                            }
-                        }} title="Chỉnh sửa đơn" className="w-6 h-6 text-amber-400 hover:bg-amber-500/20 rounded flex items-center justify-center transition-colors"><i className="fas fa-edit text-[9px]"></i></button>
-                        <button onClick={(e) => { e.stopPropagation(); setShowHistoryModal(true); }} title="Xem lịch sử chỉnh sửa công khai" className="w-6 h-6 text-blue-400 hover:bg-blue-500/20 rounded flex items-center justify-center transition-colors"><i className="fas fa-history text-[9px]"></i></button>
-                        {isAdmin && canCancel && !isReturn && <button onClick={() => handleAct('RETURN')} title="Chuyển sang Hàng Hoàn" className="w-6 h-6 text-purple-400 hover:bg-purple-500/20 rounded flex items-center justify-center transition-colors"><i className="fas fa-undo text-[9px]"></i></button>}
-                        {isAdmin && canCancel && !isCanceled && <button onClick={() => handleCancelOrder(_order)} title="Hủy đơn" className="w-6 h-6 text-rose-400 hover:bg-rose-500/20 rounded flex items-center justify-center transition-colors"><i className="fas fa-ban text-[9px]"></i></button>}
-                        {(currentUser?.role === 'Founder' || currentRole === 'TỐI CAO') && (
-                            <button onClick={(e) => { e.stopPropagation(); typeof deleteOrderHandler === 'function' && deleteOrderHandler(_order, prods, _pack, erpData, erpProducts, pushDeltas, triggerToast); }} title="Xóa vĩnh viễn" className="w-6 h-6 text-red-400 hover:bg-red-600/30 rounded flex items-center justify-center transition-colors"><i className="fas fa-trash text-[9px]"></i></button>
-                        )}
+                        {/* 4. NÚT MENU TÁC VỤ KHÁC ••• */}
+                        <button
+                            ref={actionBtnRef}
+                            type="button"
+                            onClick={handleOpenMenu}
+                            title="Tùy chọn & Tác vụ khác"
+                            className={`w-7.5 h-7.5 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
+                                showActionMenu 
+                                    ? 'bg-blue-600 text-white shadow-md' 
+                                    : 'text-zinc-300 hover:text-white hover:bg-white/10'
+                            }`}
+                        >
+                            <i className="fas fa-ellipsis-v text-xs"></i>
+                        </button>
                     </div>
                 </div>
 
+                {/* DROPDOWN MENU TÁC VỤ (PORTAL GẮN VÀO BODY - CHỐNG CLIP BỞI OVERFLOW) */}
+                {showActionMenu && ReactDOM.createPortal(
+                    <>
+                        <div 
+                            className="fixed inset-0 z-[99990]" 
+                            onClick={(e) => { e.stopPropagation(); setShowActionMenu(false); }} 
+                        />
+                        <div 
+                            style={{ position: 'fixed', top: `${menuPos.top}px`, right: `${menuPos.right}px` }}
+                            className="z-[99995] w-56 bg-[#161720]/98 backdrop-blur-2xl border border-white/15 rounded-2xl p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.8)] animate-fade-in text-xs"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-zinc-500 border-b border-white/5 mb-1 flex items-center justify-between">
+                                <span>Tùy chọn đơn</span>
+                                <span className="text-[9px] font-mono text-amber-400/80">{mainOrderCode}</span>
+                            </div>
+
+                            {/* CHỈNH SỬA ĐƠN */}
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowActionMenu(false);
+                                    if (isCTV && shippingCode) {
+                                        window.alert('Đơn hàng đã được đẩy qua đơn vị vận chuyển, bạn không thể tự sửa. Vui lòng nhắn bộ phận CSKH để được hỗ trợ!');
+                                    } else {
+                                        if (window.confirm('ĐÂY LÀ THAO TÁC SẼ LÀM SAI DỮ LIỆU BẠN VẪN MUỐN SỬA?\n\nMọi thao tác sửa đều được ghi lại để đảm bảo dữ liệu chính xác.')) {
+                                            onEditOrder && onEditOrder();
+                                        }
+                                    }
+                                }}
+                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-zinc-200 hover:text-amber-300 hover:bg-amber-500/15 transition-colors text-left cursor-pointer"
+                            >
+                                <i className="fas fa-edit text-amber-400 w-4 text-center"></i>
+                                <span className="font-semibold">Chỉnh sửa đơn</span>
+                            </button>
+
+                            {/* LỊCH SỬ CHỈNH SỬA */}
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowActionMenu(false);
+                                    setShowHistoryModal(true);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-zinc-200 hover:text-sky-300 hover:bg-sky-500/15 transition-colors text-left cursor-pointer"
+                            >
+                                <i className="fas fa-history text-sky-400 w-4 text-center"></i>
+                                <span className="font-semibold">Lịch sử đơn</span>
+                            </button>
+
+                            {/* NHẬP SĐT NHÀ XE */}
+                            {isGuiXeShipping && (isAdmin || currentRole === 'BÁN HÀNG' || currentRole === 'QUẢN LÝ BÁN HÀNG' || isBossRole || currentRole === 'TỐI CAO') && (
+                                <button 
+                                    disabled={hasShippingCode}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowActionMenu(false);
+                                        const tracking = window.prompt('Nhập SĐT Nhà Xe:', shippingCode || '');
+                                        if (tracking !== null) {
+                                            const newOrderCode = tracking.trim() ? `${mainOrderCode} | MVĐ: ${tracking.trim()}` : mainOrderCode;
+                                            const newOrder = { ..._order, orderCode: newOrderCode };
+                                            setOptimisticOrder(newOrder);
+                                            pushDeltas({ orders: [newOrder] }, 'Đã cập nhật SĐT Nhà Xe!', 'fa-bus').then(() => {
+                                                if (tracking.trim() && typeof showCopyModal === 'function') {
+                                                    const msg = `Dạ Rich Fish Aquarium gửi anh/chị thông tin nhà xe: ${tracking.trim()}. Anh/chị chú ý điện thoại để nhận hàng giúp shop nhé!`;
+                                                    showCopyModal(msg);
+                                                }
+                                            }).catch(() => { });
+                                        }
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-zinc-200 hover:text-emerald-300 hover:bg-emerald-500/15 transition-colors text-left cursor-pointer"
+                                >
+                                    <i className="fas fa-bus text-emerald-400 w-4 text-center"></i>
+                                    <span className="font-semibold">{hasShippingCode ? 'Đã có SĐT Xe' : 'Nhập SĐT Nhà Xe'}</span>
+                                </button>
+                            )}
+
+                            {/* ĐẨY GHN */}
+                            {isGHNShipping && (isAdmin || isCTV || currentRole === 'BÁN HÀNG' || currentRole === 'QUẢN LÝ BÁN HÀNG' || isBossRole || currentRole === 'TỐI CAO') && (
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowActionMenu(false);
+                                        setShowGHNModal(true);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-zinc-200 hover:text-orange-300 hover:bg-orange-500/15 transition-colors text-left cursor-pointer"
+                                >
+                                    <i className="fas fa-paper-plane text-orange-400 w-4 text-center"></i>
+                                    <span className="font-semibold">{hasShippingCode ? "Xem Vận Đơn GHN" : "Đẩy Đơn Sang GHN"}</span>
+                                </button>
+                            )}
+
+                            {/* HỒ SƠ KHIẾU NẠI (KẾ TOÁN) */}
+                            {currentRole === 'KẾ TOÁN' && (isReturn || String(_order.status).includes('Hoàn')) && (
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowActionMenu(false);
+                                        fetchAppealEvidence();
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-zinc-200 hover:text-rose-300 hover:bg-rose-500/15 transition-colors text-left cursor-pointer"
+                                >
+                                    <i className={`${isFetchingAppeal ? "fas fa-spinner fa-spin" : "fas fa-file-download"} text-rose-400 w-4 text-center`}></i>
+                                    <span className="font-semibold">Hồ sơ khiếu nại</span>
+                                </button>
+                            )}
+
+                            {/* VÙNG NGUY HIỂM / CHỐT CHẶN (HOÀN / HỦY / XÓA) */}
+                            {(isAdmin || canCancel) && (
+                                <>
+                                    <div className="border-t border-white/10 my-1"></div>
+                                    <div className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-rose-400/80 flex items-center gap-1.5">
+                                        <i className="fas fa-shield-alt text-[9px]"></i>
+                                        <span>Vùng kiểm soát</span>
+                                    </div>
+
+                                    {!isReturn && (
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowActionMenu(false);
+                                                setConfirmAction({
+                                                    type: 'RETURN',
+                                                    title: 'XÁC NHẬN CHUYỂN HÀNG HOÀN',
+                                                    desc: `Bạn có chắc chắn muốn chuyển đơn #${mainOrderCode} sang [HÀNG HOÀN CHỜ XỬ] không?`,
+                                                    warning: 'Đơn hàng sẽ rời khỏi danh sách sản xuất/đóng gói hiện tại để chuyển vào kho hoàn trả.',
+                                                    confirmText: 'Chuyển Hàng Hoàn',
+                                                    icon: 'fa-undo',
+                                                    color: 'purple'
+                                                });
+                                            }}
+                                            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-purple-300 hover:text-purple-100 hover:bg-purple-500/20 transition-colors text-left font-bold cursor-pointer"
+                                        >
+                                            <i className="fas fa-undo text-purple-400 w-4 text-center"></i>
+                                            <span>Chuyển Hàng Hoàn</span>
+                                        </button>
+                                    )}
+
+                                    {!isCanceled && (
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowActionMenu(false);
+                                                setConfirmAction({
+                                                    type: 'CANCEL',
+                                                    title: 'XÁC NHẬN HỦY ĐƠN HÀNG',
+                                                    desc: `Bạn có chắc chắn muốn HỦY đơn hàng #${mainOrderCode} không?`,
+                                                    warning: 'Đơn hàng sẽ bị hủy bỏ và chuyển sang trạng thái [ĐƠN HUỶ].',
+                                                    confirmText: 'Xác Nhận Hủy Đơn',
+                                                    icon: 'fa-ban',
+                                                    color: 'rose'
+                                                });
+                                            }}
+                                            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-rose-300 hover:text-rose-100 hover:bg-rose-500/20 transition-colors text-left font-bold cursor-pointer"
+                                        >
+                                            <i className="fas fa-ban text-rose-400 w-4 text-center"></i>
+                                            <span>Hủy đơn hàng</span>
+                                        </button>
+                                    )}
+
+                                    {(currentUser?.role === 'Founder' || currentRole === 'TỐI CAO') && (
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowActionMenu(false);
+                                                setConfirmAction({
+                                                    type: 'DELETE',
+                                                    title: 'CẢNH BÁO: XÓA VĨNH VIỄN ĐƠN',
+                                                    desc: `Hành động này sẽ XÓA VĨNH VIỄN đơn #${mainOrderCode} khỏi hệ thống và hoàn trả toàn bộ tồn kho liên quan (nếu có).`,
+                                                    warning: 'DỮ LIỆU ĐÃ XÓA SẼ KHÔNG THỂ KHÔI PHỤC!',
+                                                    confirmText: 'Xóa Vĩnh Viễn',
+                                                    icon: 'fa-trash',
+                                                    color: 'red'
+                                                });
+                                            }}
+                                            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-red-400 hover:text-red-200 hover:bg-red-600/25 transition-colors text-left font-black cursor-pointer"
+                                        >
+                                            <i className="fas fa-trash text-red-400 w-4 text-center"></i>
+                                            <span>Xóa vĩnh viễn</span>
+                                        </button>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </>,
+                    document.body
+                )}
+
+                {/* MODAL XÁC NHẬN POKA-YOKE (CHỐNG BẤM NHẦM LÀM MẤT ĐƠN) */}
+                {confirmAction && ReactDOM.createPortal(
+                    <div 
+                        className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
+                        onClick={() => setConfirmAction(null)}
+                    >
+                        <div 
+                            className="bg-[#181922] border border-white/20 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 text-slate-100 animate-scale-up"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            {/* Header with Icon */}
+                            <div className="flex items-center gap-3.5">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shrink-0 shadow-inner ${
+                                    confirmAction.color === 'purple' 
+                                        ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40' 
+                                        : confirmAction.color === 'rose' 
+                                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40' 
+                                        : 'bg-red-500/20 text-red-400 border border-red-500/40'
+                                }`}>
+                                    <i className={`fas ${confirmAction.icon}`}></i>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="font-black text-base text-white truncate">{confirmAction.title}</h3>
+                                    <p className="text-xs text-zinc-400 font-mono mt-0.5 truncate">
+                                        Đơn: <span className="text-[#d4af37] font-bold">{mainOrderCode}</span>
+                                        {_order.customer ? ` · ${_order.customer}` : ''}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Content Box */}
+                            <div className="bg-[#101116] border border-white/10 rounded-2xl p-4 space-y-2.5 text-xs">
+                                <p className="text-zinc-200 leading-relaxed font-medium">
+                                    {confirmAction.desc}
+                                </p>
+                                <div className="flex items-start gap-2 text-amber-300 text-[11px] pt-2 border-t border-white/5 font-semibold">
+                                    <i className="fas fa-exclamation-triangle mt-0.5 text-amber-400 shrink-0"></i>
+                                    <span>{confirmAction.warning}</span>
+                                </div>
+                            </div>
+
+                            {/* Buttons */}
+                            <div className="flex items-center justify-end gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setConfirmAction(null)}
+                                    className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs transition cursor-pointer active:scale-95"
+                                >
+                                    Huỷ bỏ (Giữ lại đơn)
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const type = confirmAction.type;
+                                        setConfirmAction(null);
+                                        if (type === 'RETURN') {
+                                            handleAct('RETURN');
+                                        } else if (type === 'CANCEL') {
+                                            handleCancelOrder(_order);
+                                        } else if (type === 'DELETE') {
+                                            typeof deleteOrderHandler === 'function' && deleteOrderHandler(_order, prods, _pack, erpData, erpProducts, pushDeltas, triggerToast);
+                                        }
+                                    }}
+                                    className={`px-5 py-2.5 rounded-xl font-black text-xs text-white transition flex items-center gap-2 cursor-pointer shadow-lg active:scale-95 ${
+                                        confirmAction.color === 'purple' 
+                                            ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-900/40' 
+                                            : confirmAction.color === 'rose' 
+                                            ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 shadow-rose-900/40' 
+                                            : 'bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 shadow-red-900/40'
+                                    }`}
+                                >
+                                    <i className={`fas ${confirmAction.icon}`}></i>
+                                    <span>{confirmAction.confirmText}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>,
+                    document.body
+                )}
+
                 {(isDone || isPendingHandover) && (pGoods || pBox || whPhoto) && (
-                    <div className={`absolute right-2 flex gap-1.5 z-20 ${isAdmin ? 'top-11' : 'top-2'}`}>
+                    <div className="absolute right-2 top-12 flex gap-1.5 z-20">
                         {pGoods && (
                             <div className="flex flex-col items-end">
                                 <img 
@@ -6260,6 +6584,11 @@
                             <span className="px-1.5 py-0.5">{_order.channel || 'OFFLINE'}</span>
                             {isReturn && <span className="px-1.5 py-0.5 bg-black/30 border-l border-current animate-pulse">HÀNG HOÀN</span>}
                         </div>
+                        {isPacking && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse shadow-sm">
+                                <i className="fas fa-box-open text-[8px]"></i> Đang đóng
+                            </span>
+                        )}
                         <span className="text-[9px] font-bold text-[#888] uppercase truncate">{_order.createdAt ? new Date(_order.createdAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : _order.date}</span>
                     </div>
 
@@ -6311,10 +6640,21 @@
                                     <span>{chameleonConfig.label}</span>
                                 </span>
                             ) : chameleonConfig.isFileUpload ? (
-                                <label className={`h-8 px-3.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer shrink-0 ${chameleonConfig.bg}`}>
+                                <label 
+                                    onClick={e => e.stopPropagation()} 
+                                    className={`h-8 px-3.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer shrink-0 ${chameleonConfig.bg}`}
+                                >
                                     <i className={`${chameleonConfig.icon} text-xs`}></i>
                                     <span>{chameleonConfig.label}</span>
-                                    <input type="file" accept="image/png, image/jpeg, image/jpg, image/webp" capture="environment" className="hidden" onChange={chameleonConfig.onFileChange} onClick={e => e.stopPropagation()} />
+                                    <input 
+                                        type="file" 
+                                        accept="image/png, image/jpeg, image/jpg, image/webp" 
+                                        capture="environment" 
+                                        disabled={processing}
+                                        className="hidden" 
+                                        onChange={chameleonConfig.onFileChange} 
+                                        onClick={e => { e.stopPropagation(); try { e.target.value = ''; } catch(_) {} }} 
+                                    />
                                 </label>
                             ) : (
                                 <button

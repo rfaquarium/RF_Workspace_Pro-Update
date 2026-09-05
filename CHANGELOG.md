@@ -3,6 +3,28 @@
 Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến trúc, tối ưu nghiệp vụ và sửa lỗi của hệ điều hành `RF_Workspace_Pro`.
 ---
 
+## [v2.43.0] - 2026-09-05
+
+### 📦 Mở Khóa Đóng Gói Đồng Thời Theo Lô (Batch Packing - Tối Đa 6 Đơn/Tài Khoản)
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **Hạn chế cũ (Chốt chặn đơn lẻ)**: Hệ thống trước đây áp dụng cơ chế khóa cứng: Mỗi tài khoản nhân sự đóng gói (Diệu Hương) chỉ được bấm "BẮT ĐẦU" đúng 1 đơn hàng duy nhất (`status: 'Packing'`). Nếu có bất kỳ đơn nào chưa chụp ảnh đóng kiện hoàn thành, hệ thống chặn hoàn toàn việc nhận đơn mới.
+  - **Lãng phí thời gian thao tác (Muda of Motion & Waiting)**: Trong thực tế sản xuất của Rich Fish Aquarium, nhân sự đóng gói thường gom 4 - 6 đơn hàng cùng kích thước/cùng kênh giao hàng để cắt xốp, chuẩn bị thùng carton và quấn màng co đồng loạt nhằm tối ưu hóa năng suất và nhịp độ Takt Time. Việc bắt buộc phải đóng xong, chụp ảnh và bàn giao từng đơn một tạo ra độ trễ thao tác lớn và không phản ánh đúng dòng chảy công việc thực tế.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật (`Modals_Orders.html`)**:
+  1. **Nâng trần đóng gói đồng thời lên tối đa 6 đơn**:
+     - Thay thế lệnh tìm kiếm đơn lẻ `find(p => p.user === currentUser && p.status === 'Packing')` bằng mảng lọc `userActivePackings`.
+     - Cho phép nhân sự bấm nhận "BẮT ĐẦU" tối đa 6 đơn hàng đồng thời (`MAX_CONCURRENT_PACKINGS = 6`).
+     - Cập nhật thông báo trực quan trên Toast: `Đã bắt đầu tính giờ đóng gói (X/6)!`.
+  2. **Chốt chặn Poka-Yoke chống bấm trùng & bảo vệ an toàn dữ liệu**:
+     - Kiểm tra nghiêm ngặt `isAlreadyPackingThis` (so khớp cả `orderId` và `orderCode`), ngăn chặn nhân sự vô tình bấm nhận 2 lần cho cùng 1 đơn hàng.
+     - Khi đã nhận đủ 6 đơn dở dang (`userActivePackings.length >= 6`), hệ thống kích hoạt cảnh báo đỏ yêu cầu hoàn thành bớt đơn trước khi nhận tiếp.
+  3. **Cơ chế tự động giải phóng lượt (Auto Slot Release)**:
+     - Khi nhân sự bấm "CHỤP KIỆN HÀNG" và hoàn tất đơn (`act === 'DONE'`), bản ghi đóng gói chuyển sang `status: 'Done'`, tự động giảm số lượng đơn đang gói và giải phóng ngay 1 vị trí trong hạn mức 6 đơn.
+  4. **Tối ưu hóa UI & Đồng bộ phiên bản**:
+     - Memo hóa `userActivePackings` tại `OrderCardV2`, đảm bảo hiệu năng render mượt mà khi hiển thị danh sách đơn hàng lớn.
+     - Đồng bộ nhật ký phát hành `RELEASES` và huy hiệu phiên bản `Royal v2.43.0` trên toàn hệ thống.
+- **Kiểm Định Tự Động**: Bổ sung bộ test Section 15 kiểm chứng toàn diện logic nhận 1..6 đơn, chặn đơn thứ 7, chống bấm trùng và giải phóng slot khi hoàn tất.
+
+
 ## [v2.42.0] - 2026-09-04
 
 ### ⚡ Tối Ưu Hóa Dòng Chảy Lean (One-Piece Flow), Phá Vỡ Điểm Nghẽn Sản Xuất & Giao Hàng

@@ -781,9 +781,39 @@
 
         const RELEASES = [
             {
+                version: 'Royal v2.43.0',
+                date: '05/09/2026',
+                isLatest: true,
+                badge: 'MỞ KHÓA ĐÓNG GÓI ĐỒNG THỜI (MAX 6 ĐƠN)',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Mở Khóa Nhận Đóng Gói Đồng Thời Theo Lô (Batch Packing - Tối Đa 6 Đơn/Tài Khoản)',
+                summary: 'Loại bỏ triệt để điểm nghẽn đóng gói đơn lẻ (Single Order Bottleneck) theo triết lý Lean Muda: Cho phép nhân sự đóng gói (Diệu Hương) chủ động bấm bắt đầu nhận tối đa 6 đơn hàng cùng lúc để gom lô, chuẩn bị vật tư/thùng xốp và đóng gói liên hoàn. Bổ sung cơ chế Poka-Yoke ngăn nhận trùng đơn, tự động cảnh báo khi đạt ngưỡng 6/6 và tự giải phóng lượt ngay khi chụp hoàn tất kiện hàng.',
+                categories: ['Đóng Gói', 'Lean Flow', 'Đơn Hàng', 'Poka-Yoke', 'SLA'],
+                items: [
+                    {
+                        icon: 'fa-boxes',
+                        color: 'text-emerald-400',
+                        title: 'Cho Phép Bấm Bắt Đầu 6 Đơn Đóng Gói Cùng Lúc (Max Concurrent Packings)',
+                        desc: 'Nâng trần đóng gói đồng thời từ 1 đơn lên 6 đơn cho mỗi tài khoản, giúp nhân sự tối ưu hóa thời gian chuẩn bị băng keo, xốp nổ và thùng carton theo lô lớn.'
+                    },
+                    {
+                        icon: 'fa-shield-alt',
+                        color: 'text-amber-400',
+                        title: 'Chốt Chặn Poka-Yoke Chống Bấm Trùng & Giới Hạn Nghiêm Ngặt 6/6',
+                        desc: 'Tự động kiểm tra danh sách đơn đang gói của nhân sự; cảnh báo tức thì nếu bấm trùng cùng một mã đơn hoặc khi đã chạm trần 6 đơn dở dang.'
+                    },
+                    {
+                        icon: 'fa-sync-alt',
+                        color: 'text-cyan-400',
+                        title: 'Tự Động Giải Phóng Lượt Theo Thời Gian Thực (Auto Slot Release)',
+                        desc: 'Khi nhân sự hoàn tất chụp ảnh kiện hàng của bất kỳ đơn nào (trạng thái chuyển sang Chờ Bàn Giao/Done), hệ thống tự động giải phóng 1 vị trí để nhận ngay đơn tiếp theo.'
+                    }
+                ]
+            },
+            {
                 version: 'Royal v2.42.0',
                 date: '04/09/2026',
-                isLatest: true,
+                isLatest: false,
                 badge: 'TỐI ƯU DÒNG CHẢY LEAN SẢN XUẤT & ĐƠN HÀNG',
                 badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
                 title: 'Tối Ưu Hóa Dòng Chảy Lean (One-Piece Flow), Phá Vỡ Điểm Nghẽn Sản Xuất & Giao Hàng',
@@ -6264,7 +6294,7 @@
                                     <div className="w-5 flex justify-center text-[#d4af37] text-[13px]"><i className="fas fa-rocket"></i></div>
                                     <span>Bản Cập Nhật</span>
                                 </div>
-                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.42.0</span>
+                                <span className="text-[9px] bg-rose-500/20 text-rose-400 font-black px-1.5 py-0.5 rounded border border-rose-500/30">v2.43.0</span>
                             </button>
                         </div>
                     </div>

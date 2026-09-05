@@ -4975,8 +4975,12 @@
         const isPacking = currentPackingTask?.status === 'Packing';
         const isPackOwner = currentPackingTask?.user === currentUser;
 
-        const globalActivePacking = (erpData?.Packings || []).find(p => p.user === currentUser && p.status === 'Packing');
-        const isPackingOtherOrder = globalActivePacking && globalActivePacking.orderId !== _order.id;
+        const userActivePackings = React.useMemo(() => {
+            const cUser = (currentUser || '').trim().toLowerCase();
+            return (allPackingsList || erpData?.Packings || []).filter(p => (p.user || '').trim().toLowerCase() === cUser && p.status === 'Packing');
+        }, [allPackingsList, erpData?.Packings, currentUser]);
+        const isMaxPackingReached = userActivePackings.length >= 6;
+        const isPackingOtherOrder = false; // RF v2.43.0: Hỗ trợ đóng gói đồng thời tối đa 6 đơn
 
         const requiredCheckIds = React.useMemo(() => {
             const ids = [];
@@ -5409,9 +5413,28 @@
                         return;
                     }
 
-                    const activePacking = (erpData?.Packings || []).find(p => p.user === currentUser && p.status === 'Packing');
-                    if (activePacking) {
-                        triggerToast(`Bạn đang đóng gói dở dang đơn hàng của mã ${activePacking.orderId}! Hãy hoàn thành trước khi nhận đơn mới.`, 'fa-box', 'danger');
+                    const currentPackingsList = allPackingsList || erpData?.Packings || [];
+                    const userActivePackings = currentPackingsList.filter(p =>
+                        (p.user || '').trim().toLowerCase() === (currentUser || '').trim().toLowerCase() &&
+                        p.status === 'Packing'
+                    );
+
+                    // Chống bấm trùng cùng 1 đơn hàng đang trong danh sách đóng gói của nhân sự
+                    const orderIdStr = String(_order.id || '').trim();
+                    const orderCodeStr = String(_order.orderCode || '').trim();
+                    const isAlreadyPackingThis = userActivePackings.some(p => {
+                        const pOrd = String(p.orderId || '').trim();
+                        return pOrd && (pOrd === orderIdStr || pOrd === orderCodeStr);
+                    });
+                    if (isAlreadyPackingThis) {
+                        triggerToast(`Đơn hàng #${_order.orderCode || _order.id} đang trong tiến trình đóng gói của bạn!`, 'fa-box', 'warning');
+                        return;
+                    }
+
+                    // Quy tắc Lean: Tối đa 6 đơn đóng gói đồng thời theo lô để loại trừ thời gian chết Muda
+                    const MAX_CONCURRENT_PACKINGS = 6;
+                    if (userActivePackings.length >= MAX_CONCURRENT_PACKINGS) {
+                        triggerToast(`Bạn đã nhận tối đa ${MAX_CONCURRENT_PACKINGS} đơn đóng gói đồng thời (${userActivePackings.length}/${MAX_CONCURRENT_PACKINGS})! Vui lòng hoàn thành bớt đơn trước khi nhận thêm.`, 'fa-hand-paper', 'danger');
                         return;
                     }
 
@@ -5425,7 +5448,7 @@
 
                     const newPack = { id: 'PK' + Date.now(), orderId: _order.id, user: currentUser, date: safeDateOnly, start: currentFullTime, status: 'Packing', photo: gUrl };
                     setOptimisticPack(newPack);
-                    pushDeltas({ packings: [newPack] }, 'Đã bắt đầu tính giờ, hãy gói hàng!', 'fa-box').catch(() => { });
+                    pushDeltas({ packings: [newPack] }, `Đã bắt đầu tính giờ đóng gói (${userActivePackings.length + 1}/${MAX_CONCURRENT_PACKINGS})!`, 'fa-box').catch(() => { });
                     setProcessing(false);
                 } else if (act === 'DONE') {
                     if (!targetBoxFile) { triggerToast('Vui lòng chụp ảnh kiện hàng đã đóng kín!', 'fa-camera', 'danger'); return; }

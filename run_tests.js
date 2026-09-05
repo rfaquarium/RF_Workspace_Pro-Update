@@ -744,7 +744,86 @@ const needPhase2 = itemsInQueue.filter(i => (i.phases?.phase1?.status === 'Done'
 assert('Sub-filter: Exactly 1 item needs Phase 1 (Q1)', needPhase1.length === 1 && needPhase1[0].id === 'Q1');
 assert('Sub-filter: Exactly 1 item needs Phase 2 (Q2)', needPhase2.length === 1 && needPhase2[0].id === 'Q2');
 
+// 15. TEST ROYAL V2.43.0 CONCURRENT PACKING (MAX 6 ORDERS PER ACCOUNT)
+console.log('\n--- 15. Testing Royal v2.43.0 Concurrent Packing (Max 6 Orders) ---');
+const appMainPath = path.join(__dirname, 'App_Main.html');
+const appMainContent = fs.readFileSync(appMainPath, 'utf8');
+const changelogPath = path.join(__dirname, 'CHANGELOG.md');
+const changelogContent = fs.readFileSync(changelogPath, 'utf8');
+const modalsOrdersPath = path.join(__dirname, 'Modals_Orders.html');
+const modalsOrdersContent = fs.readFileSync(modalsOrdersPath, 'utf8');
+
+// 15.1 Version Sync Checks
+assert('App_Main.html: Contains Royal v2.43.0 in RELEASES', appMainContent.includes("version: 'Royal v2.43.0'"));
+assert('App_Main.html: Sidebar badge displays v2.43.0', appMainContent.includes('>v2.43.0</span>'));
+assert('CHANGELOG.md: Documents v2.43.0 release notes', changelogContent.includes('## [v2.43.0] - 2026-09-05'));
+assert('Modals_Orders.html: Configures MAX_CONCURRENT_PACKINGS = 6', modalsOrdersContent.includes('MAX_CONCURRENT_PACKINGS = 6'));
+assert('Modals_Orders.html: Old single-order find blocker is removed', !modalsOrdersContent.includes("const activePacking = (erpData?.Packings || []).find(p => p.user === currentUser && p.status === 'Packing');"));
+
+// 15.2 Functional Simulation of Packing Concurrency Engine
+function simulateStartPacking(currentUser, order, packingsList) {
+    const userActivePackings = packingsList.filter(p =>
+        (p.user || '').trim().toLowerCase() === (currentUser || '').trim().toLowerCase() &&
+        p.status === 'Packing'
+    );
+
+    // Chống bấm trùng cùng 1 đơn hàng
+    const orderIdStr = String(order.id || '').trim();
+    const orderCodeStr = String(order.orderCode || '').trim();
+    const isAlreadyPackingThis = userActivePackings.some(p => {
+        const pOrd = String(p.orderId || '').trim();
+        return pOrd && (pOrd === orderIdStr || pOrd === orderCodeStr);
+    });
+    if (isAlreadyPackingThis) {
+        return { success: false, reason: 'DUPLICATE', count: userActivePackings.length };
+    }
+
+    const MAX_CONCURRENT_PACKINGS = 6;
+    if (userActivePackings.length >= MAX_CONCURRENT_PACKINGS) {
+        return { success: false, reason: 'LIMIT_EXCEEDED', count: userActivePackings.length };
+    }
+
+    const newPack = {
+        id: 'PK' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        orderId: order.id,
+        user: currentUser,
+        status: 'Packing'
+    };
+    return { success: true, newPack, count: userActivePackings.length + 1 };
+}
+
+let testPackings = [];
+const huongUser = 'Nguyễn Thị Diệu Hương';
+
+// Test adding 6 orders sequentially for Hương
+for (let i = 1; i <= 6; i++) {
+    const res = simulateStartPacking(huongUser, { id: `ORD_00${i}`, orderCode: `CODE_00${i}` }, testPackings);
+    assert(`Concurrency: Diệu Hương can start order #${i} (Result count: ${res.count}/6)`, res.success === true && res.count === i);
+    testPackings.push(res.newPack);
+}
+
+// Test starting the 7th order (should be blocked)
+const res7 = simulateStartPacking(huongUser, { id: 'ORD_007', orderCode: 'CODE_007' }, testPackings);
+assert('Concurrency: Diệu Hương blocked from starting 7th order (LIMIT_EXCEEDED)', res7.success === false && res7.reason === 'LIMIT_EXCEEDED');
+
+// Test anti-duplicate: Diệu Hương clicks order #3 again (should be blocked as DUPLICATE)
+const resDup = simulateStartPacking(huongUser, { id: 'ORD_003', orderCode: 'CODE_003' }, testPackings);
+assert('Concurrency: Diệu Hương blocked from duplicate start on same order #3', resDup.success === false && resDup.reason === 'DUPLICATE');
+
+// Test isolation: Another user (e.g. Dương) is NOT blocked by Hương's 6 active orders
+const duongUser = 'Nguyễn Hoàng Dương';
+const resDuong = simulateStartPacking(duongUser, { id: 'ORD_008', orderCode: 'CODE_008' }, testPackings);
+assert('Concurrency: User isolation - Hoàng Dương can start order independently', resDuong.success === true && resDuong.count === 1);
+
+// Test auto-release: Complete 1 order of Hương -> slots drop to 5 -> can start a 6th again
+const packIndexToDone = testPackings.findIndex(p => p.orderId === 'ORD_002' && p.user === huongUser);
+testPackings[packIndexToDone].status = 'Done'; // Hương finished packing ORD_002
+
+const resAfterDone = simulateStartPacking(huongUser, { id: 'ORD_007', orderCode: 'CODE_007' }, testPackings);
+assert('Concurrency: Auto-release slot - Diệu Hương can start ORD_007 after completing ORD_002', resAfterDone.success === true && resAfterDone.count === 6);
+
 // SUMMARY
+
 console.log(`\n========================================`);
 console.log(`TEST SUMMARY: ${passedTests}/${totalTests} Passed (${failedTests} Failed)`);
 console.log(`========================================\n`);

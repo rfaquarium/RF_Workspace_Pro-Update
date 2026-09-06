@@ -111,8 +111,15 @@ const RFEnterpriseCore = {
       let alerts = [];
 
       productions.forEach(prod => {
-        const status = String(prod.status || '').toUpperCase().trim();
-        if (status === 'IN_PROGRESS' || status === 'PENDING') {
+        const rawStatus = String(prod.status || '').trim();
+        const statusUpper = rawStatus.toUpperCase();
+        // Chuẩn hóa nhận diện trạng thái đang thi công: IN_PROGRESS, IN PROGRESS, PENDING, ĐANG LÀM, ĐANG SẢN XUẤT
+        const isInProgress = statusUpper === 'IN_PROGRESS' || 
+                             statusUpper === 'IN PROGRESS' || 
+                             statusUpper === 'PENDING' ||
+                             statusUpper === 'ĐANG LÀM' || 
+                             statusUpper === 'ĐANG SẢN XUẤT';
+        if (isInProgress) {
           const deadlineStr = prod.deadline;
           if (deadlineStr) {
             const deadlineTime = new Date(deadlineStr).getTime();
@@ -185,29 +192,50 @@ const RFEnterpriseCore = {
      * Tái sử dụng logic lấy KPI từ hệ thống.
      */
     updateKpiProgressData: function(ss) {
-      // Chỉ tạo bộ vỏ gọi để tương thích với luồng quét tập trung.
-      // Nếu logic cũ nằm rải rác, cần refactor chuyển mã cập nhật vào đây,
-      // sau đó ghi hàng loạt qua applyDeltasToSheet('KPI_Progress', ...).
       Logger.log('🔄 [HrPayrollAgent] Đang cập nhật KPI_Progress...');
       
-      // Ví dụ: Quét số bể hoàn thành của Hoàng Dương
+      // 1. Ưu tiên gọi các engine cập nhật KPI chuyên sâu đã có sẵn trong Code.js
+      let calledCodeJs = false;
+      if (typeof updateKpiProgressData === 'function') {
+        try { updateKpiProgressData(); calledCodeJs = true; } catch (e) { Logger.log('Lỗi gọi updateKpiProgressData: ' + e); }
+      }
+      if (typeof updateKpiProgressData_Duong === 'function') {
+        try { updateKpiProgressData_Duong(); calledCodeJs = true; } catch (e) { Logger.log('Lỗi gọi updateKpiProgressData_Duong: ' + e); }
+      }
+      if (typeof updateKpiProgressData_Tam === 'function') {
+        try { updateKpiProgressData_Tam(); calledCodeJs = true; } catch (e) { Logger.log('Lỗi gọi updateKpiProgressData_Tam: ' + e); }
+      }
+      if (typeof updateKpiProgressData_Trang === 'function') {
+        try { updateKpiProgressData_Trang(); calledCodeJs = true; } catch (e) { Logger.log('Lỗi gọi updateKpiProgressData_Trang: ' + e); }
+      }
+
+      if (calledCodeJs) {
+        Logger.log('✅ [HrPayrollAgent] Đã cập nhật KPI qua các hàm chuyên trách trong Code.js');
+        return;
+      }
+
+      // 2. Logic fallback nếu chạy môi trường tách biệt
       if (typeof readSheet !== 'function') return;
       const productions = readSheet('Production', null, ss) || [];
-      let hdGlassCount = 0;
-      
       const todayStr = Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd');
+      let hdGlassCount = 0;
+      let dtLayoutCount = 0;
       
       productions.forEach(prod => {
-        // Khớp 100% tên cột p1_user, p1_status, p1_endTime
+        // Khớp 100% tên cột p1_user, p1_status, p1_endTime, p2_user, p2_status, p2_endTime
         if (prod.p1_user === 'Nguyễn Hoàng Dương' && String(prod.p1_status).toUpperCase() === 'DONE') {
           if (prod.p1_endTime && String(prod.p1_endTime).includes(todayStr)) {
             hdGlassCount++;
           }
         }
+        if (prod.p2_user === 'Trần Duy Tân' && String(prod.p2_status).toUpperCase() === 'DONE') {
+          if (prod.p2_endTime && String(prod.p2_endTime).includes(todayStr)) {
+            dtLayoutCount++;
+          }
+        }
       });
 
-      Logger.log(`[HR] Nguyễn Hoàng Dương hôm nay hoàn thành: ${hdGlassCount} bể.`);
-      // Có thể kết nối thêm với applyDeltasToSheet('KPI_Progress', [...])
+      Logger.log(`[HR] Nguyễn Hoàng Dương hôm nay: ${hdGlassCount} bể. Trần Duy Tân: ${dtLayoutCount} layout.`);
     }
   },
 

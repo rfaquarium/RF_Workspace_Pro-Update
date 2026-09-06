@@ -2,6 +2,98 @@
 
 Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến trúc, tối ưu nghiệp vụ và sửa lỗi của hệ điều hành `RF_Workspace_Pro`.
 
+## [v2.45.7] - 2026-09-07
+
+### 🔄 Tự Động Đưa Đơn Hoàn Tháng Cũ (T8) Về Mục Hoàn Tháng Này (T9) Cho Diệu Hương Đi Kiểm
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **1. Sự cố đơn hoàn tháng 8 biến mất khi quét tại xưởng trong tháng 9**:
+    - *Triệu chứng*: Khi quản lý xưởng dùng súng bắn mã vạch tít gói hàng hoàn (hoặc ném file Excel Order.all) vào nút "Quét Đơn Hoàn Tự Động" trong tháng 9, đơn phát sinh từ tháng 8 bị hệ thống ẩn mất khỏi màn hình "Tháng Này". Diệu Hương mở app xem tab "Hàng Hoàn Chờ Xử" của Tháng Này không thấy đơn đâu để đi kiểm.
+    - *Nguyên nhân gốc rễ*:
+      1. Trong `Tab_Orders.html`, hàm lọc thời gian `matchTimeFilter` lấy `dateCandidate = order.date || order.createdAt || ...`. Vì đơn tạo từ tháng 8 nên `order.date` là tháng 8, khiến điều kiện so khớp tháng hiện tại (`filterTime === 'Tháng Này'`) trả về `false`, đẩy đơn ra khỏi danh sách hiển thị.
+      2. Trạng thái `HÀNG HOÀN` bị xếp vào nhóm `isClosed`, khiến các đơn hoàn chưa đối soát không được hưởng cơ chế giữ lại như đơn chưa sản xuất.
+      3. Hàm `processCode` trong `ReturnScannerModal` kiểm tra trạng thái cũ: nếu đơn đã từng được ghi nhận trạng thái Hoàn (ví dụ sàn cập nhật từ trước), hệ thống báo `"Đơn này đã ở trạng thái Hoàn rồi!"` và chặn không cho quét nhận hiện vật thật về kho.
+      4. Khối banner màu đỏ `realTimeSummary.urgentAlerts` ("CẢNH BÁO: ĐƠN HỦY & HOÀN TRẢ") chỉ kiểm tra `order.updatedAt || order.createdAt || order.date`, không kiểm tra `order.returnedAt`, khiến đơn hoàn vừa quét hôm nay không nhảy lên cảnh báo đỏ.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật**:
+  1. **Tự Động Đưa Đơn Tháng Cũ Về Tháng Hiện Tại Khi Quét Nhận Hoàn (`processCode` & `confirmBulkReturn`)**:
+     - Khi quét bằng súng tít đơn lẻ hoặc nạp file Excel/PDF/dán mã hàng loạt: Nếu đơn có ngày `date` thuộc tháng trước, hệ thống tự động cập nhật `date: safeDateOnly` (ngày hôm nay thuộc Tháng Này), gắn `returnedAt: returnedAt`, `updatedAt: safeDateFull`, và chuyển trạng thái sang `status: 'Hàng Hoàn'`, `_effectiveStatus: 'HÀNG HOÀN CHỜ XỬ LÝ'`, `isReconciled: false`.
+     - Tự động gắn nhãn vết vào ghi chú: `[Đơn cũ T{tháng} đưa về Hoàn T{tháng_nay}: gốc {ngày_gốc}]` để bảo toàn lịch sử truy vết 100%.
+     - Mở khóa quét nhận hàng thực tế: Cho phép quét lại đối với đơn đã có trạng thái Hoàn từ tháng trước (chỉ chặn nếu đã quét trong chính ngày hôm nay để chống tít đúp).
+  2. **Cơ Chế Zero-Dropped Trong `matchTimeFilter`**:
+     - Bổ sung quy tắc: Đơn `HÀNG HOÀN` chưa đối soát (`!isReconciled`) là công việc tồn đọng cần Diệu Hương đi kiểm ➡️ Khi lọc "Tháng Này", LUÔN LUÔN HIỂN THỊ (`return true`).
+     - Với đơn Hàng Hoàn, ngày ưu tiên hàng đầu để so khớp thời gian là ngày quét nhận hoàn `order.returnedAt`.
+  3. **Hiển Thị Tức Thì Trên Khối Cảnh Báo `urgentAlerts`**:
+     - Bổ sung `o.returnedAt` vào điều kiện kiểm tra `isToday`, giúp đơn hoàn vừa quét hôm nay lập tức xuất hiện trên banner đỏ kèm nút `[KIỂM HOÀN]` 1 chạm.
+  4. **Nâng Cấp Trải Nghiệm Hallmark UI Của `ReturnScannerModal`**:
+     - Bổ sung badge chỉ báo trực quan: *"Đơn tháng cũ (T8) khi quét sẽ tự động đưa về mục Hoàn Tháng Này để Hương kiểm tra"*.
+     - Nút xác nhận ghi rõ số lượng đơn và tháng đích để người dùng hoàn toàn an tâm khi thao tác.
+
+---
+
+## [v2.45.6] - 2026-09-07
+
+### 📱 Khóa Cứng Bàn Phím PIN Zero Layout Shift, Triệt Tiêu Lỗi Cú Pháp Unterminated String & Tối Ưu Cảm Ứng Mobile 0ms
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **1. Hiện tượng giật nảy bàn phím khi bấm đến số thứ 4 (Keypad Jitter & Misclick Flaw)**:
+    - *Triệu chứng*: Khi người dùng nhập mã PIN đến số thứ 4, toàn bộ cụm bàn phím số bị giật nảy vị trí khiến ngón tay đang bấm liên tục số 5, 6 bị bấm trượt hoặc thiếu số.
+    - *Nguyên nhân gốc rễ*:
+      - Thẻ `<input autoFocus>` ẩn kích hoạt bàn phím ảo của hệ điều hành trên mobile, làm thay đổi chiều cao viewport (`window.innerHeight`) liên tục khiến popup bị co giật.
+      - Nút "Xác nhận đăng nhập" chuyển đổi trạng thái khi đạt 4 số: từ không có viền sang có viền 1px và đổi padding, thêm shadow lớn làm kích thước modal thay đổi, đẩy toàn bộ cụm phím số bên dưới dịch chuyển.
+      - 6 chấm tròn PIN có animation phóng to `scale-110` gây reflow nhẹ lên container.
+  - **2. Lỗi cú pháp runtime `Unterminated string constant. (3309:24)`**:
+    - *Triệu chứng*: Trình duyệt hiển thị màn hình báo lỗi `THÔNG BÁO KHỞI ĐỘNG KHÔNG THÀNH CÔNG: LỖI CÚ PHÁP TẠI FILE [Modals]: unknown: Unterminated string constant. (3309:24)`.
+    - *Nguyên nhân gốc rễ*: Tại dòng 3309 trong `Modals.html`, chuỗi `'https://ntfy.sh/'` chứa ký tự hai dấu gạch chéo `//`. Khi Google Apps Script xử lý nạp tệp qua hàm `include()`, bộ tiền xử lý hiểu nhầm `//` là bắt đầu của một comment đơn dòng, dẫn đến việc cắt cụt chuỗi thành `const ntfyUrl = 'https:`, gây lỗi thiếu dấu đóng chuỗi khi Babel biên dịch.
+  - **3. Lỗi linter `Declaration or statement expected`**:
+    - *Nguyên nhân gốc rễ*: Cú pháp React Fragment rút gọn (`<>` và `</>`) bên trong thẻ `<script type="text/babel">` của tệp `.html` bị Language Server hiểu nhầm là toán tử so sánh không hợp lệ, làm gãy cây cú pháp AST.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật (Hallmark Mobile & Zero Shift)**:
+  1. **Khóa Cứng Hình Học Bàn Phím PIN (Zero Layout Shift)**:
+     - Loại bỏ hoàn toàn thẻ `<input autoFocus>` ẩn, thay thế bằng lắng nghe phím toàn cục qua `window.addEventListener('keydown')`. Trên điện thoại, bàn phím ảo của hệ điều hành không bao giờ tự bung lên.
+     - Khóa cứng kích thước nút bấm: chiều cao cố định `50px`, viền `border` 1px chuẩn border-box ở cả trạng thái chờ và kích hoạt (chỉ đổi màu từ viền mờ sang vàng amber).
+     - Khóa cứng 6 chấm tròn PIN: khung chứa cố định `20px`, mỗi chấm cố định `13px x 13px`, loại bỏ `scale-110`.
+     - Tối ưu cảm ứng mobile với `touch-action: manipulation`, triệt tiêu độ trễ 300ms và chặn double-tap zoom khi bấm nhanh.
+  2. **Triệt Tiêu 100% Lỗi Cắt Chuỗi Do Ký Tự Gạch Chéo (`//`)**:
+     - Thay thế toàn bộ chuỗi URL tĩnh trực tiếp bằng phép nối ký tự an toàn (`'https:' + '/' + '/ntfy.sh/'`), ngăn chặn tuyệt đối hiện tượng Apps Script hiểu nhầm thành comment.
+  3. **Phẳng Hóa Cây Cú Pháp JSX & Tối Ưu Hóa Render Qua `React.useMemo`**:
+     - Tách biệt logic nhãn nút (`submitBtnText`) và lớp CSS (`submitBtnClass`) ra khỏi cây JSX, đưa vào các hook `React.useMemo` độc lập.
+     - Loại bỏ hoàn toàn cú pháp Fragment rút gọn (`<>` và `</>`), thay bằng các thẻ `<i>` và `<span>` phẳng chuẩn mực, loại bỏ 100% cảnh báo linter.
+
+---
+
+## [v2.45.5] - 2026-09-06
+
+### ⚡ Tối Ưu Hiệu Năng Toàn Diện: 2-Phase Execution (0ms JSX Compile), Bảo Toàn 100% Công Thức Sheet & Concurrency Guards
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **1. Trình duyệt tải chậm và giật lag CPU khi khởi động (Babel Cold Parse / Compile)**:
+    - *Triệu chứng*: Mở ứng dụng mất từ 1.5s - 3s chỉ để tải thư viện Babel CDN 2.8 MB và biên dịch hàng nghìn dòng JSX trên thiết bị của nhân viên, gây nóng máy và nghẽn luồng render.
+    - *Nguyên nhân gốc rễ*: `Index.html` nhúng thẻ `<script src="babel.min.js">` và nạp toàn bộ 20 fragment HTML bằng `type="text/babel"`, buộc trình duyệt phải parse AST và transform runtime mỗi lần tải trang.
+  - **2. Nguy cơ mất công thức ô tính trên dòng đang sửa (Formula Overwrite Flaw)**:
+    - *Triệu chứng*: Khi client gửi delta cập nhật trạng thái đơn hoặc giá trị một trường, thao tác `setValues` theo dòng có thể biến các ô có công thức tự động (`=SUM(...)`, `=CONCATENATE(...)`) thành giá trị tĩnh.
+    - *Nguyên nhân gốc rễ*: Hàm `applyDeltasToSheet` trước đây chỉ đọc mảng giá trị bằng `getValues()`, không đọc `getFormulas()`. Khi ghi lại dòng, các ô có công thức bị gán lại bằng giá trị hiển thị cũ.
+  - **3. Nghẽn cổ chai $O(N \times M)$ khi lưu đơn/kho và ghi phân tán**:
+    - *Triệu chứng*: Khi lưu lô nhiều đơn hoặc cập nhật hàng loạt tồn kho, hàm chạy chậm do lặp lồng $O(N)$ từng item qua toàn bộ $M$ dòng của bảng, đồng thời gọi nhiều lệnh `getRange().setValues()` rời rạc.
+    - *Nguyên nhân gốc rễ*: Thiếu cơ chế lập chỉ mục in-memory và chưa gom cụm các dòng liền kề để ghi theo dải liên tục (Contiguous Range).
+  - **4. Hiện tượng Response chậm ghi đè dữ liệu vừa lưu (Stale Overwrite)**:
+    - *Triệu chứng*: Nhân viên vừa chuyển trạng thái đơn hàng sang "Đã Bàn Giao", một request polling ngầm cũ từ server trả về sau đó vài giây đã đè trạng thái cũ "Chờ Sản Xuất" lên giao diện.
+    - *Nguyên nhân gốc rễ*: Hàm `smartMerge` trước đây luôn ưu tiên `...serverItem` đè lên `...localItem`, bất kể thời điểm thao tác local của người dùng mới diễn ra gần đây.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật**:
+  1. **Động Cơ Biên Dịch JSX Pre-compile & 2-Phase Execution**:
+     - Xây dựng công cụ CLI độc lập `tools/precompile_jsx.js` sử dụng Babel Standalone nội bộ biên dịch trước 20 fragment nguồn JSX thành Javascript thuần (`React.createElement`), xuất ra `Compiled_Core.html` và `Compiled_Deferred.html`.
+     - `Index.html` loại bỏ hoàn toàn thẻ nạp Babel CDN 2.8 MB trong môi trường production, tiết kiệm 100% thời gian compile runtime (0ms CPU compile). Phase 1 thực thi tức thì App Shell và các tab cốt lõi; Phase 2 nạp các tab quản trị khi luồng chính rảnh qua `requestIdleCallback`.
+     - Tích hợp `build_manifest.json` và `tools/verify_build.js` kiểm tra mã băm SHA-256 đối chiếu 100% mã nguồn trước khi vận hành.
+  2. **Bảo Toàn 100% Công Thức Sheet & Contiguous Range Batch Write**:
+     - `Code.js`: Nâng cấp `applyDeltasToSheet` đọc đồng thời `getValues()` và `getFormulas()`. Với mọi ô không thuộc phạm vi client cập nhật có chứa công thức (bắt đầu bằng `=`), hệ thống bảo lưu nguyên vẹn chuỗi công thức gốc.
+     - Lập chỉ mục in-memory $O(1)$ (`idMap`, `codeMap`, `attLeaveMap`), hỗ trợ cập nhật in-flight in-batch cho các item thêm mới hoặc cộng dồn `_diff` nhiều lần trong cùng một yêu cầu.
+     - Gom các dòng sửa đổi liền kề thành các dải liên tục (contiguous chunks) để ghi theo lô, và append toàn bộ dòng mới bằng 1 lệnh duy nhất.
+  3. **Concurrency Guards & SmartMerge Chống Đè Dữ Liệu Cũ**:
+     - `App_Main.html`: Bổ sung các refs kiểm soát bất đồng bộ (`fetchSeqRef`, `activeSessionIdRef`, `isFetchingRef`, `refetchQueuedRef`), loại bỏ race condition giữa các request đồng bộ chồng chéo.
+     - Cập nhật `smartMerge` và `smartMergeOrders`: Nếu bản ghi local có thời gian thao tác `_optimisticTime < 60000` (dưới 60 giây), hệ thống ưu tiên tuyệt đối dữ liệu thao tác của người dùng thay vì để server response chậm đè lên.
+     - Tích hợp Page Visibility API: Tạm dừng polling ngầm khi tab bị ẩn (`document.hidden`), tự động đồng bộ khi người dùng quay lại sau 45s, và tự khôi phục kết nối ngay khi mạng online trở lại.
+  4. **Tách Biệt Cache Cấu Hình & Authoritative Auth Source**:
+     - `getUserConfig()`: Chỉ lấy dữ liệu hiển thị an toàn (`avatars`, `titles`, `subTitles`, `salaries`, `users`), cache 120s trong CacheService.
+     - `getAuthoritativeAuthConfig_()`: Nguồn thẩm quyền tối cao xác thực PIN và phân quyền vai trò, cache ngắn 30s gắn với `CONFIG_GENERATION` token.
+     - Bổ sung hàm `invalidateUserConfigCache()` và action `invalidateUserConfig` trong `handleApiRequest` (yêu cầu quyền Boss/Admin) chống triệt để race condition đè cache khi thay đổi phân quyền.
+
+---
+
 ## [v2.45.4] - 2026-09-06
 
 ### 📱 Chuẩn Hóa Công Thái Học Modal Tài Chính Mobile (Hallmark), Khắc Phục Lỗi Đồng Bộ Quỹ & Tối Ưu Đọc File Trạm Bơm Đơn

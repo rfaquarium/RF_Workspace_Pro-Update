@@ -132,12 +132,27 @@
 
             if (order) {
                 const currentStatus = String(order.status || '').toUpperCase().trim();
-                if (currentStatus === 'HÀNG HOÀN' || currentStatus.indexOf('HOÀN CHỜ XỬ') > -1 || currentStatus.indexOf('HOÀN KHO') > -1) {
-                    triggerToast('Đơn này đã ở trạng thái Hoàn rồi!', 'fa-info-circle', 'warning');
+                const safeDateFull = typeof getLocalISODate === 'function' ? getLocalISODate() : new Date().toISOString();
+                const returnedAt = safeDateFull.replace('T', ' ').slice(0, 19);
+                const safeDateOnly = safeDateFull.slice(0, 10);
+                const now = new Date();
+                const curY = now.getFullYear();
+                const curM = now.getMonth() + 1;
+                const curYm = `${curY}-${String(curM).padStart(2, '0')}`;
+
+                const origDateStr = String(order.date || order.createdAt || '').slice(0, 10);
+                const isOldMonth = origDateStr && !origDateStr.startsWith(curYm);
+                const origMonthMatch = origDateStr.match(/\d{4}-(\d{2})/);
+                const origMonthNum = origMonthMatch ? parseInt(origMonthMatch[1], 10) : '';
+
+                // Kiểm tra đơn đã từng quét nhận hoàn trong chính ngày hôm nay chưa (chống tít đúp vô tình)
+                const isAlreadyReturn = (currentStatus === 'HÀNG HOÀN' || currentStatus.indexOf('HOÀN CHỜ XỬ') > -1 || currentStatus.indexOf('HOÀN KHO') > -1);
+                const alreadyScannedToday = isAlreadyReturn && String(order.returnedAt || '').includes(safeDateOnly);
+
+                if (alreadyScannedToday) {
+                    triggerToast(`Đơn [${order.orderCode}] đã quét nhận hoàn hôm nay rồi!`, 'fa-info-circle', 'warning');
                 } else {
                     try {
-                        const safeDateFull = typeof getLocalISODate === 'function' ? getLocalISODate() : new Date().toISOString();
-                        const returnedAt = safeDateFull.replace('T', ' ').slice(0, 19);
                         const effectiveReason = String(returnReason || '').trim();
                         let updatedNote = String(order.note || '').trim();
                         if (effectiveReason) {
@@ -147,16 +162,33 @@
                                 updatedNote = updatedNote ? `${updatedNote} | [Hoàn: ${effectiveReason}]` : `[Hoàn: ${effectiveReason}]`;
                             }
                         }
+
+                        // Nếu là đơn tháng cũ (T8): ghi chú vết và chuyển ngày về tháng này để Diệu Hương kiểm
+                        if (isOldMonth) {
+                            const tag = `[Đơn cũ T${origMonthNum || 'trước'} đưa về Hoàn T${curM}: gốc ${origDateStr}]`;
+                            if (!updatedNote.includes('đưa về Hoàn T')) {
+                                updatedNote = updatedNote ? `${tag} ${updatedNote}` : tag;
+                            }
+                        }
+
                         const newOrder = { 
                             ...order, 
+                            date: isOldMonth ? safeDateOnly : (order.date || safeDateOnly),
                             status: 'Hàng Hoàn', 
+                            _effectiveStatus: 'HÀNG HOÀN CHỜ XỬ LÝ',
                             returnReason: effectiveReason || order.returnReason || '',
                             note: updatedNote,
                             returnedAt: returnedAt, 
-                            reconciledAt: order.reconciledAt || returnedAt 
+                            reconciledAt: order.reconciledAt || returnedAt,
+                            updatedAt: safeDateFull,
+                            isReconciled: false
                         };
-                        await pushDeltas({ orders: [newOrder] }, `Đã nhận hoàn đơn: ${order.orderCode}${effectiveReason ? ` (${effectiveReason})` : ''}!`, 'fa-undo');
-                        triggerToast(`Thành công! Đơn [${order.orderCode}] đã chuyển về Kho Hoàn.`, 'fa-check', 'success');
+                        await pushDeltas({ orders: [newOrder] }, `Đã nhận hoàn đơn: ${order.orderCode} (Hoàn T${curM})${effectiveReason ? ` (${effectiveReason})` : ''}!`, 'fa-undo');
+                        if (isOldMonth) {
+                            triggerToast(`Thành công! Đơn [${order.orderCode}] (T${origMonthNum || 'cũ'}) đã được đưa về mục Hoàn Tháng ${curM} để Diệu Hương kiểm!`, 'fa-check-circle', 'success');
+                        } else {
+                            triggerToast(`Thành công! Đơn [${order.orderCode}] đã chuyển về Kho Hoàn Tháng ${curM} để Diệu Hương kiểm!`, 'fa-check-circle', 'success');
+                        }
                     } catch (err) { triggerToast('Lỗi kết nối đồng bộ kho hoàn!', 'fa-times', 'danger'); }
                 }
             } else {
@@ -437,7 +469,13 @@
             try {
                 const safeDateFull = typeof getLocalISODate === 'function' ? getLocalISODate() : new Date().toISOString();
                 const returnedAt = safeDateFull.replace('T', ' ').slice(0, 19);
+                const safeDateOnly = safeDateFull.slice(0, 10);
+                const now = new Date();
+                const curY = now.getFullYear();
+                const curM = now.getMonth() + 1;
+                const curYm = `${curY}-${String(curM).padStart(2, '0')}`;
 
+                let oldMonthCount = 0;
                 const updatedOrders = scannedOrders.map(o => {
                     const effectiveReason = String(returnReason || o.fileReturnReason || '').trim();
                     let updatedNote = String(o.note || '').trim();
@@ -448,19 +486,41 @@
                             updatedNote = updatedNote ? `${updatedNote} | [Hoàn: ${effectiveReason}]` : `[Hoàn: ${effectiveReason}]`;
                         }
                     }
+
+                    const origDateStr = String(o.date || o.createdAt || '').slice(0, 10);
+                    const isOldMonth = origDateStr && !origDateStr.startsWith(curYm);
+                    const origMonthMatch = origDateStr.match(/\d{4}-(\d{2})/);
+                    const origMonthNum = origMonthMatch ? parseInt(origMonthMatch[1], 10) : '';
+
+                    if (isOldMonth) {
+                        oldMonthCount++;
+                        const tag = `[Đơn cũ T${origMonthNum || 'trước'} đưa về Hoàn T${curM}: gốc ${origDateStr}]`;
+                        if (!updatedNote.includes('đưa về Hoàn T')) {
+                            updatedNote = updatedNote ? `${tag} ${updatedNote}` : tag;
+                        }
+                    }
+
                     return {
                         ...o,
+                        date: isOldMonth ? safeDateOnly : (o.date || safeDateOnly),
                         status: 'Hàng Hoàn',
+                        _effectiveStatus: 'HÀNG HOÀN CHỜ XỬ LÝ',
                         returnReason: effectiveReason || o.returnReason || '',
                         note: updatedNote,
-                        returnedAt: o.returnedAt || returnedAt,
-                        reconciledAt: o.reconciledAt || returnedAt
+                        returnedAt: returnedAt,
+                        reconciledAt: o.reconciledAt || returnedAt,
+                        updatedAt: safeDateFull,
+                        isReconciled: false
                     };
                 });
 
-                const logMsg = returnReason ? `Đã chuyển ${updatedOrders.length} đơn về Hàng Hoàn (${returnReason})!` : `Đã chuyển ${updatedOrders.length} đơn về Hàng Hoàn!`;
+                const logMsg = returnReason ? `Đã chuyển ${updatedOrders.length} đơn về Hàng Hoàn T${curM} (${returnReason})!` : `Đã chuyển ${updatedOrders.length} đơn về Hàng Hoàn T${curM}!`;
                 await pushDeltas({ orders: updatedOrders }, logMsg, 'fa-undo');
-                triggerToast(`Thành công! Đã chuyển ${updatedOrders.length} đơn sang Hàng Hoàn.`, 'fa-check', 'success');
+                if (oldMonthCount > 0) {
+                    triggerToast(`Thành công! Đã chuyển ${updatedOrders.length} đơn (có ${oldMonthCount} đơn tháng cũ) về mục Hoàn Tháng ${curM} cho Diệu Hương kiểm.`, 'fa-check-circle', 'success');
+                } else {
+                    triggerToast(`Thành công! Đã chuyển ${updatedOrders.length} đơn sang Hàng Hoàn Tháng ${curM}.`, 'fa-check-circle', 'success');
+                }
                 onClose();
             } catch (err) { triggerToast('Lỗi đồng bộ!', 'fa-times', 'danger'); }
             setIsProcessing(false);
@@ -597,12 +657,16 @@
                             )}
 
                             <button onClick={confirmBulkReturn} disabled={isProcessing || scannedOrders.length === 0} className={`w-full py-3.5 rounded-xl font-black text-[12px] tracking-wide shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 mt-1 cursor-pointer ${isProcessing || scannedOrders.length === 0 ? 'bg-[#333] text-gray-500' : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90 shadow-purple-900/30'}`}>
-                                {isProcessing ? <><i className="fas fa-spinner fa-spin"></i> ĐANG CẬP NHẬT TRẠNG THÁI...</> : `XÁC NHẬN ĐƯA ${scannedOrders.length} ĐƠN VỀ HÀNG HOÀN`}
+                                {isProcessing ? <><i className="fas fa-spinner fa-spin"></i> ĐANG CẬP NHẬT TRẠNG THÁI...</> : `XÁC NHẬN ĐƯA ${scannedOrders.length} ĐƠN VỀ HOÀN THÁNG ${new Date().getMonth() + 1} CHO HƯƠNG KIỂM`}
                             </button>
                         </div>
                     ) : (
                         <>
-                            <p className="text-gray-400 text-[11px] mb-2.5 leading-relaxed mt-1">Dùng súng bắn mã vạch hoặc ném file Excel Order.all / PDF vào đây.</p>
+                            <p className="text-gray-400 text-[11px] mb-1.5 leading-relaxed mt-1">Dùng súng bắn mã vạch hoặc ném file Excel Order.all / PDF vào đây.</p>
+                            <div className="flex items-center justify-center gap-1.5 text-[9.5px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-xl w-fit mx-auto mb-2.5 font-bold shadow-sm">
+                                <i className="fas fa-magic text-amber-400"></i>
+                                <span>Đơn tháng cũ (T8) khi quét sẽ tự động đưa về mục Hoàn Tháng Này (T{new Date().getMonth() + 1}) để Hương kiểm tra</span>
+                            </div>
 
                             {/* Preset Lý Do Khi Tít Súng Mã Vạch */}
                             <div className="w-full mb-3 bg-[#0d0d12] border border-purple-500/20 rounded-xl p-2.5 text-left">
@@ -1682,22 +1746,34 @@
             if (!filterTime || filterTime === 'ALL' || filterTime === 'Tất Cả') return true;
 
             const st = String(order.status || order._effectiveStatus || '').toUpperCase().trim();
+            const isRec = isReconciledSafe(order.isReconciled);
+            const isReturnOrder = (st === 'HÀNG HOÀN' || st.includes('HOÀN CHỜ XỬ') || st.includes('HOÀN TRẢ') || st === 'KIỂM HÀNG HOÀN');
+
+            // 🛡️ NGUYÊN TẮC ZERO-DROPPED CHO ĐƠN HOÀN CHỜ KIỂM:
+            // Đơn Hàng Hoàn mà chưa đối soát/duyệt kho (!isRec) là công việc tồn đọng cần Diệu Hương đi kiểm.
+            // Khi lọc "Tháng Này", LUÔN LUÔN hiển thị để không bao giờ bị sót việc!
+            if (isReturnOrder && !isRec && (filterTime === 'Tháng Này' || filterTime === 'this_month')) {
+                return true;
+            }
+
             const isClosed = (
                 st === 'HOÀN THÀNH' || 
                 st === 'ĐỐI SOÁT THÀNH CÔNG' || 
                 st === 'ĐÃ BÀN GIAO' || 
                 st === 'ĐƠN HUỶ' || 
                 st === 'ĐÃ NHẬP KHO' ||
-                st === 'HÀNG HOÀN' ||
-                st.includes('HOÀN CHỜ XỬ') ||
-                isReconciledSafe(order.isReconciled)
+                (isReturnOrder && isRec) ||
+                isRec
             );
 
             if (!isClosed && (filterTime === 'Tháng Này' || filterTime === 'this_month')) {
                 return true;
             }
 
-            const dateCandidate = order.date || order.createdAt || order.reconciledAt || order.returnedAt || order.updatedAt;
+            // Với đơn Hàng Hoàn: ngày ưu tiên hàng đầu là ngày quét nhận hoàn (returnedAt)
+            const dateCandidate = isReturnOrder
+                ? (order.returnedAt || order.reconciledAt || order.date || order.createdAt || order.updatedAt)
+                : (order.date || order.createdAt || order.reconciledAt || order.returnedAt || order.updatedAt);
             const orderDateObj = (typeof window.parseOrderDateSafe === 'function') 
                 ? window.parseOrderDateSafe(dateCandidate)
                 : null;
@@ -1998,11 +2074,11 @@
             const getCleanStatus = (status) => String(status || '').toUpperCase().trim();
 
             const urgentAlerts = (orders || []).filter(o => {
-                const orderDate = String(o.updatedAt || o.createdAt || o.date || '');
+                const orderDate = String(o.returnedAt || o.updatedAt || o.createdAt || o.date || '');
                 const isToday = orderDate.includes(todayStr);
                 const cleanSt = getCleanStatus(o.status);
-                return (cleanSt === 'ĐƠN HỦY' || cleanSt === 'ĐƠN HUỶ' || cleanSt === 'HÀNG HOÀN') && isToday;
-            }).sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+                return (cleanSt === 'ĐƠN HỦY' || cleanSt === 'ĐƠN HUỶ' || cleanSt === 'HÀNG HOÀN' || cleanSt.includes('HOÀN')) && isToday;
+            }).sort((a, b) => new Date(b.returnedAt || b.updatedAt || b.createdAt || 0) - new Date(a.returnedAt || a.updatedAt || a.createdAt || 0));
 
             return { urgentAlerts };
         }, [orders]);

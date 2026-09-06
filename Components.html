@@ -550,6 +550,27 @@ const RFAgentControlTower = React.memo(function RFAgentControlTower({
 }) {
     const [isProcessing, setIsProcessing] = React.useState(false);
     const [chatInput, setChatInput] = React.useState('');
+    const [aiOnline, setAiOnline] = React.useState(null);
+
+    React.useEffect(() => {
+        let isMounted = true;
+        const checkStatus = () => {
+            fetch(KCS_LOCAL_URL + '/health')
+                .then(res => res.ok ? res.json() : null)
+                .then(data => {
+                    if (isMounted) setAiOnline(Boolean(data && data.status));
+                })
+                .catch(() => {
+                    if (isMounted) setAiOnline(false);
+                });
+        };
+        checkStatus();
+        const timer = setInterval(checkStatus, 30000);
+        return () => {
+            isMounted = false;
+            clearInterval(timer);
+        };
+    }, []);
 
     const squad = React.useMemo(() => ({
         cso: { name: "GĐ Chiến Lược", icon: "🌟", color: "#06b6d4", box: "avatar-cso" },
@@ -874,47 +895,22 @@ const RFAgentControlTower = React.memo(function RFAgentControlTower({
 
             if (loadingDiv) loadingDiv.remove();
 
-            // Fallback nếu không có kết nối backend: Tính toán thông minh dựa trên context thật
+            // Loại bỏ hoàn toàn thoại mẫu giả lập: Chỉ báo kết quả thật từ server hoặc báo lỗi trung thực
             if (!dialogues || dialogues.length === 0) {
-                const kpiArr = payloadContext.kpi_progress || [];
-                const glueInfo = payloadContext.inventory?.glue_wacker || "Keo Wacker 121 còn sẵn sàng";
-
-                if (incidentText.toLowerCase().includes("kpi") || incidentText.toLowerCase().includes("hoàn thành") || incidentText.toLowerCase().includes("tháng")) {
-                    if (kpiArr.length > 0) {
-                        const sortedKpi = [...kpiArr].sort((a, b) => (b.pct || 0) - (a.pct || 0));
-                        const topStaff = sortedKpi[0];
-                        const secondStaff = sortedKpi[1];
-                        dialogues = [
-                            { agent: "hr", message: `Theo bảng KPI_Progress thực tế, ${topStaff.user} đang dẫn đầu với ${topStaff.pct}% (${topStaff.current}/${topStaff.target} ${topStaff.unit})${secondStaff ? `, kế tiếp là ${secondStaff.user} với ${secondStaff.pct}%` : ''}. Đây là những nhân sự sáng cửa nhất để cán đích 100% KPI tháng này!` },
-                            { agent: "cso", message: `Sức cầu thị trường đang rất ủng hộ! Nếu ${topStaff.user} giữ vững nhịp độ này thì doanh số xưởng sẽ bứt phá mạnh mẽ.` },
-                            { agent: "coo", message: "Tiến độ dây chuyền bám sát SOP. Đề nghị anh em thợ dán bể và dựng khung duy trì nhịp Takt Time 2h/block để không bị nghẽn đơn cuối tháng." },
-                            { agent: "kho", message: `Thủ kho rà soát: ${glueInfo}. Phôi kính và đá lũa đã sẵn sàng 100% để anh em xưởng bứt tốc KPI.` },
-                            { agent: "sx", message: "KCS xác nhận: Đường keo dán giấu keo phải chuẩn nét, zero bọt khí, mài vát kim cương 45 độ đạt chuẩn thì mới duyệt KPI tối đa." },
-                            { agent: "cfo", message: "Quỹ thưởng hoàn thành 100% KPI đã duyệt sẵn. Nhân sự nào về đích đạt chuẩn sẽ được giải ngân thưởng minh bạch ngay." },
-                            { agent: "baodong", message: `Ối dồi ôi! ${topStaff.user} đang dẫn đầu thế này thì anh em chuẩn bị tinh thần được khao chầu liên hoan cuối tháng rồi nhé!` }
-                        ];
-                    } else {
-                        dialogues = [
-                            { agent: "hr", message: "Theo dõi số liệu nhân sự: Chị Diệu Hương (QC Đóng gói) và anh Hoàng Dương (Bể kính) đang có năng suất rất ổn định, triển vọng cao nhất để chạm mốc 100% KPI." },
-                            { agent: "cso", message: "Dòng bể kính siêu trong mài vát và layout thác cát đang bán rất chạy trên Shopee. Xưởng cần tập trung đẩy mạnh để vượt chỉ tiêu." },
-                            { agent: "coo", message: "Vận hành xưởng yêu cầu Hoàng Dương và Duy Tân phối hợp nhịp nhàng theo luồng One-Piece Flow, tuân thủ sấy keo 48h đúng SOP." },
-                            { agent: "kho", message: `Thủ kho kiểm tra: ${glueInfo}. Đáp ứng đầy đủ vật tư cho anh em sản xuất.` },
-                            { agent: "sx", message: "KCS cam kết kiểm soát 100% sản phẩm đầu ra, đường keo Wacker 121 cực nét, không một lỗi bọt khí." },
-                            { agent: "cfo", message: "Tài chính xưởng luôn sẵn sàng quỹ thưởng khuyến khích anh em thợ đạt năng suất cao." },
-                            { agent: "baodong", message: "Nghe các sếp phân tích rôm rả quá, anh em thợ xưởng cứ bình tĩnh bắn keo cho đẹp kẻo dính bọt khí lại bị trừ phạt đấy nha!" }
-                        ];
-                    }
-                } else {
-                    dialogues = [
-                        { agent: "sx", message: `KCS thẩm định sự vụ: "${incidentText}". Yêu cầu kiểm tra lại đường keo Wacker 121 và mài vát cạnh kính theo chuẩn SOP!` },
-                        { agent: "kho", message: `Kho kiểm kê tức thì: ${glueInfo}. Sẵn sàng xuất vật tư dự phòng cho ca này nếu cần.` },
-                        { agent: "hr", message: "Chiếu theo Nội quy xưởng: Thợ tuân thủ nghiêm ngặt kỹ thuật và an toàn lao động để bảo toàn điểm đánh giá KPI." },
-                        { agent: "cfo", message: "Chi phí phát sinh sẽ được kiểm soát chặt chẽ, ưu tiên xử lý dứt điểm để bảo đảm tiến độ đơn hàng." },
-                        { agent: "cso", message: "Dòng bể này đang là trụ cột uy tín của thương hiệu Rich Fish. Phải xử lý đẹp 100% để giữ đánh giá 5 sao trên sàn!" },
-                        { agent: "coo", message: "Chỉ đạo xử lý: Thợ khoét vát 45 độ, dán bù keo và gạt phẳng trong 25 phút. Shipper 16:30 lấy hàng đúng hạn." },
-                        { agent: "baodong", message: "Ối dồi ôi! Mới quay đi một cái là xưởng lại có biến. Anh em tập trung tay nghề nào, đừng để quỹ liên hoan lại đầy ắp tiền phạt!" }
-                    ];
+                if (stream) {
+                    const errDiv = document.createElement("div");
+                    errDiv.style.background = "rgba(239, 68, 68, 0.15)";
+                    errDiv.style.border = "1px solid #ef4444";
+                    errDiv.style.padding = "10px 12px";
+                    errDiv.style.borderRadius = "8px";
+                    errDiv.style.color = "#fca5a5";
+                    errDiv.style.fontSize = "12px";
+                    errDiv.style.lineHeight = "1.5";
+                    errDiv.innerHTML = `<span style="font-weight:bold;"><i class="fas fa-exclamation-triangle"></i> Lỗi kết nối / Xử lý AI:</span> Không nhận được phản hồi hợp lệ từ dịch vụ Agent. Hệ thống tuân thủ nguyên tắc báo lỗi trung thực, tuyệt đối không dùng lời thoại mẫu giả lập để che lỗi. Vui lòng kiểm tra trạng thái máy chủ AI.`;
+                    stream.appendChild(errDiv);
+                    stream.scrollTop = stream.scrollHeight;
                 }
+                return;
             }
 
             for (const line of dialogues) {
@@ -1030,7 +1026,18 @@ const RFAgentControlTower = React.memo(function RFAgentControlTower({
                     }}
                 >
                     <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#d4af37', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ width: '8px', height: '8px', background: '#22c55e', borderRadius: '50%', display: 'inline-block', boxShadow: '0 0 6px #22c55e' }}></span>
+                        <span 
+                            title={aiOnline === true ? "Hệ thống AI trực tuyến (Online)" : (aiOnline === false ? "Hệ thống AI ngoại tuyến (Offline)" : "Đang kiểm tra kết nối AI...")}
+                            style={{ 
+                                width: '8px', 
+                                height: '8px', 
+                                background: aiOnline === true ? '#22c55e' : (aiOnline === false ? '#ef4444' : '#eab308'), 
+                                borderRadius: '50%', 
+                                display: 'inline-block', 
+                                boxShadow: aiOnline === true ? '0 0 6px #22c55e' : (aiOnline === false ? '0 0 6px #ef4444' : '0 0 6px #eab308'),
+                                transition: 'all 0.3s ease'
+                            }}
+                        ></span>
                         BAN ĐIỀU HÀNH TÁC NHÂN SỐ (RF WAR ROOM)
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -1200,7 +1207,18 @@ const RFAgentControlTower = React.memo(function RFAgentControlTower({
                 }}
                 title="Bật/Tắt Ban Điều Hành Tác Nhân Số (RF War Room)"
             >
-                <span style={{ width: '6px', height: '6px', background: '#22c55e', borderRadius: '50%', display: 'inline-block', boxShadow: '0 0 6px #22c55e' }}></span>
+                <span 
+                    title={aiOnline === true ? "AI Online" : (aiOnline === false ? "AI Offline" : "Connecting...")}
+                    style={{ 
+                        width: '6px', 
+                        height: '6px', 
+                        background: aiOnline === true ? '#22c55e' : (aiOnline === false ? '#ef4444' : '#eab308'), 
+                        borderRadius: '50%', 
+                        display: 'inline-block', 
+                        boxShadow: aiOnline === true ? '0 0 6px #22c55e' : (aiOnline === false ? '0 0 6px #ef4444' : '0 0 6px #eab308'),
+                        transition: 'all 0.3s ease'
+                    }}
+                ></span>
                 🎖️ War Room (7)
             </button>
         </React.Fragment>

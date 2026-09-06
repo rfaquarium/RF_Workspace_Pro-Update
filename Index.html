@@ -47,13 +47,50 @@
       }
     }
   </script>
+  <script>
+    window.__rfBootErrors = [];
+    window.__rfReportBootError = function (msg, stack) {
+      console.error("💥 [RF CRASH]:", msg, stack);
+      window.__rfBootErrors.push({ msg: msg, stack: stack });
+      var box = document.getElementById('rf-crash-container');
+      var details = document.getElementById('rf-crash-details');
+      var status = document.getElementById('rf-boot-status-msg');
+      if (box && details) {
+        box.style.display = 'block';
+        details.textContent = (details.textContent ? details.textContent + "\n\n" : "") + msg + (stack ? "\n" + stack : "");
+      }
+      if (status) {
+        status.innerHTML = '<span class="text-rose-400 font-bold">⚠️ Sự cố nạp ứng dụng</span>';
+      }
+    };
+    window.onerror = function (msg, url, line, col, err) {
+      var fullMsg = (msg || 'Unknown Error') + (line ? ' (Dòng ' + line + ':' + col + ')' : '');
+      window.__rfReportBootError(fullMsg, err ? err.stack : '');
+    };
+    window.addEventListener('unhandledrejection', function (e) {
+      var r = e.reason;
+      var fullMsg = 'Lỗi bất đồng bộ: ' + (r ? (r.stack || r.message || String(r)) : 'Promise Rejection');
+      window.__rfReportBootError(fullMsg);
+    });
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script>window.React || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"><\/script>')</script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script>window.ReactDOM || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"><\/script>')</script>
 
+  <!-- BABEL STANDALONE VỚI CDN FALLBACK ĐỂ KHỞI ĐỘNG CHẮC CHẮN -->
   <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js" id="babel-script"></script>
+  <script>window.Babel || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"><\/script>')</script>
+  <script>
+    window.RF_IS_DEV_MODE = (function() {
+      try {
+        return window.location.search.indexOf('dev=1') > -1 || localStorage.getItem('rf_dev_mode') === 'true';
+      } catch(e) { return false; }
+    })();
+  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
@@ -435,7 +472,41 @@
 </head>
 
 <body class="m-0 p-0 overflow-hidden bg-[#09090b]">
-  <div id="root"></div>
+  <div id="root">
+    <!-- BOOT SPLASH SCREEN: CHỐNG MÀN ĐEN SÌ TUYỆT ĐỐI -->
+    <div id="rf-splash-screen" class="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-[#09090b] text-white select-none">
+      <div class="relative flex items-center justify-center mb-5">
+        <div class="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shadow-lg shadow-amber-500/10">
+          <i class="fas fa-fish-fins text-2xl text-amber-400 animate-pulse"></i>
+        </div>
+        <div class="absolute -inset-2 rounded-3xl border border-amber-400/25 animate-spin" style="animation-duration: 3s;"></div>
+      </div>
+      <div class="text-sm font-bold tracking-widest text-amber-400 uppercase mb-2">Rich Fish Workspace Pro</div>
+      <div id="rf-boot-status-msg" class="text-xs text-zinc-400 font-mono tracking-tight flex items-center gap-2">
+        <span class="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+        <span>Đang nạp dữ liệu điều hành...</span>
+      </div>
+
+      <!-- HỘP THOẠI CHI TIẾT LỖI TỰ ĐỘNG HIỆN KHI CÓ SỰ CỐ KHỞI ĐỘNG -->
+      <div id="rf-crash-container" style="display: none;" class="mt-5 max-w-lg w-full px-4">
+        <div class="bg-rose-950/50 border border-rose-500/40 rounded-xl p-4 text-left shadow-2xl backdrop-blur">
+          <div class="flex items-center gap-2 text-rose-400 font-bold text-xs uppercase mb-2">
+            <i class="fas fa-triangle-exclamation"></i>
+            <span>Thông Báo Khởi Động Không Thành Công</span>
+          </div>
+          <pre id="rf-crash-details" class="text-[11px] font-mono text-rose-200 bg-black/70 p-3 rounded-lg border border-rose-900/60 whitespace-pre-wrap max-h-48 overflow-auto"></pre>
+          <div class="mt-3 flex gap-2">
+            <button onclick="localStorage.clear(); location.reload(true);" class="bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+              <i class="fas fa-rotate-right mr-1"></i> Xoá Cache & Tải Lại (F5)
+            </button>
+            <button onclick="navigator.clipboard.writeText(document.getElementById('rf-crash-details').innerText); alert('Đã sao chép chi tiết lỗi!');" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+              Sao Chép Lỗi
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- MOBILE FULLSCREEN FIX: Dynamic viewport height -->
   <script>
@@ -443,7 +514,6 @@
       function setAppHeight() {
         var vh = window.innerHeight;
         document.documentElement.style.setProperty('--app-height', vh + 'px');
-        // Also set on body/root for maximum compatibility
         document.body.style.height = vh + 'px';
         var root = document.getElementById('root');
         if (root) root.style.height = vh + 'px';
@@ -451,53 +521,17 @@
       setAppHeight();
       window.addEventListener('resize', setAppHeight);
       window.addEventListener('orientationchange', function () {
-        // Delay to let browser finish orientation animation
         setTimeout(setAppHeight, 150);
       });
-      // Recalculate after mobile browser chrome finishes hiding/showing
       if ('visualViewport' in window) {
         window.visualViewport.addEventListener('resize', setAppHeight);
       }
     })();
   </script>
 
-
-  <script id="app-jsx" type="text/plain">
-    /** @jsx React.createElement */
-    /** @jsxFrag React.Fragment */
-
-    const { useState, useEffect, useMemo, useCallback } = React;
-
-    // Lucide Icon Component
-    const LucideIcon = ({ name, size = 16, className = "", color = "currentColor" }) => {
-      const [iconHtml, setIconHtml] = React.useState('');
-      React.useEffect(() => {
-        if (window.lucide && window.lucide.icons && window.lucide.icons[name]) {
-          const svg = window.lucide.icons[name].toSvg({ width: size, height: size, color, 'stroke-width': 2.25, class: className });
-          setIconHtml(svg);
-        } else {
-          // Fallback map Lucide names -> FontAwesome names
-          const faMap = {
-            'bot': 'robot',
-            'menu': 'bars',
-            'layout-grid': 'th',
-            'log-out': 'sign-out-alt',
-            'home': 'home',
-            'shopping-bag': 'shopping-bag',
-            'hammer': 'hammer',
-            'users': 'users',
-            'trending-up': 'chart-line',
-            'package': 'boxes',
-            'wallet': 'wallet',
-            'briefcase': 'handshake'
-          };
-          const faName = faMap[name] || name;
-          setIconHtml(`<i class="fas fa-${faName} ${className}" style="font-size:${size}px; color:${color}"></i>`);
-        }
-      }, [name, size, className, color]);
-      return <span dangerouslySetInnerHTML={{ __html: iconHtml }} />;
-    };
-  </script>
+  <!-- ========================================================================= -->
+  <!-- SOURCE CODE FRAGMENTS (BẢO VỆ PHỤC HỒI & BIÊN DỊCH AN TOÀN)               -->
+  <!-- ========================================================================= -->
   <div id="jsx-container" style="display:none;">
     <script id="jsx-Config" type="text/plain"><?!= include('Config'); ?></script>
     <script id="jsx-Components" type="text/plain"><?!= include('Components'); ?></script>
@@ -520,24 +554,27 @@
     <script id="jsx-ShopeeGlobalTab" type="text/plain"><?!= include('ShopeeGlobalTab'); ?></script>
     <script id="jsx-App_Main" type="text/plain"><?!= include('App_Main'); ?></script>
   </div>
+
+  <!-- ========================================================================= -->
+  <!-- 2-PHASE ULTRA RESILIENT BOOT RUNNER: LOCAL CACHE + BABEL FALLBACK         -->
+  <!-- ========================================================================= -->
   <script>
     (function () {
-      if (!window.Babel) {
-        console.error('Babel is not loaded!');
-        return;
-      }
-
       function cleanCode(raw) {
         if (!raw) return '';
         var code = raw.replace(/\0/g, '').replace(/[\uFEFF\uFFFE]/g, '');
         return code.replace(/^\s*<script[^>]*>/i, '').replace(/<\/script>\s*$/i, '');
       }
 
-      // ═══════════════════════════════════════════════════════════════════
-      // 2-PHASE BOOT: Tách Core (boot-critical) vs Deferred (background)
-      // Core  ~1.1 MB: App Shell + Dashboard + Orders (CTV default)
-      // Defer ~1.4 MB: Tất cả tab còn lại, biên dịch nền sau khi app hiện
-      // ═══════════════════════════════════════════════════════════════════
+      function computeHash(str) {
+        var h = 0;
+        for (var i = 0; i < str.length; i++) {
+          h = ((h << 5) - h) + str.charCodeAt(i);
+          h |= 0;
+        }
+        return h;
+      }
+
       var coreFileIds = ['Config', 'Components', 'Modals', 'Modals_Orders', 'Tab_Dashboard', 'Tab_Orders', 'App_Main'];
       var deferredFileIds = ['Tab_Production', 'Tab_Inventory', 'Tab_ImportExport', 'Tab_Suppliers', 'Tab_Finance', 'Tab_BusinessReport', 'Tab_HR', 'Tab_Documents', 'Tab_Viewer3D', 'Tab_Affiliate', 'Tab_Analytics', 'Tab_Workspaces', 'ShopeeGlobalTab'];
 
@@ -545,18 +582,11 @@
         var jsx = '';
         ids.forEach(function (id) {
           var el = document.getElementById('jsx-' + id);
-          if (!el) return;
-          jsx += '\n/* --- FILE: ' + id + ' --- */\n' + cleanCode(el.textContent || '');
+          if (el && el.textContent) {
+            jsx += '\n/* ═══ MODULE: ' + id + ' ═══ */\n' + cleanCode(el.textContent) + '\n';
+          }
         });
         return jsx;
-      }
-
-      function computeHash(str) {
-        var h = 0;
-        for (var i = 0; i < str.length; i++) {
-          h = Math.imul(31, h) + str.charCodeAt(i) | 0;
-        }
-        return h;
       }
 
       function cleanCacheByPrefix(prefix) {
@@ -570,17 +600,32 @@
         } catch (e) { }
       }
 
-      // Dọn cache cũ (hệ thống 1-phase cũ)
-      cleanCacheByPrefix('rf_compiled_jsx_');
+      function diagnoseSyntaxErrors(ids) {
+        var msgs = [];
+        ids.forEach(function (id) {
+          var el = document.getElementById('jsx-' + id);
+          if (!el) return;
+          try {
+            if (window.Babel) {
+              Babel.transform(cleanCode(el.textContent || ''), { presets: ['react'] });
+            }
+          } catch (err) {
+            var msg = '❌ LỖI CÚ PHÁP TẠI FILE [' + id + ']: ' + err.message;
+            console.error(msg);
+            msgs.push(msg);
+          }
+        });
+        return msgs;
+      }
 
-      function transpileAndExec(jsx, cachePrefix, label) {
+      function transpileAndExec(jsx, cachePrefix, label, fileIds) {
         var hash = computeHash(jsx);
         var cacheKey = cachePrefix + hash;
         var cached = null;
         try { cached = localStorage.getItem(cacheKey); } catch (e) { }
 
         if (cached) {
-          console.log('⚡ ' + label + ' — nạp từ bộ nhớ đệm siêu tốc!');
+          console.log('⚡ ' + label + ' — nạp từ bộ nhớ đệm siêu tốc (0ms)!');
           try {
             var s = document.createElement('script');
             s.textContent = cached;
@@ -590,6 +635,15 @@
             console.warn('Cache ' + label + ' bị lỗi, biên dịch lại...', err);
             try { localStorage.removeItem(cacheKey); } catch (e) { }
           }
+        }
+
+        if (!window.Babel) {
+          var errMsg = 'Thư viện Babel chưa sẵn sàng để biên dịch ' + label + '. Vui lòng kiểm tra kết nối mạng.';
+          console.error(errMsg);
+          if (typeof window.__rfReportBootError === 'function') {
+            window.__rfReportBootError(errMsg);
+          }
+          return { ok: false };
         }
 
         console.log('🔄 Đang biên dịch ' + label + '...');
@@ -608,67 +662,31 @@
           return { ok: true, fromCache: false };
         } catch (err) {
           console.error('❌ Lỗi biên dịch ' + label + ':', err.message);
+          var detailErrors = diagnoseSyntaxErrors(fileIds || []);
+          var fullMsg = detailErrors.length > 0 ? detailErrors.join('\n\n') : ('Lỗi tại ' + label + ': ' + err.message);
+          if (typeof window.__rfReportBootError === 'function') {
+            window.__rfReportBootError(fullMsg, err.stack);
+          }
           return { ok: false, error: err };
         }
-      }
-
-      function diagnoseSyntaxErrors(ids) {
-        var msgs = [];
-        ids.forEach(function (id) {
-          var el = document.getElementById('jsx-' + id);
-          if (!el) return;
-          try {
-            Babel.transform(cleanCode(el.textContent || ''), { presets: ['react'] });
-          } catch (err) {
-            var msg = '❌ LỖI CÚ PHÁP TẠI FILE [' + id + ']: ' + err.message;
-            console.error(msg);
-            msgs.push(msg);
-          }
-        });
-        return msgs;
-      }
-
-      function showErrorOverlay(messages) {
-        var errorDiv = document.createElement('div');
-        errorDiv.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#09090b;color:#f87171;padding:24px;z-index:999999;font-family:monospace;overflow:auto;display:flex;flex-direction:column;gap:16px;';
-        errorDiv.innerHTML = '<h2 style="color:#ef4444;font-size:20px;font-weight:bold;">⚠️ PHÁT HIỆN LỖI KHI TẢI ỨNG DỤNG</h2>' +
-          '<p style="color:#e2e4e9;">Hệ thống phát hiện lỗi biên dịch JavaScript/JSX. Chi tiết lỗi bên dưới:</p>' +
-          '<pre style="background:#18181b;padding:16px;border-radius:8px;border:1px solid #27272a;white-space:pre-wrap;color:#fca5a5;">' + messages.join('\n\n') + '</pre>' +
-          '<button onclick="localStorage.clear();location.reload();" style="background:#ef4444;color:white;padding:12px 24px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;width:fit-content;">Xóa Cache & Tải Lại Trang</button>';
-        document.body.appendChild(errorDiv);
       }
 
       function cleanupBootDOM() {
         try {
           var container = document.getElementById('jsx-container');
           if (container) container.remove();
-          var appJsx = document.getElementById('app-jsx');
-          if (appJsx) appJsx.remove();
-          var babelScript = document.getElementById('babel-script');
-          if (babelScript) babelScript.remove();
-          setTimeout(function () {
-            if (window.Babel) {
-              try { delete window.Babel; } catch (e) { window.Babel = undefined; }
-            }
-          }, 1500);
-        } catch (e) {
-          console.warn("Lỗi dọn dẹp bộ nhớ boot:", e);
-        }
+        } catch (e) { }
       }
 
       // ═══════════════════════════════════════════════
       // PHASE 1: CORE — App Shell + Dashboard + Orders
-      // Biên dịch tức thì, người dùng thấy app ngay
       // ═══════════════════════════════════════════════
       var bootT0 = performance.now();
       var coreJsx = buildJsx(coreFileIds);
-      var coreResult = transpileAndExec(coreJsx, 'rf_core_', 'Phase 1 — Core');
-      coreJsx = null; // Giải phóng heap
+      var coreResult = transpileAndExec(coreJsx, 'rf_core_v3_', 'Phase 1 — Core', coreFileIds);
+      coreJsx = null;
 
       if (!coreResult.ok) {
-        // Core lỗi — dò tìm file nào gây ra
-        var msgs = diagnoseSyntaxErrors(coreFileIds);
-        showErrorOverlay(msgs.length > 0 ? msgs : ['Lỗi biên dịch không xác định tại Core modules.']);
         return;
       }
 
@@ -676,8 +694,7 @@
       console.log('🚀 Phase 1 hoàn tất trong ' + coreMs + 'ms — App Shell đã sẵn sàng!');
 
       // ═══════════════════════════════════════════════
-      // PHASE 2: DEFERRED — Tất cả tab còn lại
-      // Biên dịch nền sau khi app đã hiện lên màn hình
+      // PHASE 2: DEFERRED — Tất cả tab còn lại (requestIdleCallback)
       // ═══════════════════════════════════════════════
       var runPhase2 = function () {
         var deferredJsx = buildJsx(deferredFileIds);
@@ -686,29 +703,20 @@
           return;
         }
 
-        var deferResult = transpileAndExec(deferredJsx, 'rf_deferred_', 'Phase 2 — Deferred Tabs');
+        var deferResult = transpileAndExec(deferredJsx, 'rf_defer_v3_', 'Phase 2 — Deferred Tabs', deferredFileIds);
         deferredJsx = null;
 
-        if (!deferResult.ok) {
-          // Deferred lỗi — dò tìm file cụ thể
-          var errMsgs = diagnoseSyntaxErrors(deferredFileIds);
-          errMsgs.forEach(function (m) { console.error(m); });
-          cleanCacheByPrefix('rf_deferred_');
-        }
-
-        // Thông báo cho React re-render để phát hiện component mới
         if (typeof window.__rfOnDeferredLoaded === 'function') {
           window.__rfOnDeferredLoaded();
         }
 
         var totalMs = (performance.now() - bootT0).toFixed(0);
-        console.log('🏁 Phase 2 hoàn tất — Toàn bộ hệ thống sẵn sàng! (Tổng: ' + totalMs + 'ms)');
+        console.log('🏁 Phase 2 hoàn tất — Toàn bộ hệ thống 23 phân hệ sẵn sàng! (Tổng: ' + totalMs + 'ms)');
         cleanupBootDOM();
       };
 
-      // Chạy Phase 2 khi browser rảnh, ưu tiên render Phase 1 trước
       if (window.requestIdleCallback) {
-        requestIdleCallback(runPhase2, { timeout: 3000 });
+        requestIdleCallback(runPhase2, { timeout: 2500 });
       } else {
         setTimeout(runPhase2, 150);
       }

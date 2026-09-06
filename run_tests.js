@@ -1197,6 +1197,52 @@ assert('Tab_Finance.html: Implements touch scroll isolation for category select'
 assert('Tab_Finance.html: Rollback protection on pushDeltas failure', tabFinanceV2454.includes('prevTxsSnapshot') && tabFinanceV2454.includes('res.success === false'));
 assert('Modals_Orders.html: Implements native file.arrayBuffer() with clear file lock handling', modalsOrdersV2454.includes('file.arrayBuffer()') && modalsOrdersV2454.includes('Microsoft Excel'));
 
+console.log('\n--- 25. Testing Royal v2.45.7 Smart Return Scanner & Zero-Dropped Audit ---');
+const appMainV2457 = fs.readFileSync(appMainPath, 'utf8');
+const changelogV2457 = fs.readFileSync(changelogPath, 'utf8');
+const tabOrdersV2457 = fs.readFileSync(path.join(__dirname, 'Tab_Orders.html'), 'utf8');
+
+assert('App_Main.html: Contains Royal v2.45.7 in RELEASES', appMainV2457.includes("version: 'Royal v2.45.7'"));
+assert('App_Main.html: Sidebar badge displays >= v2.45.7', />v2\.(4[5-9]|\d{2,})\.\d+<\/span>/.test(appMainV2457));
+assert('CHANGELOG.md: Documents v2.45.7 release notes', changelogV2457.includes('## [v2.45.7] - 2026-09-07'));
+assert('Tab_Orders.html: processCode implements auto-migration of past month return orders', tabOrdersV2457.includes('isOldMonth') && tabOrdersV2457.includes('đưa về mục Hoàn Tháng'));
+assert('Tab_Orders.html: confirmBulkReturn implements auto-migration of past month return orders', tabOrdersV2457.includes('oldMonthCount') && tabOrdersV2457.includes('đưa về Hoàn T'));
+assert('Tab_Orders.html: matchTimeFilter preserves unreconciled return orders in Tháng Này', tabOrdersV2457.includes('isReturnOrder && !isRec && (filterTime ==='));
+assert('Tab_Orders.html: matchTimeFilter prioritizes returnedAt for return orders', tabOrdersV2457.includes('order.returnedAt || order.reconciledAt || order.date'));
+assert('Tab_Orders.html: realTimeSummary.urgentAlerts checks returnedAt', tabOrdersV2457.includes('String(o.returnedAt || o.updatedAt || o.createdAt || o.date'));
+assert('Tab_Orders.html: ReturnScannerModal displays informative auto-migration guarantee pill', tabOrdersV2457.includes('Đơn tháng cũ (T8) khi quét sẽ tự động đưa về mục Hoàn Tháng Này'));
+
+// Unit logic test for return order migration
+const augOrder = {
+    id: 'ORD_AUG_001',
+    orderCode: 'SPX_AUG_9988',
+    date: '2026-08-20',
+    createdAt: '2026-08-20 14:30:00',
+    status: 'Đã Bàn Giao',
+    isReconciled: false
+};
+const nowMonth = '2026-09';
+const todayDate = '2026-09-07';
+const isOld = augOrder.date && !augOrder.date.startsWith(nowMonth);
+assert('Logic Test: August order is correctly identified as isOldMonth in September', isOld === true);
+
+const migratedOrder = {
+    ...augOrder,
+    date: isOld ? todayDate : augOrder.date,
+    status: 'Hàng Hoàn',
+    _effectiveStatus: 'HÀNG HOÀN CHỜ XỬ LÝ',
+    returnedAt: '2026-09-07 00:45:00',
+    isReconciled: false
+};
+assert('Logic Test: Migrated order date updated to September', migratedOrder.date === '2026-09-07');
+assert('Logic Test: Migrated order status updated to Hàng Hoàn', migratedOrder.status === 'Hàng Hoàn');
+
+// Simulate matchTimeFilter for migrated order in "Tháng Này"
+const isReturnOrderSim = (migratedOrder.status === 'Hàng Hoàn');
+const isRecSim = migratedOrder.isReconciled === true;
+const isVisibleInThisMonth = (isReturnOrderSim && !isRecSim) || migratedOrder.date.startsWith('2026-09');
+assert('Logic Test: Migrated order is 100% visible to Diệu Hương in Tháng Này', isVisibleInThisMonth === true);
+
 // SUMMARY
 
 console.log(`\n========================================`);

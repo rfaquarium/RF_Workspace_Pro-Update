@@ -432,6 +432,23 @@ function handleApiRequest(payload) {
       var pushData = typeof payload.data === 'string' ? JSON.parse(payload.data) : (payload.data || payload);
       response = saveUserPushSubscription(pushData);
     }
+    else if (action === 'invalidateUserConfig' || action === 'invalidateUserConfigCache') {
+      var pin = payload.pin;
+      var auth = validatePin(pin);
+      if (auth && auth.valid) {
+        if (auth.isBoss || auth.role === 'TỐI CAO' || auth.role === 'ADMIN') {
+          var invRes = invalidateUserConfigCache();
+          response.success = true;
+          response.data = invRes;
+          response.message = 'Đã làm mới cache cấu hình nhân sự thành công!';
+        } else {
+          response.message = 'Từ chối quyền: Chỉ Tối Cao hoặc Admin mới có quyền làm mới cache nhân sự!';
+          response.error = 'PERMISSION_DENIED';
+        }
+      } else {
+        response.message = 'Xác thực thất bại!';
+      }
+    }
     else if (action === 'api_insertManualKPI' || action === 'insertManualKPI') {
       var pin = payload.pin;
       var auth = validatePin(pin);
@@ -2175,11 +2192,17 @@ function setupAutoArchiveTrigger(pin) {
 
 
 function applyDeltasToSheet(sheetName, items, formatter, ss) {
+  if (!items || !items.length) return;
   var activeSs = ss || SpreadsheetApp.getActiveSpreadsheet();
   var sheet = activeSs.getSheetByName(sheetName); if (!sheet) return;
-  var data = sheet.getDataRange().getValues();
+
+  // 1. Đọc đồng thời dữ liệu giá trị và dữ liệu công thức để bảo tồn công thức trên toàn bảng
+  var dataRange = sheet.getDataRange();
+  var data = dataRange.getValues();
+  var formulas = dataRange.getFormulas();
   var headers = data[0] || SCHEMA[sheetName] || SCHEMA_ERP[sheetName] || [];
 
+  // Mở rộng cột nếu thiếu cột theo schema quy định
   var expectedSchema = SCHEMA[sheetName] || SCHEMA_ERP[sheetName] || [];
   if (expectedSchema.length > 0 && data.length > 0) {
     var missing = [];
@@ -2192,129 +2215,232 @@ function applyDeltasToSheet(sheetName, items, formatter, ss) {
       var lastCol = sheet.getLastColumn();
       sheet.getRange(1, lastCol + 1, 1, missing.length).setValues([missing])
         .setFontWeight("bold").setBackground("#e6f5f5");
-      data = sheet.getDataRange().getValues();
+      dataRange = sheet.getDataRange();
+      data = dataRange.getValues();
+      formulas = dataRange.getFormulas();
       headers = data[0];
     }
   }
 
-  var modified = false;
   var idColIdx = headers.indexOf('id');
   if (idColIdx === -1) idColIdx = 0;
   var codeColIdx = headers.indexOf('orderCode');
+  var userCol = headers.indexOf('user');
+  var dateCol = headers.indexOf('date');
+  var shiftCol = headers.indexOf('shift');
+  var statusCol = headers.indexOf('status');
+  var catColIdx = headers.indexOf('category');
+
+  // 2. Xây dựng chỉ mục tra cứu in-memory O(1)
+  var idMap = new Map();
+  var codeMap = new Map();
+  var attLeaveMap = new Map();
+
+  for (var r = 1; r < data.length; r++) {
+    var rId = String(data[r][idColIdx] || '').trim();
+    if (rId !== '' && !idMap.has(rId)) {
+      idMap.set(rId, r);
+    }
+    if (sheetName === 'Orders' && codeColIdx !== -1) {
+      var rCode = String(data[r][codeColIdx] || '').split(' | ')[0].split('|')[0].trim().toUpperCase();
+      if (rCode && !codeMap.has(rCode)) {
+        codeMap.set(rCode, r);
+      }
+    }
+    if (sheetName === 'Attendance' && userCol !== -1 && dateCol !== -1) {
+      var rUser = String(data[r][userCol]).trim();
+      var rDate = String(data[r][dateCol]).trim().substring(0, 10);
+      var rRowId = String(data[r][0]).trim();
+      var rShift = shiftCol !== -1 ? String(data[r][shiftCol]) : '';
+      var rStatus = statusCol !== -1 ? String(data[r][statusCol]) : '';
+      if (rUser && rDate && (rRowId.indexOf('ATT_LEAVE_') === 0 || rShift.indexOf('Nghỉ') !== -1 || rStatus.indexOf('Nghỉ') !== -1)) {
+        var leaveKey = rUser + '|' + rDate;
+        if (!attLeaveMap.has(leaveKey)) {
+          attLeaveMap.set(leaveKey, r);
+        }
+      }
+    }
+  }
+
+  // Quản lý các dòng sửa và dòng thêm mới
+  var updatedRows = new Map();
+  var newRows = [];
 
   items.forEach(function (item) {
     var rowObject = formatter(item);
-    var found = false;
-    for (var i = 1; i < data.length; i++) {
-      var rowIdStr = String(data[i][idColIdx] || '').trim();
-      var itemIdStr = String(item.id || '').trim();
-      var isMatch = (itemIdStr !== '' && rowIdStr === itemIdStr);
+    var itemIdStr = String(item.id || '').trim();
+    var matchedRowIdx = -1;
 
-      // Fallback matching cho Orders theo orderCode nếu id không khớp
-      if (!isMatch && sheetName === 'Orders' && codeColIdx !== -1) {
-        var rowCode = String(data[i][codeColIdx] || '').split(' | ')[0].split('|')[0].trim().toUpperCase();
-        var itemCode = String(item.orderCode || item.id || '').split(' | ')[0].split('|')[0].trim().toUpperCase();
-        if (rowCode && itemCode && rowCode === itemCode) {
-          isMatch = true;
-        }
-      }
+    // Bước 1: Tra cứu theo id
+    if (itemIdStr !== '' && idMap.has(itemIdStr)) {
+      matchedRowIdx = idMap.get(itemIdStr);
+    }
 
-      // Chống x2 phiếu nghỉ trùng lặp trên Google Sheets
-      if (!isMatch && sheetName === 'Attendance' && item.id && (String(item.id).indexOf('ATT_LEAVE_') === 0 || String(item.leaveType || '').indexOf('Nghỉ') === 0)) {
-        var userCol = headers.indexOf('user');
-        var dateCol = headers.indexOf('date');
-        if (userCol !== -1 && dateCol !== -1) {
-          var rowUser = String(data[i][userCol]).trim();
-          var rowDate = String(data[i][dateCol]).trim();
-          var rowId = String(data[i][0]).trim();
-          var shiftCol = headers.indexOf('shift');
-          var statusCol = headers.indexOf('status');
-          var rowShift = shiftCol !== -1 ? String(data[i][shiftCol]) : '';
-          var rowStatus = statusCol !== -1 ? String(data[i][statusCol]) : '';
-          var itemDate = String(item.date).trim();
-          if (rowUser === String(item.user).trim() && rowDate.substring(0, 10) === itemDate.substring(0, 10)) {
-            if (rowId.indexOf('ATT_LEAVE_') === 0 || rowShift.indexOf('Nghỉ') !== -1 || rowStatus.indexOf('Nghỉ') !== -1) {
-              isMatch = true;
-            }
-          }
-        }
-      }
-
-      if (isMatch) {
-
-        var newRow = headers.map(function (h, colIdx) {
-          if (sheetName === 'Products' && h === 'quantity' && item._diff !== undefined) {
-            var currentQtyVal = Number(data[i][colIdx]);
-            if (isNaN(currentQtyVal)) currentQtyVal = 0;
-            var diffVal = Number(item._diff);
-            if (isNaN(diffVal)) diffVal = 0;
-            var finalQty = currentQtyVal + diffVal;
-
-            var catColIdx = headers.indexOf('category');
-            var category = catColIdx >= 0 ? String(data[i][catColIdx]).trim().toUpperCase() : '';
-            if ((category.indexOf('BỂ KÍNH') > -1 || category.indexOf('LAYOUT') > -1) && finalQty < 0) {
-              finalQty = 0;
-            }
-            return finalQty;
-          }
-
-          if (sheetName === 'Accounts' && h === 'balance') {
-            return data[i][colIdx];
-          }
-
-          var hasField = item.hasOwnProperty(h);
-          if (!hasField && sheetName === 'Production' && (h.indexOf('p1_') === 0 || h.indexOf('p2_') === 0)) {
-            hasField = item.hasOwnProperty('phases');
-          }
-
-          if (hasField) {
-            var newVal = rowObject[h];
-            if (typeof newVal === 'number' && isNaN(newVal)) return 0;
-            if (newVal === 'NaN' || newVal === 'undefined') return '';
-
-            var finalVal = newVal !== undefined ? newVal : '';
-            if (sheetName === 'Products' && h === 'quantity') {
-              var catColIdx2 = headers.indexOf('category');
-              var category2 = catColIdx2 >= 0 ? String(data[i][catColIdx2]).trim().toUpperCase() : '';
-              if ((category2.indexOf('BỂ KÍNH') > -1 || category2.indexOf('LAYOUT') > -1)) {
-                var qtyNum = Number(finalVal);
-                if (qtyNum < 0) finalVal = 0;
-              }
-            }
-            return finalVal;
-          }
-
-          return data[i][colIdx];
-        });
-
-        data[i] = newRow;
-        found = true;
-        modified = true;
-        break;
+    // Bước 2: Fallback tra cứu theo orderCode nếu là Orders (Exact Match)
+    if (matchedRowIdx === -1 && sheetName === 'Orders' && codeColIdx !== -1) {
+      var itemCode = String(item.orderCode || item.id || '').split(' | ')[0].split('|')[0].trim().toUpperCase();
+      if (itemCode && codeMap.has(itemCode)) {
+        matchedRowIdx = codeMap.get(itemCode);
       }
     }
-    if (!found) {
+
+    // Bước 3: Chống x2 phiếu nghỉ trùng lặp trên Attendance
+    if (matchedRowIdx === -1 && sheetName === 'Attendance' && item.id && (String(item.id).indexOf('ATT_LEAVE_') === 0 || String(item.leaveType || '').indexOf('Nghỉ') === 0)) {
+      if (userCol !== -1 && dateCol !== -1) {
+        var leaveKey = String(item.user).trim() + '|' + String(item.date).trim().substring(0, 10);
+        if (attLeaveMap.has(leaveKey)) {
+          matchedRowIdx = attLeaveMap.get(leaveKey);
+        }
+      }
+    }
+
+    if (matchedRowIdx !== -1) {
+      // Đang cập nhật một dòng: có thể là dòng trong data gốc HOẶC dòng mới được thêm trước đó trong cùng lô
+      var isVirtualNewRow = (matchedRowIdx >= data.length);
+      var currentRowData;
+      var currentRowFormulas;
+
+      if (isVirtualNewRow) {
+        var virtualIdx = matchedRowIdx - data.length;
+        currentRowData = newRows[virtualIdx];
+        currentRowFormulas = [];
+      } else {
+        currentRowData = updatedRows.has(matchedRowIdx) ? updatedRows.get(matchedRowIdx) : data[matchedRowIdx];
+        currentRowFormulas = (formulas && formulas[matchedRowIdx]) ? formulas[matchedRowIdx] : [];
+      }
+
+      var newRow = headers.map(function (h, colIdx) {
+        // Xử lý tồn kho _diff (hỗ trợ cộng dồn nhiều lần)
+        if (sheetName === 'Products' && h === 'quantity' && item._diff !== undefined) {
+          var currentQtyVal = Number(currentRowData[colIdx]);
+          if (isNaN(currentQtyVal)) currentQtyVal = 0;
+          var diffVal = Number(item._diff);
+          if (isNaN(diffVal)) diffVal = 0;
+          var finalQty = currentQtyVal + diffVal;
+
+          var category = catColIdx >= 0 ? String(currentRowData[catColIdx]).trim().toUpperCase() : '';
+          if ((category.indexOf('BỂ KÍNH') > -1 || category.indexOf('LAYOUT') > -1) && finalQty < 0) {
+            finalQty = 0;
+          }
+          return finalQty;
+        }
+
+        // Bảo vệ số dư tài khoản
+        if (sheetName === 'Accounts' && h === 'balance') {
+          if (currentRowFormulas[colIdx] && String(currentRowFormulas[colIdx]).indexOf('=') === 0) {
+            return currentRowFormulas[colIdx];
+          }
+          return currentRowData[colIdx];
+        }
+
+        var hasField = item.hasOwnProperty(h);
+        if (!hasField && sheetName === 'Production' && (h.indexOf('p1_') === 0 || h.indexOf('p2_') === 0)) {
+          hasField = item.hasOwnProperty('phases');
+        }
+
+        if (hasField) {
+          var newVal = rowObject[h];
+          if (typeof newVal === 'number' && isNaN(newVal)) return 0;
+          if (newVal === 'NaN' || newVal === 'undefined') return '';
+
+          var finalVal = newVal !== undefined ? newVal : '';
+          if (sheetName === 'Products' && h === 'quantity') {
+            var category2 = catColIdx >= 0 ? String(currentRowData[catColIdx]).trim().toUpperCase() : '';
+            if (category2.indexOf('BỂ KÍNH') > -1 || category2.indexOf('LAYOUT') > -1) {
+              var qtyNum = Number(finalVal);
+              if (qtyNum < 0) finalVal = 0;
+            }
+          }
+          return finalVal;
+        }
+
+        // BẢO TOÀN CÔNG THỨC: Nếu client không gửi trường này và ô có công thức gốc, giữ nguyên chuỗi công thức!
+        if (currentRowFormulas[colIdx] && String(currentRowFormulas[colIdx]).indexOf('=') === 0) {
+          return currentRowFormulas[colIdx];
+        }
+
+        return currentRowData[colIdx];
+      });
+
+      if (isVirtualNewRow) {
+        var virtualIdx2 = matchedRowIdx - data.length;
+        newRows[virtualIdx2] = newRow;
+      } else {
+        updatedRows.set(matchedRowIdx, newRow);
+        data[matchedRowIdx] = newRow; // Cập nhật in-memory cho các item sau cùng lô
+      }
+
+    } else {
+      // Thêm dòng mới
       var newRow = headers.map(function (h) {
         var val = rowObject[h];
         if (typeof val === 'number' && isNaN(val)) return 0;
         return val !== undefined ? val : '';
       });
-      data.push(newRow);
-      modified = true;
+
+      var virtualRowIdx = data.length + newRows.length;
+      newRows.push(newRow);
+
+      // CẬP NHẬT CHỈ MỤC IN-FLIGHT NGAY TRONG LÔ:
+      if (itemIdStr !== '') {
+        idMap.set(itemIdStr, virtualRowIdx);
+      }
+      if (sheetName === 'Orders' && codeColIdx !== -1) {
+        var itemCodeNew = String(item.orderCode || item.id || '').split(' | ')[0].split('|')[0].trim().toUpperCase();
+        if (itemCodeNew) {
+          codeMap.set(itemCodeNew, virtualRowIdx);
+        }
+      }
+      if (sheetName === 'Attendance' && userCol !== -1 && dateCol !== -1) {
+        var leaveKeyNew = String(item.user).trim() + '|' + String(item.date).trim().substring(0, 10);
+        attLeaveMap.set(leaveKeyNew, virtualRowIdx);
+      }
     }
   });
 
-  // Tối ưu hóa ghi theo lô (Batch Write) kèm cơ chế tự động mở rộng hàng / cột an toàn
-  if (modified) {
-    var maxRows = sheet.getMaxRows();
-    if (data.length > maxRows) {
-      sheet.insertRowsAfter(maxRows, data.length - maxRows);
+  // 3. TỐI ƯU GHI THEO LÔ (CONTIGUOUS RANGE BATCH WRITE)
+  var totalRowsToWrite = updatedRows.size + newRows.length;
+  if (totalRowsToWrite === 0) return;
+
+  var currentMaxRows = sheet.getMaxRows();
+  var neededRows = data.length + newRows.length;
+  if (neededRows > currentMaxRows) {
+    sheet.insertRowsAfter(currentMaxRows, neededRows - currentMaxRows);
+  }
+  var currentMaxCols = sheet.getMaxColumns();
+  if (headers.length > currentMaxCols) {
+    sheet.insertColumnsAfter(currentMaxCols, headers.length - currentMaxCols);
+  }
+
+  // A. Ghi các dòng cập nhật theo các dải liên tiếp (Contiguous Chunks)
+  if (updatedRows.size > 0) {
+    var sortedIndices = Array.from(updatedRows.keys()).sort(function (a, b) { return a - b; });
+    var chunkStart = sortedIndices[0];
+    var chunkRows = [updatedRows.get(chunkStart)];
+
+    for (var k = 1; k < sortedIndices.length; k++) {
+      var currentIdx = sortedIndices[k];
+      var prevIdx = sortedIndices[k - 1];
+
+      if (currentIdx === prevIdx + 1) {
+        chunkRows.push(updatedRows.get(currentIdx));
+      } else {
+        var sheetRow = chunkStart + 1; // 1-based row index trên Sheet
+        sheet.getRange(sheetRow, 1, chunkRows.length, headers.length).setValues(chunkRows);
+        chunkStart = currentIdx;
+        chunkRows = [updatedRows.get(chunkStart)];
+      }
     }
-    var maxCols = sheet.getMaxColumns();
-    if (headers.length > maxCols) {
-      sheet.insertColumnsAfter(maxCols, headers.length - maxCols);
+    if (chunkRows.length > 0) {
+      var sheetRowFinal = chunkStart + 1;
+      sheet.getRange(sheetRowFinal, 1, chunkRows.length, headers.length).setValues(chunkRows);
     }
-    sheet.getRange(1, 1, data.length, headers.length).setValues(data);
+  }
+
+  // B. Thêm toàn bộ dòng mới theo lô duy nhất (Single Batch Append)
+  if (newRows.length > 0) {
+    var appendStartRow = data.length + 1;
+    sheet.getRange(appendStartRow, 1, newRows.length, headers.length).setValues(newRows);
   }
 }
 
@@ -2685,7 +2811,7 @@ function updateUserConfigSheet(configPayload) {
 
     sheet.clearContents();
     sheet.getRange(1, 1, newRows.length, headers.length).setValues(newRows);
-    CacheService.getScriptCache().remove('USER_CONFIG');
+    invalidateUserConfigCache();
   } finally {
     if (hasLock) {
       try { lock.releaseLock(); } catch(e) {}
@@ -3563,6 +3689,10 @@ function syncDeltas(payload, pin) {
       updateUserConfigSheet(payload.UserConfigs[0]);
       var updatedUser = payload.UserConfigs[0]['Tên Nhân Sự'] || 'N/A';
       logBehavior('Cập nhật Config_NhanSu', 'Nhân sự thực hiện: ' + (auth ? auth.user : 'Unknown') + ' | Sửa cấu hình của: ' + updatedUser);
+      invalidateUserConfigCache();
+    }
+    if (payload.Config_NhanSu && payload.Config_NhanSu.length > 0) {
+      invalidateUserConfigCache();
     }
 
     var props = PropertiesService.getScriptProperties();
@@ -3632,95 +3762,93 @@ function syncDeltas(payload, pin) {
 const ADMIN_ROLES = ['TỐI CAO', 'QUẢN LÝ CẤP TRUNG', 'QUẢN LÝ SẢN XUẤT', 'SẢN XUẤT', 'QUẢN LÝ KHO VẬN', 'KHO VẬN', 'BÁN HÀNG', 'QUẢN LÝ BÁN HÀNG', 'QUẢN LÝ NHÂN SỰ', 'NHÂN SỰ', 'KẾ TOÁN', 'QUẢN LÝ KIỂM TOÁN', 'KIỂM TOÁN', 'NHÂN VIÊN', 'CỘNG TÁC VIÊN', 'CTV', 'KHÁCH'];
 const BOSS_ROLES = ['TỐI CAO'];
 
+// =========================================================================
+// HỆ THỐNG QUẢN LÝ CẤU HÌNH & XÁC THỰC AN TOÀN (CACHE INVALIDATION & GENERATION TOKEN)
+// =========================================================================
+
+function invalidateUserConfigCache() {
+  try {
+    var cache = CacheService.getScriptCache();
+    if (cache) {
+      cache.remove('USER_DISPLAY_CONFIG');
+      cache.remove('USER_CONFIG');
+    }
+    var props = PropertiesService.getScriptProperties();
+    var newGen = Date.now().toString();
+    if (props) {
+      props.setProperty('CONFIG_GENERATION', newGen);
+    }
+    return { success: true, generation: newGen };
+  } catch (e) {
+    console.warn('Lỗi invalidateUserConfigCache:', e);
+    return { success: false, error: e.toString() };
+  }
+}
+
+/**
+ * Lấy cấu hình hiển thị giao diện (avatars, titles, subTitles, salaries, users).
+ * Dữ liệu này an toàn, được cache 120s trong CacheService để tối ưu tốc độ mở app.
+ */
 function getUserConfig() {
-  const cache = CacheService.getScriptCache();
-  // BYPASS CACHE DE-BUG:
-  // const cached = cache.get('USER_CONFIG');
-  // if (cached) {
-  //   try { return JSON.parse(cached); } catch (e) { console.warn('Cache corrupted...'); }
-  // }
+  var cache = CacheService.getScriptCache();
+  try {
+    var cached = cache.get('USER_DISPLAY_CONFIG');
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    console.warn('Lỗi đọc cache USER_DISPLAY_CONFIG:', e);
+  }
 
   try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config_NhanSu');
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config_NhanSu');
     if (!sheet) { console.error('Sheet Config_NhanSu not found'); return getEmptyConfig("Lỗi: Không tìm thấy sheet Config_NhanSu"); }
 
-    const data = sheet.getDataRange().getValues();
-    const config = { avatars: {}, titles: {}, subTitles: {}, salaries: {}, pins: {}, users: [], roles: {} };
+    var data = sheet.getDataRange().getValues();
+    var config = { avatars: {}, titles: {}, subTitles: {}, salaries: {}, users: [], roles: {} };
 
     if (data.length === 0) return getEmptyConfig("Lỗi: Sheet Config_NhanSu không có dữ liệu (data.length === 0)");
-    const headers = data[0];
-    const getCol = (names, fallback) => {
-      for (let n of names) {
-        let idx = headers.findIndex(h => String(h).trim().toLowerCase() === n.toLowerCase());
+    var headers = data[0];
+    var getCol = function (names, fallback) {
+      for (var k = 0; k < names.length; k++) {
+        var idx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === names[k].toLowerCase(); });
         if (idx !== -1) return idx;
       }
       return fallback;
     };
 
-    const nameCol = getCol(['Tên Nhân Sự'], 0);
-    const avatarCol = getCol(['ID Ảnh'], 1);
-    const titleCol = getCol(['Chức Danh'], 2);
-    const subTitleCol = getCol(['Chức Danh Phụ'], -1);
-    const roleCol = getCol(['Phân Quyền'], 3);
-    const pinCol = getCol(['Mã PIN'], 4);
-    const baseSalCol = getCol(['Lương Cơ Bản'], -1);
-    const funcSalCol = getCol(['Lương Chức Vụ'], -1);
-    const allowCol = getCol(['Phụ Cấp Xăng Xe'], -1);
-    const deductCol = getCol(['Khoản Trừ Vi Phạm'], -1);
+    var nameCol = getCol(['Tên Nhân Sự'], 0);
+    var avatarCol = getCol(['ID Ảnh'], 1);
+    var titleCol = getCol(['Chức Danh'], 2);
+    var subTitleCol = getCol(['Chức Danh Phụ'], -1);
+    var roleCol = getCol(['Phân Quyền'], 3);
+    var baseSalCol = getCol(['Lương Cơ Bản'], -1);
+    var funcSalCol = getCol(['Lương Chức Vụ'], -1);
+    var allowCol = getCol(['Phụ Cấp Xăng Xe'], -1);
+    var deductCol = getCol(['Khoản Trừ Vi Phạm'], -1);
 
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      const name = String(row[nameCol] || '').trim();
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var name = String(row[nameCol] || '').trim();
       if (!name) continue;
 
       config.users.push(name);
-      const linkOrId = String(row[avatarCol] || '').trim();
+      var linkOrId = String(row[avatarCol] || '').trim();
       if (linkOrId) {
-        const match = linkOrId.match(/[-\w]{25,}/);
+        var match = linkOrId.match(/[-\w]{25,}/);
         config.avatars[name] = match ? match[0] : linkOrId;
       }
 
-      const title = String(row[titleCol] || '').trim();
+      var title = String(row[titleCol] || '').trim();
       if (title) config.titles[name] = title;
 
       if (subTitleCol !== -1) {
-        const subTitle = String(row[subTitleCol] || '').trim();
+        var subTitle = String(row[subTitleCol] || '').trim();
         if (subTitle) config.subTitles[name] = subTitle;
       }
 
-      const role = String(row[roleCol] || '').trim().toUpperCase() || 'THỢ';
+      var role = String(row[roleCol] || '').trim().toUpperCase() || 'THỢ';
       config.roles[name] = role;
-
-      var pin = String(row[pinCol] || '').trim();
-      if (pin) {
-        // Loại bỏ phần thập phân .0 nếu có (ví dụ "123456.0" -> "123456")
-        pin = pin.replace(/\.0+$/, '');
-
-        var pinObj = {
-          name: name,
-          role: role,
-          title: title,
-          subTitle: subTitleCol !== -1 ? String(row[subTitleCol] || '').trim() : '',
-          avatar: config.avatars[name] || ''
-        };
-
-        // Lưu trữ mã PIN gốc đã chuẩn hóa
-        config.pins[pin] = pinObj;
-
-        // Nếu mã PIN chỉ chứa chữ số, xử lý thêm trường hợp mất số 0 đầu hoặc thừa số 0 đầu
-        if (/^\d+$/.test(pin)) {
-          // 1. Thêm số 0 đầu cho đủ 6 chữ số nếu độ dài < 6 (ví dụ: "12345" -> "012345")
-          if (pin.length < 6) {
-            var padded = pin.padStart(6, '0');
-            config.pins[padded] = pinObj;
-          }
-          // 2. Bỏ số 0 đầu (ví dụ: "012345" -> "12345")
-          var intVal = parseInt(pin, 10);
-          if (!isNaN(intVal)) {
-            config.pins[String(intVal)] = pinObj;
-          }
-        }
-      }
 
       config.salaries[name] = {
         baseSalary: parseNumber(row[baseSalCol]),
@@ -3730,12 +3858,100 @@ function getUserConfig() {
       };
     }
 
-    cache.put('USER_CONFIG', JSON.stringify(config), 300);
+    try {
+      cache.put('USER_DISPLAY_CONFIG', JSON.stringify(config), 120);
+    } catch (errCache) { }
     return config;
 
   } catch (e) {
     console.error('Error in getUserConfig:', e);
     return getEmptyConfig(e.toString());
+  }
+}
+
+/**
+ * Nguồn xác thực thẩm quyền cho PIN và Phân Quyền (Authoritative Auth Source).
+ * Sử dụng CONFIG_GENERATION token chống race condition đè cache cũ khi có thao tác sửa quyền.
+ */
+function getAuthoritativeAuthConfig_() {
+  var props = PropertiesService.getScriptProperties();
+  var generation = props.getProperty('CONFIG_GENERATION') || '1';
+  var cacheKey = 'AUTH_CONFIG_' + generation;
+  var cache = CacheService.getScriptCache();
+
+  try {
+    var cached = cache.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (e) { }
+
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config_NhanSu');
+    if (!sheet) return { pins: {}, roles: {}, _debugMsg: "Không tìm thấy sheet Config_NhanSu" };
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length === 0) return { pins: {}, roles: {}, _debugMsg: "Sheet Config_NhanSu rỗng" };
+
+    var headers = data[0];
+    var getCol = function (names, fallback) {
+      for (var k = 0; k < names.length; k++) {
+        var idx = headers.findIndex(function (h) { return String(h).trim().toLowerCase() === names[k].toLowerCase(); });
+        if (idx !== -1) return idx;
+      }
+      return fallback;
+    };
+
+    var nameCol = getCol(['Tên Nhân Sự'], 0);
+    var avatarCol = getCol(['ID Ảnh'], 1);
+    var titleCol = getCol(['Chức Danh'], 2);
+    var subTitleCol = getCol(['Chức Danh Phụ'], -1);
+    var roleCol = getCol(['Phân Quyền'], 3);
+    var pinCol = getCol(['Mã PIN'], 4);
+
+    var authConfig = { pins: {}, roles: {} };
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var name = String(row[nameCol] || '').trim();
+      if (!name) continue;
+
+      var role = String(row[roleCol] || '').trim().toUpperCase() || 'THỢ';
+      authConfig.roles[name] = role;
+
+      var pin = String(row[pinCol] || '').trim();
+      if (pin) {
+        pin = pin.replace(/\.0+$/, '');
+        var pinObj = {
+          name: name,
+          role: role,
+          title: String(row[titleCol] || '').trim(),
+          subTitle: subTitleCol !== -1 ? String(row[subTitleCol] || '').trim() : '',
+          avatar: String(row[avatarCol] || '').trim()
+        };
+
+        authConfig.pins[pin] = pinObj;
+
+        if (/^\d+$/.test(pin)) {
+          if (pin.length < 6) {
+            authConfig.pins[pin.padStart(6, '0')] = pinObj;
+          }
+          var intVal = parseInt(pin, 10);
+          if (!isNaN(intVal)) {
+            authConfig.pins[String(intVal)] = pinObj;
+          }
+        }
+      }
+    }
+
+    try {
+      cache.put(cacheKey, JSON.stringify(authConfig), 30); // TTL ngắn 30s với generation token
+    } catch (e) { }
+
+    return authConfig;
+  } catch (e) {
+    console.error('Lỗi getAuthoritativeAuthConfig_:', e);
+    return { pins: {}, roles: {}, _debugMsg: e.toString() };
   }
 }
 
@@ -3766,27 +3982,36 @@ function validatePin(pin) {
   if (!rawPin || rawPin === 'SYSTEM' || rawPin === 'AUTO_TRIGGER' || rawPin === 'INTERNAL_ENGINE') {
     return { valid: false, user: null, role: '', isAdmin: false, isBoss: false, error: 'Mã PIN không hợp lệ' };
   }
-  const config = getUserConfig();
+  
+  // Nguồn xác thực thẩm quyền có generation token bảo vệ chống race condition
+  var authConfig;
+  if (typeof getAuthoritativeAuthConfig_ === 'function') {
+    authConfig = getAuthoritativeAuthConfig_();
+  } else if (typeof getUserConfig === 'function') {
+    authConfig = getUserConfig();
+  } else {
+    authConfig = { pins: {}, roles: {} };
+  }
 
-  if (config._debugMsg) {
+  if (authConfig && authConfig._debugMsg) {
     return { valid: false, _debugMsg: "Lỗi nạp cấu hình tài khoản hệ thống" };
   }
 
   var pinStr = String(rawPin).trim().replace(/\.0+$/, '');
-  var userInfo = config.pins[pinStr];
+  var userInfo = authConfig.pins[pinStr];
 
   // Thử tìm theo chuỗi số nguyên (bỏ số 0 đầu)
   if (!userInfo && /^\d+$/.test(pinStr)) {
     var intVal = parseInt(pinStr, 10);
     if (!isNaN(intVal)) {
-      userInfo = config.pins[String(intVal)];
+      userInfo = authConfig.pins[String(intVal)];
     }
   }
 
   // Thử tìm theo chuỗi đã đệm số 0 đầu cho đủ 6 ký tự
   if (!userInfo && /^\d+$/.test(pinStr) && pinStr.length < 6) {
     var padded = pinStr.padStart(6, '0');
-    userInfo = config.pins[padded];
+    userInfo = authConfig.pins[padded];
   }
 
   if (!userInfo) {

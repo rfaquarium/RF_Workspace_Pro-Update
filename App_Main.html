@@ -781,9 +781,117 @@
 
         const RELEASES = [
             {
+                version: 'Royal v2.45.7',
+                date: '07/09/2026',
+                isLatest: true,
+                badge: 'SMART RETURN SCANNER & ZERO-DROPPED AUDIT',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Tự Động Đưa Đơn Hoàn Tháng Cũ (T8) Về Mục Hoàn Tháng Này (T9) Cho Diệu Hương Đi Kiểm',
+                summary: 'Nâng cấp toàn diện cơ chế tiếp nhận và quản lý hàng hoàn: (1) Máy Quét Hoàn Tự Động (súng mã vạch, file Excel Order.all, dán mã) tự động nhận diện đơn tháng cũ (T8) và chuyển ngày đối soát/kiểm tra về kỳ Tháng Này (T9) để Diệu Hương mở máy ra là thấy ngay đi kiểm; (2) Chống bỏ chặn đơn đã từng ghi nhận hoàn ảo từ sàn trước đó, cho phép quét tít nhận hàng thực tế tại xưởng; (3) Tối ưu bộ lọc matchTimeFilter với cơ chế Zero-Dropped cho đơn Hàng Hoàn chưa đối soát, ưu tiên ngày hoàn returnedAt; (4) Đơn vừa quét hoàn trong ngày lập tức xuất hiện trên Banner Cảnh Báo Đỏ có nút [KIỂM HOÀN] trực quan.',
+                categories: ['Quét Đơn Hoàn', 'Vận Hành Kho', 'Quy Trình KCS', 'Zero-Dropped', 'Diệu Hương'],
+                items: [
+                    {
+                        icon: 'fa-barcode',
+                        color: 'text-emerald-400',
+                        title: 'Tự Động Đưa Đơn Tháng Cũ Về Tháng Này',
+                        desc: 'Khi tít súng mã vạch hoặc ném file Excel đơn hoàn T8, hệ thống tự động gán ngày hoàn hiện tại T9 và đưa đơn vào danh sách Hàng Hoàn của Tháng Này để Diệu Hương đi kiểm.'
+                    },
+                    {
+                        icon: 'fa-box-archive',
+                        color: 'text-amber-400',
+                        title: 'Mở Khoá Quét Nhận Hàng Hoàn Thực Tế',
+                        desc: 'Loại bỏ rào cản báo lỗi "Đơn đã ở trạng thái Hoàn", cho phép quét nhận hiện vật thật về kho cho các đơn sàn đã cập nhật trạng thái từ trước.'
+                    },
+                    {
+                        icon: 'fa-filter',
+                        color: 'text-blue-400',
+                        title: 'Bộ Lọc Thông Minh (Zero-Dropped Return)',
+                        desc: 'Đơn Hàng Hoàn chưa duyệt kho luôn luôn hiển thị khi xem Tháng Này, ưu tiên ngày quét returnedAt để không bao giờ bị trôi hoặc sót việc.'
+                    },
+                    {
+                        icon: 'fa-exclamation-triangle',
+                        color: 'text-rose-400',
+                        title: 'Hiển Thị Tức Thì Trên Banner Cảnh Báo',
+                        desc: 'Ngay khi quét tít, đơn hoàn nhảy ngay lên khối cảnh báo màu đỏ kèm nút [KIỂM HOÀN] ở đầu trang để kiểm tra ngoại quan 1 chạm.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.45.6',
+                date: '07/09/2026',
+                isLatest: false,
+                badge: 'HALLMARK MOBILE & ZERO SHIFT KEYPAD',
+                badgeColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                title: 'Khóa Cứng Bàn Phím PIN Zero Layout Shift, Triệt Tiêu Lỗi Cú Pháp Unterminated String & Tối Ưu Cảm Ứng Mobile 0ms',
+                summary: 'Bản phát hành chuẩn hóa thiết kế Hallmark Mobile Ergonomics và gia cố tính toàn vẹn mã nguồn: (1) Khóa cứng hình học bàn phím số PIN đứng im 100% (Zero Layout Shift), loại bỏ thẻ input tàng hình để chặn đứng bàn phím ảo OS bung lên làm co giật màn hình; (2) Cố định kích thước nút bấm 50px và viền 1px chuẩn border-box ở cả 2 trạng thái; (3) Phẳng hóa cấu trúc JSX của Login, loại bỏ hoàn toàn React Fragment (<> / </>) để chống gãy AST của linter; (4) Triệt tiêu lỗi cú pháp Unterminated String Constant do ký tự URL (https://) bị Apps Script hiểu nhầm là comment gạch chéo kép; (5) Tối ưu cảm ứng mobile với touch-action manipulation loại bỏ độ trễ 300ms.',
+                categories: ['Hallmark Mobile', 'Zero Layout Shift', 'Bảo Mật PIN', 'Vá Lỗi Cú Pháp', 'Tối Ưu Cảm Ứng'],
+                items: [
+                    {
+                        icon: 'fa-lock',
+                        color: 'text-amber-400',
+                        title: 'Bàn Phím PIN Đứng Im Tuyệt Đối (Zero Layout Shift)',
+                        desc: 'Khóa cứng kích thước modal, bỏ autoFocus input ẩn chống bung bàn phím ảo OS, loại bỏ co giãn chấm tròn, nút xác thực cố định 50px viền 1px không xê dịch dù 0.1px.'
+                    },
+                    {
+                        icon: 'fa-shield-alt',
+                        color: 'text-emerald-400',
+                        title: 'Khắc Phục Dứt Điểm Lỗi Unterminated String Constant',
+                        desc: 'Chuẩn hoá chuỗi URL ntfy.sh và icon thông báo qua phép nối ký tự an toàn, triệt tiêu 100% hiện tượng Apps Script ngắt dòng do hiểu nhầm hai dấu gạch chéo thành comment.'
+                    },
+                    {
+                        icon: 'fa-mobile-alt',
+                        color: 'text-blue-400',
+                        title: 'Tối Ưu Cảm Ứng Mobile (Touch-Action: Manipulation)',
+                        desc: 'Triệt tiêu độ trễ 300ms của trình duyệt di động trên toàn bộ các phím số, ngăn chặn hoàn toàn thao tác phóng to/thu nhỏ ngoài ý muốn khi bấm nhanh.'
+                    },
+                    {
+                        icon: 'fa-code',
+                        color: 'text-purple-400',
+                        title: 'Phẳng Hóa Cây JSX & useMemo Tối Ưu Render',
+                        desc: 'Tách toàn bộ logic text và class ra khỏi JSX, loại bỏ React Fragment rỗng (<>), giúp AST luôn nguyên vẹn và tăng tốc độ transpile trên mọi thiết bị.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.45.5',
+                date: '06/09/2026',
+                isLatest: false,
+                badge: 'PERFORMANCE ENGINE & DATA INTEGRITY',
+                badgeColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                title: 'Tối Ưu Hiệu Năng Toàn Diện: 2-Phase Execution (0ms JSX Compile), Bảo Toàn 100% Công Thức Sheet & Concurrency Guards',
+                summary: 'Gói tối ưu hiệu năng toàn diện và nâng cấp an toàn dữ liệu cho toàn bộ hệ điều hành RF Workspace Pro: (1) Động cơ 2-Phase Execution loại bỏ hoàn toàn Babel CDN runtime 2.8 MB, chuyển sang biên dịch JSX trước (0ms CPU compile) giúp mở app tức thì; (2) Tối ưu hóa hàm lưu delta với in-memory indexing O(1), contiguous range batch write và bảo toàn 100% công thức ô tính (Zero Formula Loss); (3) Concurrency guards và SmartMerge ưu tiên Optimistic UI gần nhất (< 60s), loại bỏ triệt để hiện tượng server response chậm đè dữ liệu vừa sửa; (4) Tách biệt cache hiển thị giao diện và nguồn xác thực thẩm quyền có generation token chống race condition.',
+                categories: ['Hiệu Năng Cao', '0ms JSX Compile', 'Bảo Toàn Công Thức', 'Contiguous Batching', 'Chống Stale Overwrite'],
+                items: [
+                    {
+                        icon: 'fa-bolt',
+                        color: 'text-amber-400',
+                        title: '2-Phase Execution & 0ms JSX Compile',
+                        desc: 'Loại bỏ hoàn toàn thư viện Babel CDN 2.8 MB, nạp trực tiếp Javascript thuần đã biên dịch trước, App Shell tương tác ngay lập tức.'
+                    },
+                    {
+                        icon: 'fa-calculator',
+                        color: 'text-emerald-400',
+                        title: 'Bảo Toàn 100% Công Thức Ô Tính (Zero Formula Loss)',
+                        desc: 'Đọc đồng thời values và formulas khi lưu, giữ nguyên vẹn chuỗi công thức =SUM, =CONCATENATE cho các ô không bị client sửa đổi.'
+                    },
+                    {
+                        icon: 'fa-layer-group',
+                        color: 'text-blue-400',
+                        title: 'Contiguous Range Batch Write & O(1) Indexing',
+                        desc: 'Tra cứu O(1) qua Map in-memory, gom các dòng liền kề thành dải ghi liên tục, hỗ trợ cập nhật in-flight in-batch và cộng dồn _diff nhiều lần.'
+                    },
+                    {
+                        icon: 'fa-shield-halved',
+                        color: 'text-purple-400',
+                        title: 'SmartMerge Chống Đè Dữ Liệu & Concurrency Guards',
+                        desc: 'Ưu tiên dữ liệu optimistic gần nhất (< 60s), loại bỏ race condition từ server response cũ, throttle polling khi tab ẩn.'
+                    }
+                ]
+            },
+            {
                 version: 'Royal v2.45.4',
                 date: '06/09/2026',
-                isLatest: true,
+                isLatest: false,
                 badge: 'HALLMARK MOBILE FINANCE & SEAMLESS SYNC',
                 badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
                 title: 'Chuẩn Hóa Công Thái Học Modal Tài Chính Mobile (Hallmark), Khắc Phục Lỗi Đồng Bộ Quỹ & Tối Ưu Đọc File Trạm Bơm Đơn',
@@ -5610,10 +5718,16 @@
         const syncCounterRef = React.useRef(0);
         const pendingSyncsRef = React.useRef(0);
         const lastSyncCompletedRef = React.useRef(0); // Thời điểm hoàn thành sync gần nhất (ms) — dùng cho cooldown guard
+        const lastStateMutationTimestampRef = React.useRef(Date.now());
+        const activeSessionIdRef = React.useRef(String(currentUser || '') + '_' + Date.now());
+        const fetchSeqRef = React.useRef(0);
+        const isFetchingRef = React.useRef(false);
+        const refetchQueuedRef = React.useRef(false);
+        const pollingIntervalRef = React.useRef(null);
 
         // SMART MERGE UTILITY: Hợp nhất mảng server vào mảng local mà KHÔNG gây flash
         // Cơ chế: serverArray làm chuẩn, map qua localMap để bảo toàn các trường optimistic,
-        // đồng thời bảo lưu các items mới tạo local chưa kịp lên server (_optimisticTime < 20s).
+        // đồng thời bảo lưu các items mới tạo local chưa kịp lên server (_optimisticTime < 180s).
         const smartMerge = React.useCallback((localArray, serverArray) => {
             if (!serverArray || !Array.isArray(serverArray)) return localArray || [];
             if (!localArray || !Array.isArray(localArray) || localArray.length === 0) return serverArray;
@@ -5629,6 +5743,13 @@
                 if (!serverItem || serverItem.id == null) return serverItem;
                 const localItem = localMap.get(String(serverItem.id));
                 if (!localItem) return serverItem;
+                
+                // Chống Stale Overwrite: Nếu localItem vừa có thao tác optimistic gần nhất (< 60s),
+                // ưu tiên giữ các trường thay đổi cục bộ của localItem thay vì bị server cũ đè lên!
+                const isRecentLocalEdit = localItem._optimisticTime && (Date.now() - localItem._optimisticTime < 60000);
+                if (isRecentLocalEdit) {
+                    return { ...serverItem, ...localItem };
+                }
                 return { ...localItem, ...serverItem };
             });
 
@@ -5667,6 +5788,13 @@
                 if (isIncomingEmpty && localOrder.accessories) {
                     const isLocalEmpty = !localOrder.accessories || localOrder.accessories === '[]' || localOrder.accessories === '' || (Array.isArray(localOrder.accessories) && localOrder.accessories.length === 0);
                     if (!isLocalEmpty) mergedAcc = localOrder.accessories;
+                }
+
+                // Chống Stale Overwrite: Nếu đơn hàng vừa có thao tác optimistic gần nhất (< 60s),
+                // ưu tiên giữ các trường thay đổi cục bộ của localOrder!
+                const isRecentLocalEdit = localOrder._optimisticTime && (Date.now() - localOrder._optimisticTime < 60000);
+                if (isRecentLocalEdit) {
+                    return { ...serverOrder, ...localOrder, accessories: mergedAcc };
                 }
                 return { ...localOrder, ...serverOrder, accessories: mergedAcc };
             });
@@ -5834,6 +5962,7 @@
         // BỘ HỢP NHẤT DELTA VÀO STATE CỰC NHANH (SHARED REALTIME ENGINE - KHỞI TẠO ĐẦU TIÊN)
         const applyDeltaToState = React.useCallback((payload) => {
             if (!payload) return;
+            lastStateMutationTimestampRef.current = Date.now();
             const optimisticMerge = (currentArray, newItems, deleteIds) => {
                 let result = [...(currentArray || [])];
                 if (deleteIds && deleteIds.length > 0) {
@@ -5951,11 +6080,23 @@
 
         const loadData = async (isInitial = false) => {
             if (!isInitial) {
-                // Guard mạnh: Bỏ qua nếu đang sync HOẶC vừa sync xong < 5 giây
+                // Guard mạnh: Bỏ qua nếu đang sync HOẶC vừa sync xong < 3 giây
                 if (pendingSyncsRef.current > 0) return;
                 const msSinceLastSync = Date.now() - lastSyncCompletedRef.current;
-                if (msSinceLastSync < 5000) return; // Cooldown 5s sau sync hoàn tất
+                if (msSinceLastSync < 3000) return; // Cooldown 3s sau sync hoàn tất
             }
+
+            // CONCURRENCY GUARD: Nếu có yêu cầu tải đang chạy dở dang, xếp hàng lượt sau, không nuốt lệnh!
+            if (isFetchingRef.current) {
+                refetchQueuedRef.current = true;
+                return;
+            }
+
+            isFetchingRef.current = true;
+            const requestStartTime = Date.now();
+            const currentSeq = ++fetchSeqRef.current;
+            const sessionAtStart = activeSessionIdRef.current;
+
             try {
                 if (isInitial) {
                     // 1. TẦNG 1: Local Instant Cache (<5ms) - Phục hồi ngay lập tức để vẽ UI
@@ -5972,6 +6113,10 @@
 
                     // 2. TẦNG 2: Nạp dữ liệu đồng bộ chính thức từ Google Apps Script
                     const [d, cfg] = await Promise.all([runGAS('getAppData'), runGAS('getUserConfig')]);
+                    
+                    // Bỏ qua nếu phiên đăng nhập đã thay đổi
+                    if (activeSessionIdRef.current !== sessionAtStart) return;
+
                     if (d && !d.error) {
                         updateStateWithData(d);
                         if (d.serverTime) lastSyncTimeRef.current = d.serverTime;
@@ -5989,9 +6134,14 @@
                 } else {
                     // POLLING: Dùng smartMerge để không đè optimistic state
                     const delta = await runGAS('getAppData');
+                    
+                    // CHỐNG RACE CONDITION: Hủy bỏ nếu đổi phiên, hoặc có lượt tải mới hơn, hoặc đang sync
+                    if (activeSessionIdRef.current !== sessionAtStart) return;
+                    if (currentSeq !== fetchSeqRef.current) return;
                     if (pendingSyncsRef.current > 0) return;
+
                     if (delta && !delta.error) {
-                        mergeServerDataSilently(delta); // ← MERGE thay vì REPLACE
+                        mergeServerDataSilently(delta); // smartMerge bảo vệ các bản ghi optimistic < 60s
                         if (delta.serverTime) {
                             lastSyncTimeRef.current = delta.serverTime;
                         }
@@ -6000,9 +6150,15 @@
             } catch (e) {
                 console.error("Lỗi đồng bộ dữ liệu:", e);
             } finally {
+                isFetchingRef.current = false;
                 if (isInitial) {
                     setLoading(false);
                     setIsInitialFetching(false);
+                }
+                // HÀNG ĐỢI REFETCH: Tự động chạy tiếp nếu có yêu cầu tải cần thiết đến trong lúc đang fetch
+                if (refetchQueuedRef.current) {
+                    refetchQueuedRef.current = false;
+                    setTimeout(() => { loadData(false); }, 50);
                 }
             }
         };
@@ -6117,8 +6273,8 @@
                                     
                                     new Notification(notifTitle, {
                                         body: notifBody,
-                                        icon: 'https://i.postimg.cc/TYD5NncZ/icon.png',
-                                        badge: 'https://i.postimg.cc/TYD5NncZ/icon.png',
+                                        icon: 'https:' + '/' + '/i.postimg.cc/TYD5NncZ/icon.png',
+                                        badge: 'https:' + '/' + '/i.postimg.cc/TYD5NncZ/icon.png',
                                         tag: isSOS ? 'rf-sos-' + data.timestamp : isUrgent ? 'rf-urgent-' + data.timestamp : 'rf-action-' + data.timestamp,
                                         renotify: true,
                                         requireInteraction: isSOS || isUrgent,
@@ -6130,17 +6286,88 @@
                     }
                 });
 
-                // Safety Net: Quét dự phòng 120 giây (Firebase delta đã xử lý realtime)
-                const interval = setInterval(() => { loadData(false); }, 120000);
+                // Safety Net: Quản lý Polling thông minh kết hợp Visibility Throttle & Phục hồi Online/Offline
+                const pollMs = window.firebase ? 120000 : 30000;
+                const startPolling = () => {
+                    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                    pollingIntervalRef.current = setInterval(() => {
+                        if (typeof document !== 'undefined' && document.hidden) return; // Bỏ qua nếu tab đang ẩn
+                        loadData(false);
+                    }, pollMs);
+                };
+
+                const handleVisibilityChange = () => {
+                    if (document.hidden) {
+                        // Khi tab ẩn: ngắt polling interval để tiết kiệm CPU, pin và quota GAS
+                        if (pollingIntervalRef.current) {
+                            clearInterval(pollingIntervalRef.current);
+                            pollingIntervalRef.current = null;
+                        }
+                    } else {
+                        // Khi tab quay lại: kiểm tra nếu > 45s kể từ lần sync cuối thì đồng bộ lại ngay
+                        const msSinceLast = Date.now() - lastSyncCompletedRef.current;
+                        if (msSinceLast > 45000) {
+                            loadData(false);
+                        }
+                        startPolling();
+                    }
+                };
+
+                const handleOnline = () => {
+                    triggerToast("Đã khôi phục Internet — Đang đồng bộ dữ liệu...", "fa-wifi", "success");
+                    loadData(false);
+                };
+
+                const handleOffline = () => {
+                    triggerToast("Mất kết nối Internet — Đang ở chế độ ngoại tuyến", "fa-wifi-slash", "warning");
+                };
+
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+                window.addEventListener('online', handleOnline);
+                window.addEventListener('offline', handleOffline);
+
+                startPolling();
 
                 return () => {
                     dbDeltaRef.off();
-                    clearInterval(interval);
+                    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                    document.removeEventListener('visibilitychange', handleVisibilityChange);
+                    window.removeEventListener('online', handleOnline);
+                    window.removeEventListener('offline', handleOffline);
                 };
             } else {
-                // Fallback nếu Firebase lỗi — 30s thay vì 15s
-                const interval = setInterval(() => { loadData(false); }, 30000);
-                return () => clearInterval(interval);
+                // Fallback nếu không có Firebase
+                const pollMs = 30000;
+                const startPollingFallback = () => {
+                    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                    pollingIntervalRef.current = setInterval(() => {
+                        if (typeof document !== 'undefined' && document.hidden) return;
+                        loadData(false);
+                    }, pollMs);
+                };
+
+                const handleVisibilityChangeFallback = () => {
+                    if (document.hidden) {
+                        if (pollingIntervalRef.current) {
+                            clearInterval(pollingIntervalRef.current);
+                            pollingIntervalRef.current = null;
+                        }
+                    } else {
+                        const msSinceLast = Date.now() - lastSyncCompletedRef.current;
+                        if (msSinceLast > 25000) {
+                            loadData(false);
+                        }
+                        startPollingFallback();
+                    }
+                };
+
+                document.addEventListener('visibilitychange', handleVisibilityChangeFallback);
+                startPollingFallback();
+
+                return () => {
+                    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                    document.removeEventListener('visibilitychange', handleVisibilityChangeFallback);
+                };
             }
         }, [currentUser, applyDeltaToState]);
 
@@ -6581,7 +6808,7 @@
                                     <div className="w-5 flex justify-center text-[#d4af37] text-[13px]"><i className="fas fa-rocket"></i></div>
                                     <span>Bản Cập Nhật</span>
                                 </div>
-                                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 font-black px-1.5 py-0.5 rounded border border-emerald-500/30">v2.45.4</span>
+                                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 font-black px-1.5 py-0.5 rounded border border-emerald-500/30">v2.45.7</span>
                             </button>
                         </div>
                     </div>

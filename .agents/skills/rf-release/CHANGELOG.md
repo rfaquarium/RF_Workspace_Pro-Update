@@ -4,6 +4,31 @@ Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến tr
 
 ---
 
+## [v2.45.7] - 2026-09-07
+
+### 🔄 Tự Động Đưa Đơn Hoàn Tháng Cũ (T8) Về Mục Hoàn Tháng Này (T9) Cho Diệu Hương Đi Kiểm
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - Khi quét đơn hoàn tháng cũ (T8) bằng súng tít hoặc Excel tại xưởng, đơn bị ẩn khỏi Tháng Này khiến Diệu Hương không thấy đi kiểm.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật**:
+  1. Tự động đưa đơn tháng cũ về ngày hôm nay thuộc Tháng Này khi quét (`processCode` & `confirmBulkReturn`).
+  2. Mở khoá quét nhận hàng thực tế cho các đơn đã có trạng thái hoàn từ sàn trước đó.
+  3. Cơ chế Zero-Dropped trong `matchTimeFilter` cho đơn Hàng Hoàn chưa đối soát, ưu tiên `returnedAt`.
+  4. Đơn vừa quét hoàn xuất hiện tức thì trên banner cảnh báo đỏ kèm nút `[KIỂM HOÀN]`.
+
+---
+
+## [v2.45.6] - 2026-09-07
+
+### 📱 Khóa Cứng Bàn Phím PIN Zero Layout Shift, Triệt Tiêu Lỗi Cú Pháp Unterminated String & Tối Ưu Cảm Ứng Mobile 0ms
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - Khắc phục lỗi giật nảy bàn phím khi bấm 4 số và lỗi Unterminated string constant tại ntfyUrl.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật (Hallmark Mobile & Zero Shift)**:
+  1. Khóa cứng hình học bàn phím PIN, bỏ autoFocus input ẩn.
+  2. Triệt tiêu 100% chuỗi // trong ntfyUrl.
+  3. Phẳng hóa JSX và React.useMemo tối ưu render.
+
+---
+
 ## [v2.42.0] - 2026-09-04
 
 ### ⚡ Tối Ưu Hóa Dòng Chảy Lean (One-Piece Flow), Phá Vỡ Điểm Nghẽn Sản Xuất & Giao Hàng

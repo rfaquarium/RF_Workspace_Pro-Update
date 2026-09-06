@@ -15,6 +15,7 @@
 !ShopeeDataMigration.js
 !MasterGovernanceAgent.js
 !RFEnterpriseCore.js
+!MigrationFinancialStatements.js
 
 # 3. Tuyệt đối loại trừ thư mục kỹ năng AI, môi trường và service worker
 .agents/**

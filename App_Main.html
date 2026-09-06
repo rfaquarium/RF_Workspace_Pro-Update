@@ -781,11 +781,47 @@
 
         const RELEASES = [
             {
+                version: 'Royal v2.45.4',
+                date: '06/09/2026',
+                isLatest: true,
+                badge: 'HALLMARK MOBILE FINANCE & SEAMLESS SYNC',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Chuẩn Hóa Công Thái Học Modal Tài Chính Mobile (Hallmark), Khắc Phục Lỗi Đồng Bộ Quỹ & Tối Ưu Đọc File Trạm Bơm Đơn',
+                summary: 'Khắc phục triệt để 4 vấn đề vận hành trên thiết bị di động và máy tính: (1) Phân quyền ghi bảng Accounts cho các vai trò quản trị tài chính, kèm cơ chế rollback tự động chống hiện tượng phiếu ảo (ghost vouchers) chỉ hiện trên mobile mà máy tính không có; (2) Tái thiết kế Modal tạo phiếu chi thành Hallmark Bottom Sheet cố định ở đáy màn hình, khóa cuộn trang nền chống trôi nảy khi mở bàn phím ảo; (3) Cách ly sự kiện cảm ứng trên dropdown danh mục, bổ sung 4 chip chọn nhanh 1 chạm công thái học; (4) Tối ưu Trạm Bơm Đơn với native file.arrayBuffer() và bắt lỗi thông minh khi file Excel bị ứng dụng khác khóa.',
+                categories: ['Tài Chính Mobile', 'Hallmark Bottom Sheet', 'Chống Ghost Voucher', 'Đồng Bộ Quỹ', 'Trạm Bơm Đơn'],
+                items: [
+                    {
+                        icon: 'fa-mobile-screen-button',
+                        color: 'text-emerald-400',
+                        title: 'Hallmark Bottom Sheet & Chống Trôi Nền Mobile',
+                        desc: 'Modal tạo phiếu chi được cố định vững chãi ở đáy màn hình di động, khóa cuộn body chống giật nảy khi gõ bàn phím ảo, các nút Hủy/Lưu luôn cố định trong tầm với ngón tay cái.'
+                    },
+                    {
+                        icon: 'fa-tags',
+                        color: 'text-amber-400',
+                        title: 'Cách Ly Sự Kiện Cuộn & 4 Chip Danh Mục 1 Chạm',
+                        desc: 'Danh sách danh mục chi phí cuộn siêu mượt độc lập, tích hợp sẵn 4 chip bấm nhanh đạt chuẩn touch target >= 44px.'
+                    },
+                    {
+                        icon: 'fa-vault',
+                        color: 'text-cyan-400',
+                        title: 'Phân Quyền Ghi Accounts & Chống Lệch Quỹ Đa Thiết Bị',
+                        desc: 'Cho phép các vai trò tài chính cập nhật số dư tài khoản trong Code.js, đồng thời kiểm tra xác nhận từ server để bảo vệ 100% tính nhất quán dữ liệu giữa điện thoại và máy tính.'
+                    },
+                    {
+                        icon: 'fa-file-excel',
+                        color: 'text-blue-400',
+                        title: 'Tối Ưu Trạm Bơm Đơn Native ArrayBuffer',
+                        desc: 'Đọc file Excel mượt mà với native Web API, thông báo thân thiện và tự giải phóng trạng thái khi tệp bị Excel khóa trên máy tính.'
+                    }
+                ]
+            },
+            {
                 version: 'Royal v2.45.3',
                 date: '05/09/2026',
-                isLatest: true,
+                isLatest: false,
                 badge: 'WAR ROOM REALTIME DATA GROUNDING & ANTI-HALLUCINATION',
-                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                badgeColor: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
                 title: 'Đồng Bộ Dữ Liệu Thời Gian Thực Vào War Room & Triệt Tiêu Hallucination 7 Agents',
                 summary: 'Đột phá kiến trúc Grounding Context cho Ban Điều Hành 7 Agents: Truyền tải trực tiếp snapshot dữ liệu thực tế từ Google Sheets (danh sách nhân sự Config_NhanSu, tiến độ KPI thực tế KPI_Progress, lệnh sản xuất Production, tồn kho keo/kính Products, đơn hàng Orders). Cấm triệt để AI bịa đặt nhân sự ảo (như anh Tuấn) và đảm bảo các Agent phân tích chính xác tiến độ, số liệu của Hoàng Dương, Duy Tân, Diệu Hương, Trang.',
                 categories: ['War Room Data Grounding', 'Anti-Hallucination', 'KPI Realtime', '7 Nhân Sự Số'],
@@ -6545,7 +6581,7 @@
                                     <div className="w-5 flex justify-center text-[#d4af37] text-[13px]"><i className="fas fa-rocket"></i></div>
                                     <span>Bản Cập Nhật</span>
                                 </div>
-                                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 font-black px-1.5 py-0.5 rounded border border-emerald-500/30">v2.45.3</span>
+                                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 font-black px-1.5 py-0.5 rounded border border-emerald-500/30">v2.45.4</span>
                             </button>
                         </div>
                     </div>

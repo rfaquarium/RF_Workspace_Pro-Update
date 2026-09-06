@@ -103,6 +103,114 @@ const parseAccountInfo = (acc) => {
 };
 
 /**
+ * Tìm kiếm tài khoản thông minh & linh hoạt (hỗ trợ cả id hệ thống, mã code migration ACC_GIAMDOC, ACC_KETOAN, hoặc STK)
+ */
+const resolveAccount = (accIdOrCode, accountsData) => {
+    if (!accIdOrCode) return null;
+    const list = accountsData || [];
+    // 1. Khớp chính xác ID
+    let found = list.find(a => a.id === accIdOrCode);
+    if (found) return found;
+
+    const raw = String(accIdOrCode).toUpperCase().trim();
+    
+    // 2. Nhận diện theo mã code Giám Đốc hoặc STK 2686688286
+    if (raw.includes('GIAMDOC') || raw.includes('2686688286') || raw.includes('GD')) {
+        found = list.find(a => {
+            const p = parseAccountInfo(a);
+            return p.name.toUpperCase().includes('GIÁM ĐỐC') || String(p.number).includes('2686688286') || a.id === 'ACC_GIAMDOC';
+        });
+        if (found) return found;
+    }
+    
+    // 3. Nhận diện theo mã code Kế Toán hoặc STK 077354030001 / LPBank
+    if (raw.includes('KETOAN') || raw.includes('077354030001') || raw.includes('LPBANK') || raw.includes('KT')) {
+        found = list.find(a => {
+            const p = parseAccountInfo(a);
+            return p.name.toUpperCase().includes('KẾ TOÁN') || String(p.number).includes('077354030001') || a.id === 'ACC_KETOAN';
+        });
+        if (found) return found;
+    }
+
+    // 4. Nhận diện theo mã code Công Ty hoặc STK 8600428268 / CTY
+    if (raw.includes('CONGTY') || raw.includes('CTY') || raw.includes('8600428268') || raw.includes('1782746951474')) {
+        found = list.find(a => {
+            const p = parseAccountInfo(a);
+            return p.name.toUpperCase().includes('CÔNG TY') || String(p.number).includes('8600428268') || a.id === 'ACC_1782746951474';
+        });
+        if (found) return found;
+    }
+
+    // 5. Nhận diện theo Shopee
+    if (raw.includes('SHOPEE') || raw.includes('SHP')) {
+        found = list.find(a => {
+            const p = parseAccountInfo(a);
+            return p.name.toUpperCase().includes('SHOPEE') || String(p.number).toLowerCase().includes('shopee') || a.id === 'ACC_SHOPEE';
+        });
+        if (found) return found;
+    }
+
+    // 6. Nhận diện theo tên chứa mã
+    found = list.find(a => {
+        const p = parseAccountInfo(a);
+        return p.name.toUpperCase().includes(raw) || (p.number && String(p.number).includes(raw));
+    });
+    if (found) return found;
+
+    return null;
+};
+
+/**
+ * Lấy ID chuẩn của tài khoản từ id/mã alias
+ */
+const resolveAccountId = (accRef, accountsData) => {
+    if (!accRef) return '';
+    const acc = resolveAccount(accRef, accountsData);
+    return acc ? acc.id : accRef;
+};
+
+/**
+ * Hiển thị tên tài khoản thân thiện, không bao giờ lộ mã thô như ACC_GIAMDOC hay N/A
+ */
+const getAccountDisplayName = (accIdOrCode, accountsData) => {
+    if (!accIdOrCode) return 'Chưa phân bổ';
+    const acc = resolveAccount(accIdOrCode, accountsData);
+    if (acc) return parseAccountInfo(acc).name;
+    const raw = String(accIdOrCode).toUpperCase().trim();
+    if (raw.includes('GIAMDOC') || raw.includes('2686688286')) return 'TÀI KHOẢN GIÁM ĐỐC';
+    if (raw.includes('KETOAN') || raw.includes('077354030001')) return 'TÀI KHOẢN KẾ TOÁN (LPBANK)';
+    if (raw.includes('CONGTY') || raw.includes('8600428268') || raw.includes('1782746951474')) return 'TÀI KHOẢN CÔNG TY';
+    if (raw.includes('SHOPEE')) return 'TÀI KHOẢN VÍ SHOPEE';
+    return (accIdOrCode === 'N/A' || !accIdOrCode) ? 'Chưa phân bổ' : accIdOrCode;
+};
+
+/**
+ * Kiểm tra xem một mã tài khoản (hoặc alias ACC_GIAMDOC...) có khớp với đối tượng tài khoản đích hay không
+ */
+const isAccountMatch = (accRef, targetAccount) => {
+    if (!accRef || !targetAccount) return false;
+    if (accRef === targetAccount.id) return true;
+    const p = parseAccountInfo(targetAccount);
+    const raw = String(accRef).toUpperCase().trim();
+    const nameUpper = String(p.name || '').toUpperCase();
+    const num = String(p.number || '').trim();
+
+    if (nameUpper.includes('GIÁM ĐỐC') || num === '2686688286' || targetAccount.id === 'ACC_GIAMDOC') {
+        return raw.includes('GIAMDOC') || raw.includes('2686688286') || raw.includes('GD');
+    }
+    if (nameUpper.includes('KẾ TOÁN') || num === '077354030001' || targetAccount.id === 'ACC_KETOAN') {
+        return raw.includes('KETOAN') || raw.includes('077354030001') || raw.includes('LPBANK') || raw.includes('KT');
+    }
+    if (nameUpper.includes('CÔNG TY') || num === '8600428268' || targetAccount.id === 'ACC_1782746951474') {
+        return raw.includes('CONGTY') || raw.includes('8600428268') || raw === 'ACC_1782746951474' || raw.includes('CTY');
+    }
+    if (nameUpper.includes('SHOPEE') || targetAccount.id === 'ACC_SHOPEE') {
+        return raw.includes('SHOPEE') || raw.includes('SHP');
+    }
+    return false;
+};
+
+/**
  * Nhận diện trực quan biểu tượng và màu sắc tài khoản
  */
 const getBankVisuals = (accName, type) => {
@@ -279,15 +387,21 @@ const DynamicCategorySelect = ({ value, type, onChange, onCategoriesChange }) =>
         return () => window.removeEventListener('rf_categories_updated', handleUpdate);
     }, []);
 
-    // Close on click outside
+    // Close on click outside (support both desktop mousedown and mobile touchstart)
     React.useEffect(() => {
-        const handleClickOutside = (e) => {
+        const handlePointerDown = (e) => {
             if (containerRef.current && !containerRef.current.contains(e.target)) {
                 setIsOpen(false);
             }
         };
-        if (isOpen) document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        if (isOpen) {
+            document.addEventListener('mousedown', handlePointerDown);
+            document.addEventListener('touchstart', handlePointerDown, { passive: true });
+        }
+        return () => {
+            document.removeEventListener('mousedown', handlePointerDown);
+            document.removeEventListener('touchstart', handlePointerDown);
+        };
     }, [isOpen]);
 
     const filteredList = currentList.filter(c => {
@@ -350,7 +464,7 @@ const DynamicCategorySelect = ({ value, type, onChange, onCategoriesChange }) =>
             <button
                 type="button"
                 onClick={() => setIsOpen(prev => !prev)}
-                className="w-full bg-[#09090b] border border-zinc-700 hover:border-amber-400/80 focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-left flex items-center justify-between transition-all cursor-pointer group shadow-inner"
+                className="w-full bg-[#09090b] border border-zinc-700 hover:border-amber-400/80 focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-left flex items-center justify-between transition-all cursor-pointer group shadow-inner min-h-[44px]"
             >
                 <div className="flex items-center gap-2.5 min-w-0 pr-2">
                     <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs shrink-0 ${
@@ -365,9 +479,36 @@ const DynamicCategorySelect = ({ value, type, onChange, onCategoriesChange }) =>
                 </div>
             </button>
 
+            {/* Quick 1-Touch Chips */}
+            <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                {currentList.slice(0, 4).map(c => {
+                    const cVal = typeof c === 'string' ? c : c.value;
+                    const cLabel = typeof c === 'string' ? c : (c.label || c.value);
+                    const isSel = cVal === value;
+                    return (
+                        <button
+                            key={cVal}
+                            type="button"
+                            onClick={() => handleSelect(cVal)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                                isSel 
+                                    ? (typeKey === 'THU' ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 font-black' : 'bg-rose-500/25 text-rose-300 border border-rose-500/50 font-black')
+                                    : 'bg-zinc-900/90 text-zinc-400 border border-zinc-800 hover:text-zinc-200'
+                            }`}
+                        >
+                            {cLabel}
+                        </button>
+                    );
+                })}
+            </div>
+
             {/* Dropdown Floating Panel */}
             {isOpen && (
-                <div className="absolute top-full left-0 mt-1.5 w-full bg-[#121216] border border-zinc-700 rounded-2xl shadow-2xl z-[1050] p-2.5 flex flex-col space-y-2 animate-slide-up backdrop-blur-xl">
+                <div 
+                    className="absolute top-full left-0 mt-1.5 w-full bg-[#121216] border border-zinc-700 rounded-2xl shadow-2xl z-[1050] p-2.5 flex flex-col space-y-2 animate-slide-up backdrop-blur-xl"
+                    onClick={e => e.stopPropagation()}
+                    style={{ overscrollBehavior: 'contain' }}
+                >
                     {/* Search & Header */}
                     <div className="relative">
                         <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs"></i>
@@ -376,13 +517,17 @@ const DynamicCategorySelect = ({ value, type, onChange, onCategoriesChange }) =>
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             placeholder="Tìm kiếm danh mục..."
-                            className="w-full bg-[#09090b] border border-zinc-700 focus:border-amber-400 rounded-xl pl-8 pr-3 py-1.5 text-[11.5px] font-bold text-white outline-none placeholder-zinc-500"
+                            className="w-full bg-[#09090b] border border-zinc-700 focus:border-amber-400 rounded-xl pl-8 pr-3 py-2 text-[12px] font-bold text-white outline-none placeholder-zinc-500"
                             autoFocus
                         />
                     </div>
 
-                    {/* Category List */}
-                    <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-1 pr-0.5">
+                    {/* Category List - Isolated Touch Scroll for Mobile */}
+                    <div 
+                        className="max-h-56 overflow-y-auto custom-scrollbar space-y-1 pr-0.5"
+                        onTouchMove={e => e.stopPropagation()}
+                        style={{ touchAction: 'pan-y', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
+                    >
                         {filteredList.length === 0 ? (
                             <div className="text-zinc-500 text-[11px] text-center py-3 italic">
                                 Không tìm thấy danh mục phù hợp
@@ -398,22 +543,22 @@ const DynamicCategorySelect = ({ value, type, onChange, onCategoriesChange }) =>
                                     <div
                                         key={cVal}
                                         onClick={() => handleSelect(cVal)}
-                                        className={`px-2.5 py-2 rounded-xl text-[11.5px] font-bold flex items-center justify-between cursor-pointer transition-all ${
+                                        className={`px-3 py-2.5 rounded-xl text-[12px] font-bold flex items-center justify-between cursor-pointer transition-all min-h-[44px] ${
                                             isSel 
                                                 ? (typeKey === 'THU' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-black' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40 font-black')
-                                                : 'hover:bg-zinc-800/80 text-zinc-300 border border-transparent'
+                                                : 'hover:bg-zinc-800/80 active:bg-zinc-800 text-zinc-300 border border-transparent'
                                         }`}
                                     >
                                         <div className="flex items-center gap-2 min-w-0 pr-2">
                                             <i className={`fas ${cIcon} text-xs ${isSel ? (typeKey === 'THU' ? 'text-emerald-400' : 'text-rose-400') : 'text-zinc-500'}`}></i>
                                             <span className="truncate">{cLabel}</span>
                                         </div>
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                            {isSel && <i className="fas fa-check text-[10px]"></i>}
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            {isSel && <i className="fas fa-check text-xs text-amber-400"></i>}
                                             <button
                                                 type="button"
                                                 onClick={(e) => handleDeleteCategory(cVal, e)}
-                                                className="w-5 h-5 rounded-md hover:bg-rose-950/60 text-zinc-600 hover:text-rose-400 flex items-center justify-center transition-colors text-[10px]"
+                                                className="w-7 h-7 rounded-lg hover:bg-rose-950/60 active:bg-rose-950 text-zinc-500 hover:text-rose-400 flex items-center justify-center transition-colors text-xs"
                                                 title="Xóa danh mục này"
                                             >
                                                 <i className="fas fa-trash-alt"></i>
@@ -433,13 +578,13 @@ const DynamicCategorySelect = ({ value, type, onChange, onCategoriesChange }) =>
                             onChange={e => setNewCatName(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddCategory())}
                             placeholder="+ Thêm danh mục mới..."
-                            className="flex-1 bg-[#09090b] border border-zinc-700 focus:border-amber-400 rounded-xl px-3 py-1.5 text-[11px] font-bold text-white outline-none placeholder-zinc-500"
+                            className="flex-1 bg-[#09090b] border border-zinc-700 focus:border-amber-400 rounded-xl px-3 py-2 text-[11px] font-bold text-white outline-none placeholder-zinc-500"
                         />
                         <button
                             type="button"
                             onClick={handleAddCategory}
                             disabled={!newCatName.trim()}
-                            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-zinc-950 font-black text-[11px] uppercase rounded-xl transition-all shadow-sm cursor-pointer shrink-0"
+                            className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-zinc-950 font-black text-[11px] uppercase rounded-xl transition-all shadow-sm cursor-pointer shrink-0"
                         >
                             Thêm
                         </button>
@@ -482,8 +627,8 @@ const TransactionDetailModal = React.memo(function TransactionDetailModal({ tx, 
     const isThu = tx.type === 'Thu';
     const isChi = tx.type === 'Chi';
     const isChuyen = tx.type === 'Chuyển';
-    const fAcc = accountsData?.find(a => a.id === tx.fromAccount);
-    const tAcc = accountsData?.find(a => a.id === tx.toAccount);
+    const fAcc = resolveAccount(tx.fromAccount, accountsData);
+    const tAcc = resolveAccount(tx.toAccount, accountsData);
     const pFAcc = fAcc ? parseAccountInfo(fAcc) : null;
     const pTAcc = tAcc ? parseAccountInfo(tAcc) : null;
 
@@ -557,13 +702,13 @@ const TransactionDetailModal = React.memo(function TransactionDetailModal({ tx, 
                         {tx.fromAccount && (
                             <div className="flex justify-between items-center">
                                 <span className="text-zinc-500 font-bold uppercase text-[9px]">Từ Tài Khoản (Nguồn):</span>
-                                <span className="text-rose-300 font-bold font-mono text-right">{pFAcc ? `${pFAcc.name} (${pFAcc.number || '---'})` : tx.fromAccount}</span>
+                                <span className="text-rose-300 font-bold font-mono text-right">{pFAcc ? `${pFAcc.name} (${pFAcc.number || '---'})` : getAccountDisplayName(tx.fromAccount, accountsData)}</span>
                             </div>
                         )}
                         {tx.toAccount && (
                             <div className="flex justify-between items-center">
                                 <span className="text-zinc-500 font-bold uppercase text-[9px]">Đến Tài Khoản (Đích):</span>
-                                <span className="text-emerald-300 font-bold font-mono text-right">{pTAcc ? `${pTAcc.name} (${pTAcc.number || '---'})` : tx.toAccount}</span>
+                                <span className="text-emerald-300 font-bold font-mono text-right">{pTAcc ? `${pTAcc.name} (${pTAcc.number || '---'})` : getAccountDisplayName(tx.toAccount, accountsData)}</span>
                             </div>
                         )}
                         {tx.bankRef && (
@@ -945,22 +1090,22 @@ const AccountHistoryModal = React.memo(function AccountHistoryModal({ account, a
     const parsed = parseAccountInfo(account);
 
     const historyTxs = React.useMemo(() => {
-        if (!account?.id) return [];
-        const accId = account.id;
-        return allTxs.filter(t => t.fromAccount === accId || t.toAccount === accId)
+        if (!account) return [];
+        return allTxs.filter(t => isAccountMatch(t.fromAccount, account) || isAccountMatch(t.toAccount, account))
                      .sort((a, b) => parseTxTimestamp(b) - parseTxTimestamp(a));
     }, [account, allTxs]);
 
     const stats = React.useMemo(() => {
         let inAmt = 0, outAmt = 0;
-        if (!account?.id) return { inAmt: 0, outAmt: 0 };
-        const accId = account.id;
+        if (!account) return { inAmt: 0, outAmt: 0 };
 
         historyTxs.forEach(t => {
             const amt = Number(t.amount || 0);
+            const isFrom = isAccountMatch(t.fromAccount, account);
+            const isTo = isAccountMatch(t.toAccount, account);
             if (t.type === 'Chuyển') {
-                if (t.fromAccount === accId) outAmt += amt; 
-                if (t.toAccount === accId) inAmt += amt; 
+                if (isFrom) outAmt += amt; 
+                if (isTo) inAmt += amt; 
             } else if (t.type === 'Thu') {
                 inAmt += amt;
             } else if (t.type === 'Chi') {
@@ -1028,7 +1173,7 @@ const AccountHistoryModal = React.memo(function AccountHistoryModal({ account, a
                             let sign = '';
 
                             if (t.type === 'Chuyển') {
-                                if (t.fromAccount === account.id) {
+                                if (isAccountMatch(t.fromAccount, account)) {
                                     displayType = 'Chuyển Đi'; colorClass = 'text-rose-400'; sign = '-';
                                 } else {
                                     displayType = 'Nhận Tiền'; colorClass = 'text-emerald-400'; sign = '+';
@@ -2242,6 +2387,14 @@ const TransactionFormModal = React.memo(function TransactionFormModal({ initialD
         }));
     };
 
+    React.useEffect(() => {
+        const origOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = origOverflow;
+        };
+    }, []);
+
     // Quick 24h Time presets
     const setQuickTime24h = (presetTime) => {
         if (presetTime === 'NOW') {
@@ -2252,19 +2405,38 @@ const TransactionFormModal = React.memo(function TransactionFormModal({ initialD
     };
 
     return (
-        <div className="fixed inset-0 bg-black/85 flex items-center justify-center z-[999] p-4 backdrop-blur-md animate-fade-in" onClick={onClose}>
-            <div className="bg-[#121216] border border-zinc-800 w-full max-w-md rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col max-h-[92vh] animate-slide-up" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-4 border-b border-zinc-800 pb-3">
+        <div 
+            className="fixed inset-0 bg-black/80 z-[999] flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-md" 
+            onClick={(e) => { if (e.target === e.currentTarget && !isSaving) onClose(); }}
+            style={{ overscrollBehavior: 'contain' }}
+        >
+            <div 
+                className="bg-[#121216] border border-zinc-800 w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col max-h-[90dvh] sm:max-h-[85vh] h-[88dvh] sm:h-auto animate-slide-up" 
+                onClick={e => e.stopPropagation()}
+                style={{ overscrollBehavior: 'contain' }}
+            >
+                {/* Mobile Drag Handle */}
+                <div className="w-12 h-1.5 rounded-full bg-zinc-700/80 mx-auto mb-2 sm:hidden shrink-0"></div>
+
+                <div className="flex justify-between items-center mb-3 border-b border-zinc-800 pb-3 shrink-0">
                     <h3 className="font-black text-zinc-100 text-[14px] uppercase tracking-wider flex items-center gap-2">
                         <i className="fas fa-file-invoice-dollar text-amber-400"></i>
-                        <span>{form.id ? 'Sửa Giao Dịch' : 'Tạo Giao Dịch Mới'}</span>
+                        <span>{form.id ? 'Sửa Giao Dịch' : (form.type === 'Chi' ? 'Lập Phiếu Chi Tiền' : form.type === 'Thu' ? 'Lập Phiếu Thu Tiền' : 'Chuyển Quỹ Nội Bộ')}</span>
                     </h3>
-                    <button onClick={onClose} className="w-7 h-7 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer">
+                    <button 
+                        type="button"
+                        onClick={onClose} 
+                        disabled={isSaving}
+                        className="w-8 h-8 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                    >
                         <i className="fas fa-times text-xs"></i>
                     </button>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3.5 pr-1">
+                <div 
+                    className="flex-1 overflow-y-auto custom-scrollbar space-y-3.5 pr-1"
+                    style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
+                >
                     {/* Loại giao dịch: Thu / Chi / Chuyển (Hallmark Pills) */}
                     <div className="flex bg-[#09090b] p-1 rounded-2xl border border-zinc-800 gap-1 shadow-inner">
                         {['Thu', 'Chi', 'Chuyển'].map(t => {
@@ -2290,7 +2462,7 @@ const TransactionFormModal = React.memo(function TransactionFormModal({ initialD
 
                     {/* Số tiền */}
                     <div className="bg-[#09090b] border border-zinc-800 rounded-2xl p-3.5 shadow-inner">
-                        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Số Tiền (VNĐ)</label>
+                        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Số Tiền (VNĐ) *</label>
                         <input 
                             type="text" 
                             value={form.amount ? Number(String(form.amount).replace(/[^0-9]/g, '')).toLocaleString('vi-VN') : ''} 
@@ -2319,7 +2491,7 @@ const TransactionFormModal = React.memo(function TransactionFormModal({ initialD
                     {/* Người nhận / người chuyển */}
                     <div>
                         <label className="text-[10px] font-black text-zinc-400 uppercase tracking-wider block mb-1">
-                            {form.type === 'Thu' ? 'Người Gửi / Khách Hàng' : form.type === 'Chi' ? 'Người Nhận / Đối Tác' : 'Nội Dung Chuyển'}
+                            {form.type === 'Thu' ? 'Người Gửi / Khách Hàng' : form.type === 'Chi' ? 'Người Nhận / Đối Tác *' : 'Nội Dung Chuyển'}
                         </label>
                         <div className="flex gap-1.5">
                             <input 
@@ -2348,11 +2520,11 @@ const TransactionFormModal = React.memo(function TransactionFormModal({ initialD
                     <div className="grid grid-cols-2 gap-2.5">
                         {form.type !== 'Thu' && (
                             <div>
-                                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Từ Tài Khoản</label>
+                                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Từ Tài Khoản *</label>
                                 <select 
                                     value={form.fromAccount} 
                                     onChange={e => setForm({...form, fromAccount: e.target.value})} 
-                                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl px-3 py-2.5 text-[12px] font-bold text-zinc-200 outline-none focus:border-amber-500 cursor-pointer"
+                                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl px-3 py-2.5 text-[12px] font-bold text-zinc-200 outline-none focus:border-amber-500 cursor-pointer min-h-[44px]"
                                 >
                                     <option value="">-- Chọn quỹ --</option>
                                     {accountsData.map(a => <option key={a.id} value={a.id}>{parseAccountInfo(a).name}</option>)}
@@ -2361,11 +2533,11 @@ const TransactionFormModal = React.memo(function TransactionFormModal({ initialD
                         )}
                         {form.type !== 'Chi' && (
                             <div className={form.type === 'Thu' ? 'col-span-2' : ''}>
-                                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Đến Tài Khoản</label>
+                                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Đến Tài Khoản *</label>
                                 <select 
                                     value={form.toAccount} 
                                     onChange={e => setForm({...form, toAccount: e.target.value})} 
-                                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl px-3 py-2.5 text-[12px] font-bold text-sky-400 outline-none focus:border-amber-500 cursor-pointer"
+                                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl px-3 py-2.5 text-[12px] font-bold text-sky-400 outline-none focus:border-amber-500 cursor-pointer min-h-[44px]"
                                 >
                                     <option value="">-- Chọn quỹ --</option>
                                     {accountsData.filter(a => form.type !== 'Chuyển' || a.id !== form.fromAccount).map(a => <option key={a.id} value={a.id}>{parseAccountInfo(a).name}</option>)}
@@ -2486,7 +2658,7 @@ const TransactionFormModal = React.memo(function TransactionFormModal({ initialD
                                 />
                                 <label 
                                     htmlFor="tx-upload-file-input" 
-                                    className="cursor-pointer bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 text-zinc-400 hover:text-zinc-200 rounded-xl py-3 flex items-center justify-center gap-2 text-[11px] font-bold transition-colors"
+                                    className="cursor-pointer bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 text-zinc-400 hover:text-zinc-200 rounded-xl py-3 flex items-center justify-center gap-2 text-[11px] font-bold transition-colors min-h-[44px]"
                                 >
                                     <i className="fas fa-camera text-amber-400"></i>
                                     <span>Tải ảnh bill hoặc chứng từ</span>
@@ -2496,14 +2668,25 @@ const TransactionFormModal = React.memo(function TransactionFormModal({ initialD
                     </div>
                 </div>
 
-                <div className="mt-3 pt-3 border-t border-zinc-800">
-                    <button 
-                        onClick={() => onSave(form)} 
-                        disabled={isSaving} 
-                        className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-zinc-950 font-black text-[12px] uppercase tracking-wider rounded-2xl transition-all shadow-md shadow-amber-950/40 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                    >
-                        {isSaving ? <><i className="fas fa-spinner fa-spin"></i> Đang Lưu...</> : <><i className="fas fa-save"></i> Lưu Giao Dịch</>}
-                    </button>
+                <div className="mt-3 pt-3 border-t border-zinc-800 shrink-0">
+                    <div className="flex gap-2">
+                        <button 
+                            type="button"
+                            onClick={onClose} 
+                            disabled={isSaving}
+                            className="w-1/3 py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-black uppercase transition-colors cursor-pointer min-h-[44px]"
+                        >
+                            Hủy
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => onSave(form)} 
+                            disabled={isSaving} 
+                            className="w-2/3 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-zinc-950 font-black text-[12px] uppercase tracking-wider rounded-2xl transition-all shadow-md shadow-amber-950/40 flex items-center justify-center gap-2 cursor-pointer active:scale-95 min-h-[44px]"
+                        >
+                            {isSaving ? <><i className="fas fa-spinner fa-spin"></i> Đang Lưu...</> : <><i className="fas fa-save"></i> {form.type === 'Chi' ? 'Lưu Phiếu Chi' : 'Lưu Giao Dịch'}</>}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2580,6 +2763,8 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
     const [viewingAccountTxs, setViewingAccountTxs] = React.useState(null);
     const [selectedTxIds, setSelectedTxIds] = React.useState(new Set());
     const [showBatchCategoryModal, setShowBatchCategoryModal] = React.useState(false);
+    const [expandedTxId, setExpandedTxId] = React.useState(null);
+    const [copiedTxId, setCopiedTxId] = React.useState(null);
 
     // Dynamic accounts list
     const accountsData = React.useMemo(() => {
@@ -2606,6 +2791,67 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
                title.includes('điều chỉnh số dư') || 
                note.includes('điều chỉnh số dư') ||
                note.includes('sinh phiếu điều chỉnh');
+    }, []);
+
+    // Helper bóc tách tên đối tác / người nhận / người gửi thông minh
+    const formatTxDisplayTitle = React.useCallback((t) => {
+        if (!t) return '';
+        let title = String(t.title || '').trim();
+        const note = String(t.note || '').trim();
+        
+        // Nếu title bị ngắn dạng MB, SMB, ke toan hoặc rỗng
+        if (!title || title === 'MB' || title === 'SMB' || title.toLowerCase() === 'ke toan' || title.length <= 3) {
+            // 1. Pattern MB-TKThe <number>_<NAME>, tai <Bank>
+            const m1 = note.match(/(?:MB-)?TKThe\s+[^_]*_([^,]+?)(?:,\s*tai|\.|\s*$)/i);
+            if (m1 && m1[1] && isNaN(Number(m1[1]))) {
+                return `Người nhận: ${m1[1].trim()}`;
+            }
+            // 2. Pattern SMB-TkThe :<acc>, tai <bank>. <content>
+            const m2 = note.match(/SMB-TkThe\s*:[^,]+,\s*tai\s+[^.]+\.\s*([^;.\-]+)/i);
+            if (m2 && m2[1] && m2[1].trim()) {
+                return m2[1].trim().slice(0, 50);
+            }
+            // 3. Customer name via @VA_
+            const m3 = note.match(/@VA_[^_]+_HO KINH DOANH RICHFISH AQUARIUM_([^_@]+)/i);
+            if (m3 && m3[1]) {
+                return `Khách: ${m3[1].trim()}`;
+            }
+            // 4. Pattern NGUYEN NGOC TIEN Chuyen tien <content>
+            if (note.includes('NGUYEN NGOC TIEN Chuyen tien')) {
+                const parts = note.split('NGUYEN NGOC TIEN Chuyen tien');
+                if (parts[1] && parts[1].trim()) return parts[1].split('-')[0].trim().slice(0, 45);
+            }
+            // 5. Pattern HO KINH DOANH RICHFISH AQUARIUM Chuyen tien <content>
+            if (note.includes('HO KINH DOANH RICHFISH AQUARIUM Chuyen tien')) {
+                const parts = note.split('HO KINH DOANH RICHFISH AQUARIUM Chuyen tien');
+                if (parts[1] && parts[1].trim()) return parts[1].split('-')[0].trim().slice(0, 45);
+            }
+        }
+        return title || 'Giao dịch không tên';
+    }, []);
+
+    // Helper sao chép nội dung giao dịch 1-click
+    const handleCopyNote = React.useCallback((text, txId, e) => {
+        if (e) e.stopPropagation();
+        if (!text) return;
+        const content = String(text).trim();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(content).then(() => {
+                setCopiedTxId(txId);
+                setTimeout(() => setCopiedTxId(null), 2000);
+            }).catch(() => {});
+        } else {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = content;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                setCopiedTxId(txId);
+                setTimeout(() => setCopiedTxId(null), 2000);
+            } catch (err) {}
+        }
     }, []);
 
     // All transactions combined & chronologically sorted
@@ -2680,12 +2926,22 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
         let totalOutflow = 0;
         let totalTransfer = 0;
 
+        const getAccStatBucket = (accRef) => {
+            if (!accRef) return null;
+            if (accStats[accRef]) return accStats[accRef];
+            const resolved = resolveAccount(accRef, accountsData);
+            if (resolved && accStats[resolved.id]) return accStats[resolved.id];
+            return null;
+        };
+
         allTxs.forEach(t => {
             const amt = Number(t.amount || 0);
             const ts = parseTxTimestamp(t);
             const isAdj = isAdjustmentTx(t);
             const isAfter = timeRange ? (ts > timeRange.end) : false;
             const isInPeriod = timeRange ? (ts >= timeRange.start && ts <= timeRange.end) : true;
+            const toBucket = getAccStatBucket(t.toAccount);
+            const fromBucket = getAccStatBucket(t.fromAccount);
 
             if (t.type === 'Thu') {
                 if (isAfter) totalAfterDelta += amt;
@@ -2693,12 +2949,12 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
                     totalInPeriodDelta += amt;
                     if (!isAdj) totalInflow += amt;
                 }
-                if (t.toAccount && accStats[t.toAccount]) {
-                    if (isAfter) accStats[t.toAccount].afterDelta += amt;
+                if (toBucket) {
+                    if (isAfter) toBucket.afterDelta += amt;
                     if (isInPeriod) {
-                        accStats[t.toAccount].inPeriodDelta += amt;
-                        if (!isAdj) accStats[t.toAccount].inflow += amt;
-                        else accStats[t.toAccount].adjIn += amt;
+                        toBucket.inPeriodDelta += amt;
+                        if (!isAdj) toBucket.inflow += amt;
+                        else toBucket.adjIn += amt;
                     }
                 }
             } else if (t.type === 'Chi') {
@@ -2707,28 +2963,28 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
                     totalInPeriodDelta -= amt;
                     if (!isAdj) totalOutflow += amt;
                 }
-                if (t.fromAccount && accStats[t.fromAccount]) {
-                    if (isAfter) accStats[t.fromAccount].afterDelta -= amt;
+                if (fromBucket) {
+                    if (isAfter) fromBucket.afterDelta -= amt;
                     if (isInPeriod) {
-                        accStats[t.fromAccount].inPeriodDelta -= amt;
-                        if (!isAdj) accStats[t.fromAccount].outflow += amt;
-                        else accStats[t.fromAccount].adjOut += amt;
+                        fromBucket.inPeriodDelta -= amt;
+                        if (!isAdj) fromBucket.outflow += amt;
+                        else fromBucket.adjOut += amt;
                     }
                 }
             } else if (t.type === 'Chuyển') {
                 if (isInPeriod) totalTransfer += amt;
-                if (t.fromAccount && accStats[t.fromAccount]) {
-                    if (isAfter) accStats[t.fromAccount].afterDelta -= amt;
+                if (fromBucket) {
+                    if (isAfter) fromBucket.afterDelta -= amt;
                     if (isInPeriod) {
-                        accStats[t.fromAccount].inPeriodDelta -= amt;
-                        accStats[t.fromAccount].transferOut += amt;
+                        fromBucket.inPeriodDelta -= amt;
+                        fromBucket.transferOut += amt;
                     }
                 }
-                if (t.toAccount && accStats[t.toAccount]) {
-                    if (isAfter) accStats[t.toAccount].afterDelta += amt;
+                if (toBucket) {
+                    if (isAfter) toBucket.afterDelta += amt;
                     if (isInPeriod) {
-                        accStats[t.toAccount].inPeriodDelta += amt;
-                        accStats[t.toAccount].transferIn += amt;
+                        toBucket.inPeriodDelta += amt;
+                        toBucket.transferIn += amt;
                     }
                 }
             }
@@ -2788,11 +3044,14 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
                 if (ts < timeRange.start || ts > timeRange.end) return false;
             }
             if (filterAccount !== 'ALL') {
-                if (t.fromAccount !== filterAccount && t.toAccount !== filterAccount) return false;
+                const targetAcc = accountsData.find(a => a.id === filterAccount);
+                const isFromMatch = t.fromAccount === filterAccount || (targetAcc && isAccountMatch(t.fromAccount, targetAcc));
+                const isToMatch = t.toAccount === filterAccount || (targetAcc && isAccountMatch(t.toAccount, targetAcc));
+                if (!isFromMatch && !isToMatch) return false;
             }
             return true;
         });
-    }, [allTxs, timeRange, filterAccount]);
+    }, [allTxs, timeRange, filterAccount, accountsData]);
 
     // Filtered transaction list based on Quick Filter (Thu / Chi / Chuyển / Điều Chỉnh)
     const filteredTxs = React.useMemo(() => {
@@ -2813,17 +3072,20 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
 
         allTxs.forEach(t => {
             const amt = Number(t.amount || 0);
+            const fromId = resolveAccountId(t.fromAccount, accountsData);
+            const toId = resolveAccountId(t.toAccount, accountsData);
+
             balances[t.id] = {
-                from: t.fromAccount ? (running[t.fromAccount] || 0) : null,
-                to: t.toAccount ? (running[t.toAccount] || 0) : null
+                from: fromId ? (running[fromId] != null ? running[fromId] : null) : null,
+                to: toId ? (running[toId] != null ? running[toId] : null) : null
             };
             if (t.type === 'Thu') {
-                if (t.toAccount) running[t.toAccount] -= amt;
+                if (toId && running[toId] != null) running[toId] -= amt;
             } else if (t.type === 'Chi') {
-                if (t.fromAccount) running[t.fromAccount] += amt;
+                if (fromId && running[fromId] != null) running[fromId] += amt;
             } else if (t.type === 'Chuyển') {
-                if (t.fromAccount) running[t.fromAccount] += amt;
-                if (t.toAccount) running[t.toAccount] -= amt;
+                if (fromId && running[fromId] != null) running[fromId] += amt;
+                if (toId && running[toId] != null) running[toId] -= amt;
             }
         });
         return balances;
@@ -3003,14 +3265,17 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
             const isEdit = !!formData.id;
             const oldTx = isEdit ? allTxs.find(t => t.id === formData.id) : null;
 
+            const formattedTime = formatTime24h(formData.time);
+            const dateWithTime = formData.date ? `${formData.date} ${formattedTime}` : new Date().toISOString();
+
             const newTx = { 
                 id: isEdit ? formData.id : 'TX_' + Date.now(), 
                 type: formData.type, 
                 category: formData.category, 
                 amount: amt, 
                 title: formData.title.trim(), 
-                date: formData.date, 
-                time: formatTime24h(formData.time), 
+                date: dateWithTime, 
+                time: formattedTime, 
                 note: formData.note || '', 
                 proofImage: formData.proofImage || null,
                 fromAccount: formData.type !== 'Thu' ? formData.fromAccount : '',
@@ -3048,6 +3313,10 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
 
             payload.Accounts = Object.values(updatedAccsMap);
 
+            // Snapshot để rollback nếu server từ chối ghi (chống tạo phiếu ảo / ghost transaction)
+            const prevTxsSnapshot = [...localTxs];
+            const prevAccsSnapshot = { ...localAccounts };
+
             if (isEdit) setLocalTxs(prev => prev.map(t => t.id === newTx.id ? newTx : t));
             else setLocalTxs(prev => [newTx, ...prev]);
 
@@ -3057,7 +3326,14 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
                 setLocalAccounts(newLocal);
             }
 
-            await pushDeltas(payload, isEdit ? `Đã cập nhật phiếu thành công!` : `Đã thêm giao dịch!`, 'fa-check-circle');
+            const res = await pushDeltas(payload, isEdit ? `Đã cập nhật phiếu thành công!` : `Đã thêm giao dịch!`, 'fa-check-circle');
+            if (res && res.success === false) {
+                // Rollback lại state cũ để điện thoại không bị lưu phiếu rác khi máy tính không có
+                setLocalTxs(prevTxsSnapshot);
+                setLocalAccounts(prevAccsSnapshot);
+                return;
+            }
+
             setShowAddTx(false);
             setEditingTxData(null);
         } catch(e) {
@@ -3112,12 +3388,10 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
 
     const handlePrintK58 = (tx) => {
         const isThu = tx.type === 'Thu';
-        const fAcc = accountsData.find(a => a.id === tx.fromAccount);
-        const tAcc = accountsData.find(a => a.id === tx.toAccount);
         let accDisplay = '';
-        if (tx.type === 'Thu') accDisplay = tAcc ? parseAccountInfo(tAcc).name : (tx.toAccount || 'N/A');
-        else if (tx.type === 'Chi') accDisplay = fAcc ? parseAccountInfo(fAcc).name : (tx.fromAccount || 'N/A');
-        else accDisplay = `${fAcc ? parseAccountInfo(fAcc).name : 'N/A'} ➔ ${tAcc ? parseAccountInfo(tAcc).name : 'N/A'}`;
+        if (tx.type === 'Thu') accDisplay = getAccountDisplayName(tx.toAccount, accountsData);
+        else if (tx.type === 'Chi') accDisplay = getAccountDisplayName(tx.fromAccount, accountsData);
+        else accDisplay = `${getAccountDisplayName(tx.fromAccount, accountsData)} ➔ ${getAccountDisplayName(tx.toAccount, accountsData)}`;
 
         const printContent = `
             <!DOCTYPE html>
@@ -3161,11 +3435,16 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
             </body>
             </html>
         `;
-        const win = window.open('', '_blank');
-        win.document.write(printContent);
-        win.document.close();
-        win.focus();
-        setTimeout(() => { win.print(); win.close(); }, 800);
+
+        const printWin = window.open('', '', 'width=350,height=600');
+        if (printWin) {
+            printWin.document.write(printContent);
+            printWin.document.close();
+            printWin.focus();
+            setTimeout(() => { printWin.print(); printWin.close(); }, 300);
+        } else {
+            alert('Trình duyệt đã chặn popup in. Vui lòng cho phép popup để in phiếu.');
+        }
     };
 
     const handleExportExcel = () => {
@@ -3180,18 +3459,12 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
             { 
                 key: 'fromAccount', 
                 label: 'Từ Tài Khoản',
-                formatter: (val) => {
-                    const acc = accountsData.find(a => a.id === val);
-                    return acc ? parseAccountInfo(acc).name : (val || '');
-                }
+                formatter: (val) => getAccountDisplayName(val, accountsData)
             },
             { 
                 key: 'toAccount', 
                 label: 'Đến Tài Khoản',
-                formatter: (val) => {
-                    const acc = accountsData.find(a => a.id === val);
-                    return acc ? parseAccountInfo(acc).name : (val || '');
-                }
+                formatter: (val) => getAccountDisplayName(val, accountsData)
             },
             { key: 'note', label: 'Diễn Giải Chi Tiết' }
         ];
@@ -3580,9 +3853,29 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
                         )}
                     </div>
 
-                    <div className="space-y-2">
+                    {/* BẢNG GIAO DỊCH DẠNG ROW COMPACT & ACCORDION MỞ RỘNG (HALLMARK STYLE) */}
+                    <div className="space-y-1.5">
+                        {/* Table Header (Desktop Only) */}
+                        <div className="hidden md:grid grid-cols-12 gap-3 px-3.5 py-2 text-[10px] font-black uppercase text-zinc-400 bg-zinc-900/60 rounded-xl border border-zinc-800/80 items-center tracking-wider">
+                            <div className="col-span-1 flex items-center gap-2 pl-1">
+                                <span>LOẠI</span>
+                            </div>
+                            <div className="col-span-2">
+                                <span>THỜI GIAN</span>
+                            </div>
+                            <div className="col-span-2">
+                                <span>DANH MỤC</span>
+                            </div>
+                            <div className="col-span-4">
+                                <span>ĐỐI TÁC / NỘI DUNG</span>
+                            </div>
+                            <div className="col-span-3 text-right pr-2">
+                                <span>SỐ TIỀN & THAO TÁC</span>
+                            </div>
+                        </div>
+
                         {filteredTxs.length === 0 ? (
-                            <div className="bg-[#121216] border border-dashed border-zinc-800 p-12 text-center rounded-3xl text-zinc-500 text-[12px] font-medium">
+                            <div className="bg-[#121216] border border-dashed border-zinc-800 p-12 text-center rounded-2xl text-zinc-500 text-[12px] font-medium">
                                 <i className="fas fa-receipt text-3xl mb-2 text-zinc-600 block"></i>
                                 Không tìm thấy giao dịch nào phù hợp với bộ lọc
                             </div>
@@ -3591,128 +3884,284 @@ const FinanceTab = React.memo(function FinanceTab({ orders, erpData, pushDeltas,
                                 const isThu = t.type === 'Thu';
                                 const isAdj = isAdjustmentTx(t);
                                 const isSelected = selectedTxIds.has(t.id);
-                                const fAcc = accountsData.find(a => a.id === t.fromAccount);
-                                const tAcc = accountsData.find(a => a.id === t.toAccount);
+                                const isExpanded = expandedTxId === t.id;
                                 let accDisplay = '';
-                                const pFAcc = fAcc ? parseAccountInfo(fAcc) : null;
-                                const pTAcc = tAcc ? parseAccountInfo(tAcc) : null;
-
                                 if (t.type === 'Thu') {
-                                    accDisplay = pTAcc ? pTAcc.name : (t.toAccount || 'N/A');
+                                    accDisplay = getAccountDisplayName(t.toAccount, accountsData);
                                 } else if (t.type === 'Chi') {
-                                    accDisplay = pFAcc ? pFAcc.name : (t.fromAccount || 'N/A');
+                                    accDisplay = getAccountDisplayName(t.fromAccount, accountsData);
                                 } else {
-                                    accDisplay = `${pFAcc ? pFAcc.name : 'N/A'} ➔ ${pTAcc ? pTAcc.name : 'N/A'}`;
+                                    accDisplay = `${getAccountDisplayName(t.fromAccount, accountsData)} ➔ ${getAccountDisplayName(t.toAccount, accountsData)}`;
                                 }
+
+                                const cleanDisplayTitle = formatTxDisplayTitle(t);
 
                                 return (
                                     <div 
                                         key={t.id} 
-                                        onClick={() => setViewingTxDetail(t)}
-                                        className={`bg-[#121216] border ${
+                                        onClick={() => setExpandedTxId(isExpanded ? null : t.id)}
+                                        className={`bg-[#121216] border rounded-xl relative overflow-hidden transition-all cursor-pointer group ${
                                             isSelected 
                                                 ? 'border-amber-500/70 bg-amber-950/15 shadow-[0_0_15px_rgba(245,158,11,0.12)]' 
-                                                : 'border-zinc-800/80 hover:border-zinc-700'
-                                        } p-3 rounded-2xl flex flex-col sm:flex-row justify-between sm:items-center shadow-sm relative overflow-hidden group gap-2.5 transition-all cursor-pointer`}
+                                                : isExpanded 
+                                                    ? 'border-zinc-700 bg-zinc-900/40 shadow-sm'
+                                                    : 'border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900/30'
+                                        }`}
                                     >
-                                        <div className={`absolute top-0 left-0 w-1.5 h-full ${
-                                            isSelected ? 'bg-amber-400' : (isAdj ? 'bg-purple-500' : isThu ? 'bg-emerald-500' : t.type === 'Chuyển' ? 'bg-sky-500' : 'bg-rose-500')
+                                        {/* Vạch màu định danh bên mép trái */}
+                                        <div className={`absolute top-0 left-0 w-1 h-full ${
+                                            isSelected 
+                                                ? 'bg-amber-400' 
+                                                : (isAdj ? 'bg-purple-500' : isThu ? 'bg-emerald-500' : t.type === 'Chuyển' ? 'bg-sky-500' : 'bg-rose-500')
                                         }`}></div>
-                                        
-                                        <div className="flex gap-2.5 items-start flex-1 min-w-0 pl-1.5">
-                                            {/* Ô CHECKBOX CHỌN HÀNG LOẠT */}
-                                            {canManageFinance && (
-                                                <div 
-                                                    onClick={(e) => handleToggleSelectTx(t.id, e)} 
-                                                    className="pt-1.5 pr-0.5 flex items-center justify-center shrink-0"
-                                                    title="Chọn phiếu để xoá hoặc phân bổ danh mục"
-                                                >
-                                                    <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all cursor-pointer ${
-                                                        isSelected 
-                                                            ? 'bg-amber-500 border-amber-400 text-zinc-950 shadow-sm' 
-                                                            : 'border-zinc-700 bg-[#09090b] hover:border-amber-400/80 text-transparent'
+
+                                        {/* === BỐ CỤC DẠNG HÀNG BẢNG TRÊN DESKTOP === */}
+                                        <div className="hidden md:grid grid-cols-12 gap-3 px-3 py-2.5 items-center">
+                                            {/* Col 1: Checkbox & Loại GD */}
+                                            <div className="col-span-1 flex items-center gap-2 pl-1.5">
+                                                {canManageFinance && (
+                                                    <div 
+                                                        onClick={(e) => handleToggleSelectTx(t.id, e)} 
+                                                        className="flex items-center justify-center shrink-0 cursor-pointer"
+                                                        title="Chọn phiếu"
+                                                    >
+                                                        <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${
+                                                            isSelected 
+                                                                ? 'bg-amber-500 border-amber-400 text-zinc-950' 
+                                                                : 'border-zinc-700 bg-[#09090b] hover:border-amber-400/80 text-transparent'
+                                                        }`}>
+                                                            <i className="fas fa-check text-[8px] font-black"></i>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <div className={`w-6 h-6 rounded-lg bg-zinc-900/90 border border-zinc-800 flex items-center justify-center shrink-0 ${
+                                                    isAdj ? 'text-purple-400' : isThu ? 'text-emerald-400' : t.type === 'Chuyển' ? 'text-sky-400' : 'text-rose-400'
+                                                }`}>
+                                                    <i className={`fas ${isAdj ? 'fa-sliders-h' : isThu ? 'fa-arrow-down' : t.type === 'Chuyển' ? 'fa-exchange-alt' : 'fa-arrow-up'} text-[10px]`}></i>
+                                                </div>
+                                            </div>
+
+                                            {/* Col 2: Thời gian */}
+                                            <div className="col-span-2 min-w-0">
+                                                <div className="text-[11px] text-zinc-300 font-mono font-medium truncate">
+                                                    {formatDateTime24h(t.date, t.time)}
+                                                </div>
+                                            </div>
+
+                                            {/* Col 3: Danh mục & Tag */}
+                                            <div className="col-span-2 min-w-0 flex items-center gap-1.5 flex-wrap">
+                                                <span className={`font-bold text-[11px] uppercase tracking-wide truncate max-w-[130px] ${
+                                                    isAdj ? 'text-purple-300' : (t.category === 'Chờ Xử Lý' ? 'text-amber-400' : 'text-zinc-200')
+                                                }`}>
+                                                    {t.category || 'Chung'}
+                                                </span>
+                                                {t.isAuto && (
+                                                    <span className="bg-sky-950/40 text-sky-300 text-[8.5px] font-bold px-1 py-0.2 rounded border border-sky-500/30 uppercase">
+                                                        Auto
+                                                    </span>
+                                                )}
+                                                {t.isCleared && (
+                                                    <span className="bg-emerald-950/40 text-emerald-300 text-[8.5px] font-bold px-1 py-0.2 rounded border border-emerald-500/30">
+                                                        ✔
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Col 4: Tên đối tác / Người nhận & Quỹ */}
+                                            <div className="col-span-4 min-w-0 flex flex-col justify-center">
+                                                <div className="text-[12px] text-zinc-100 font-bold truncate leading-snug">
+                                                    {cleanDisplayTitle}
+                                                </div>
+                                                <div className="text-[10px] text-sky-400/90 font-medium truncate flex items-center gap-1 mt-0.5">
+                                                    <i className="fas fa-university text-[9px]"></i>
+                                                    <span>{accDisplay}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Col 5: Số tiền & Nút bung chi tiết */}
+                                            <div className="col-span-3 flex items-center justify-end gap-3 text-right">
+                                                <div className="flex flex-col items-end">
+                                                    <div className={`text-[14.5px] font-mono font-black tracking-tight leading-none ${
+                                                        isAdj ? 'text-purple-400' : isThu ? 'text-emerald-400' : t.type === 'Chuyển' ? 'text-sky-400' : 'text-rose-400'
                                                     }`}>
-                                                        <i className="fas fa-check text-[9px] font-black"></i>
+                                                        {isThu ? '+' : t.type === 'Chuyển' ? '↔' : '-'}{secureMoney(t.amount)}đ
+                                                    </div>
+                                                    {txBalances[t.id] && (
+                                                        <div className="text-[9.5px] text-zinc-400 font-mono mt-1">
+                                                            {t.type === 'Thu' && <span>SD: <b className="text-zinc-300">{secureMoney(txBalances[t.id].to)}</b></span>}
+                                                            {t.type === 'Chi' && <span>SD: <b className="text-zinc-300">{secureMoney(txBalances[t.id].from)}</b></span>}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className={`w-6 h-6 rounded-lg bg-zinc-900/60 border border-zinc-800/80 flex items-center justify-center text-zinc-400 group-hover:text-zinc-200 transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-180 text-amber-400 border-amber-500/40' : ''}`}>
+                                                    <i className="fas fa-chevron-down text-[9.5px]"></i>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* === BỐ CỤC THẺ GỌN TRÊN MOBILE === */}
+                                        <div className="md:hidden p-3 pl-3.5 flex flex-col gap-1.5">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                    {canManageFinance && (
+                                                        <div 
+                                                            onClick={(e) => handleToggleSelectTx(t.id, e)} 
+                                                            className="flex items-center justify-center shrink-0 cursor-pointer"
+                                                        >
+                                                            <div className={`w-4 h-4 rounded-md border flex items-center justify-center ${
+                                                                isSelected 
+                                                                    ? 'bg-amber-500 border-amber-400 text-zinc-950' 
+                                                                    : 'border-zinc-700 bg-[#09090b]'
+                                                            }`}>
+                                                                <i className="fas fa-check text-[8px] font-black"></i>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    <div className={`w-5 h-5 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 ${
+                                                        isAdj ? 'text-purple-400' : isThu ? 'text-emerald-400' : t.type === 'Chuyển' ? 'text-sky-400' : 'text-rose-400'
+                                                    }`}>
+                                                        <i className={`fas ${isAdj ? 'fa-sliders-h' : isThu ? 'fa-arrow-down' : t.type === 'Chuyển' ? 'fa-exchange-alt' : 'fa-arrow-up'} text-[9px]`}></i>
+                                                    </div>
+                                                    <span className="text-[12px] text-zinc-100 font-bold truncate">
+                                                        {cleanDisplayTitle}
+                                                    </span>
+                                                </div>
+                                                <div className={`text-[13.5px] font-mono font-black shrink-0 ${
+                                                    isAdj ? 'text-purple-400' : isThu ? 'text-emerald-400' : t.type === 'Chuyển' ? 'text-sky-400' : 'text-rose-400'
+                                                }`}>
+                                                    {isThu ? '+' : t.type === 'Chuyển' ? '↔' : '-'}{secureMoney(t.amount)}đ
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between gap-2 text-[10px] text-zinc-400 pt-0.5">
+                                                <div className="flex items-center gap-2 truncate">
+                                                    <span className="font-mono text-zinc-400">{formatDateTime24h(t.date, t.time)}</span>
+                                                    <span className="text-zinc-600">•</span>
+                                                    <span className="font-bold text-zinc-300 truncate">{t.category || 'Chung'}</span>
+                                                    <span className="text-zinc-600">•</span>
+                                                    <span className="text-sky-400 truncate">{accDisplay}</span>
+                                                </div>
+                                                <div className={`text-zinc-400 transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-180 text-amber-400' : ''}`}>
+                                                    <i className="fas fa-chevron-down text-[9.5px]"></i>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* === ACCORDION PANEL CHI TIẾT (BẤM VÀO DÒNG ĐỂ MỞ RỘNG) === */}
+                                        {isExpanded && (
+                                            <div 
+                                                onClick={(e) => e.stopPropagation()} 
+                                                className="border-t border-zinc-800/80 bg-zinc-950/80 p-3.5 space-y-3 animate-fade-in"
+                                            >
+                                                {/* Khối Nội dung / Ghi chú gốc kèm nút sao chép */}
+                                                <div className="space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                                                            <i className="fas fa-quote-left text-amber-400"></i> Nội dung giao dịch gốc:
+                                                        </span>
+                                                        <button 
+                                                            onClick={(e) => handleCopyNote(t.note || t.title, t.id, e)}
+                                                            className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                                                                copiedTxId === t.id 
+                                                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
+                                                                    : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
+                                                            }`}
+                                                            title="Sao chép toàn bộ nội dung"
+                                                        >
+                                                            <i className={`fas ${copiedTxId === t.id ? 'fa-check text-emerald-400' : 'fa-copy'}`}></i>
+                                                            <span>{copiedTxId === t.id ? 'Đã sao chép!' : 'Sao chép nội dung'}</span>
+                                                        </button>
+                                                    </div>
+                                                    <div className="bg-[#09090b] border border-zinc-800/90 p-2.5 rounded-xl font-mono text-zinc-200 text-[11.5px] leading-relaxed break-words select-all">
+                                                        {t.note || t.title || 'Không có ghi chú thêm'}
                                                     </div>
                                                 </div>
-                                            )}
 
-                                            {t.proofImage ? (
-                                                <div 
-                                                    onClick={(e) => { e.stopPropagation(); setViewingProofImage(t.proofImage); }} 
-                                                    className="w-11 h-11 rounded-2xl overflow-hidden border border-zinc-700 shrink-0 cursor-pointer hover:border-amber-400 transition-colors relative"
-                                                >
-                                                    <img src={t.proofImage} className="w-full h-full object-cover" alt="Chứng từ" />
+                                                {/* Grid chi tiết quỹ, số dư & ID */}
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-[11px]">
+                                                    <div className="bg-zinc-900/60 border border-zinc-800/70 p-2.5 rounded-xl">
+                                                        <div className="text-zinc-400 text-[9.5px] uppercase font-bold">Tài khoản quỹ</div>
+                                                        <div className="text-sky-400 font-bold truncate mt-0.5 flex items-center gap-1.5">
+                                                            <i className="fas fa-university text-[10px]"></i>
+                                                            <span>{accDisplay}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-zinc-900/60 border border-zinc-800/70 p-2.5 rounded-xl">
+                                                        <div className="text-zinc-400 text-[9.5px] uppercase font-bold">Số dư biến động</div>
+                                                        <div className="text-zinc-300 font-mono mt-0.5">
+                                                            {txBalances[t.id] ? (
+                                                                t.type === 'Thu' ? <span>SD sau: <b className="text-emerald-400">{secureMoney(txBalances[t.id].to)}đ</b></span> :
+                                                                t.type === 'Chi' ? <span>SD sau: <b className="text-amber-400">{secureMoney(txBalances[t.id].from)}đ</b></span> :
+                                                                <span>Nguồn: <b className="text-rose-400">{secureMoney(txBalances[t.id].from)}đ</b> | Đích: <b className="text-emerald-400">{secureMoney(txBalances[t.id].to)}đ</b></span>
+                                                            ) : 'Theo sao kê ngân hàng'}
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-zinc-900/60 border border-zinc-800/70 p-2.5 rounded-xl">
+                                                        <div className="text-zinc-400 text-[9.5px] uppercase font-bold">Mã giao dịch & Đối soát</div>
+                                                        <div className="text-zinc-400 font-mono text-[10.5px] truncate mt-0.5 flex items-center gap-2">
+                                                            <span className="truncate">{t.id}</span>
+                                                            {t.isCleared && <span className="text-emerald-400 font-bold shrink-0">✔ Khớp</span>}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            ) : (
-                                                <div className="w-11 h-11 rounded-2xl bg-[#09090b] border border-zinc-800 shrink-0 flex items-center justify-center">
-                                                    <i className={`fas ${isAdj ? 'fa-sliders-h text-purple-400' : isThu ? 'fa-arrow-down text-emerald-400' : t.type === 'Chuyển' ? 'fa-exchange-alt text-sky-400' : 'fa-arrow-up text-rose-400'} text-sm`}></i>
-                                                </div>
-                                            )}
-                                            
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-1.5 flex-wrap leading-tight">
-                                                    <span className={`font-black text-[12px] uppercase tracking-wide ${isAdj ? 'text-purple-300' : (t.category === 'Chờ Xử Lý' ? 'text-amber-400 font-black' : 'text-zinc-100')}`}>
-                                                        {t.category || 'Chung'}
-                                                    </span>
-                                                    <span className="text-[10px] text-zinc-400 font-mono bg-[#09090b] px-1.5 py-0.2 rounded-md border border-zinc-800">
-                                                        {formatDateTime24h(t.date, t.time)}
-                                                    </span>
-                                                    {t.isAuto && (
-                                                        <span className="bg-sky-950/40 text-sky-300 text-[9px] font-bold px-1.5 py-0.2 rounded border border-sky-500/30 uppercase">
-                                                            Auto
-                                                        </span>
-                                                    )}
-                                                    {t.isCleared && (
-                                                        <span className="bg-emerald-950/40 text-emerald-300 text-[9px] font-bold px-1.5 py-0.2 rounded border border-emerald-500/30">
-                                                            ✔ Đối Soát
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="text-[12px] text-zinc-200 font-bold truncate mt-0.5">{t.title}</div>
-                                                <div className="flex items-center gap-2 mt-0.5 text-[10px] text-zinc-400 flex-wrap">
-                                                    <span className="text-sky-400 font-bold truncate"><i className="fas fa-university mr-1"></i>{accDisplay}</span>
-                                                    {t.note && <span className="text-zinc-500 truncate" title={t.note}>- {t.note}</span>}
+
+                                                {/* Toolbar thao tác & Chứng từ */}
+                                                <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-zinc-800/70">
+                                                    <div className="flex items-center gap-2">
+                                                        {t.proofImage ? (
+                                                            <button 
+                                                                onClick={() => setViewingProofImage(t.proofImage)}
+                                                                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-sky-400 border border-sky-500/30 rounded-xl text-[10.5px] font-bold transition-all cursor-pointer"
+                                                            >
+                                                                <i className="fas fa-image"></i>
+                                                                <span>Xem ảnh chứng từ</span>
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-zinc-500 text-[10px] italic">Không đính kèm ảnh chứng từ</span>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex items-center gap-1.5">
+                                                        <button 
+                                                            onClick={() => setViewingTxDetail(t)} 
+                                                            className="px-2.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-sky-400 border border-zinc-800 rounded-xl text-[10.5px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer" 
+                                                            title="Xem modal chi tiết phiếu"
+                                                        >
+                                                            <i className="fas fa-external-link-alt text-[9.5px]"></i>
+                                                            <span>Chi tiết</span>
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handlePrintK58(t)} 
+                                                            className="px-2.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 rounded-xl text-[10.5px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer" 
+                                                            title="In phiếu K58"
+                                                        >
+                                                            <i className="fas fa-print text-[9.5px]"></i>
+                                                            <span>In K58</span>
+                                                        </button>
+                                                        {canEditTx && (
+                                                            <button 
+                                                                onClick={() => { setEditingTxData(t); setShowAddTx(true); }} 
+                                                                className="px-2.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-amber-400 border border-zinc-800 rounded-xl text-[10.5px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer" 
+                                                                title="Chỉnh sửa phiếu"
+                                                            >
+                                                                <i className="fas fa-pen text-[9.5px]"></i>
+                                                                <span>Sửa</span>
+                                                            </button>
+                                                        )}
+                                                        {canDeleteTx && (
+                                                            <button 
+                                                                onClick={() => handleDeleteTx(t)} 
+                                                                className="px-2.5 py-1.5 bg-zinc-900 hover:bg-rose-950/60 text-zinc-400 hover:text-rose-400 border border-zinc-800 rounded-xl text-[10.5px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer" 
+                                                                title="Xóa phiếu"
+                                                            >
+                                                                <i className="fas fa-trash text-[9.5px]"></i>
+                                                                <span>Xóa</span>
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        
-                                        <div className="text-left sm:text-right shrink-0 pl-1.5 sm:pl-0 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-zinc-800 flex sm:flex-col justify-between sm:justify-center items-center sm:items-end">
-                                            <div className={`text-[15px] sm:text-[17px] font-mono font-black leading-none ${
-                                                isAdj ? 'text-purple-400' : isThu ? 'text-emerald-400' : t.type === 'Chuyển' ? 'text-sky-400' : 'text-rose-400'
-                                            }`}>
-                                                {isThu ? '+' : t.type === 'Chuyển' ? '↔' : '-'}{secureMoney(t.amount)}đ
-                                            </div>
-
-                                            {txBalances[t.id] && (
-                                                <div className="text-[10px] text-zinc-500 font-mono mt-1">
-                                                    {t.type === 'Thu' && t.toAccount && <span>SD: <b className="text-amber-400">{secureMoney(txBalances[t.id].to)}</b></span>}
-                                                    {t.type === 'Chi' && t.fromAccount && <span>SD: <b className="text-amber-400">{secureMoney(txBalances[t.id].from)}</b></span>}
-                                                    {t.type === 'Chuyển' && (
-                                                        <span>N: <b className="text-rose-400">{secureMoney(txBalances[t.id].from)}</b> | Đ: <b className="text-emerald-400">{secureMoney(txBalances[t.id].to)}</b></span>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            <div className="flex items-center gap-1.5 mt-1.5" onClick={e => e.stopPropagation()}>
-                                                <button onClick={() => setViewingTxDetail(t)} className="w-7 h-7 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-sky-400 flex items-center justify-center transition-colors cursor-pointer" title="Xem chi tiết phiếu">
-                                                    <i className="fas fa-eye text-[10px]"></i>
-                                                </button>
-                                                <button onClick={() => handlePrintK58(t)} className="w-7 h-7 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer" title="In phiếu">
-                                                    <i className="fas fa-print text-[10px]"></i>
-                                                </button>
-                                                {canEditTx && (
-                                                    <button onClick={() => { setEditingTxData(t); setShowAddTx(true); }} className="w-7 h-7 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-amber-400 flex items-center justify-center transition-colors cursor-pointer" title="Sửa">
-                                                        <i className="fas fa-pen text-[10px]"></i>
-                                                    </button>
-                                                )}
-                                                {canDeleteTx && (
-                                                    <button onClick={() => handleDeleteTx(t)} className="w-7 h-7 rounded-xl bg-zinc-900 hover:bg-rose-950/60 text-zinc-400 hover:text-rose-400 flex items-center justify-center transition-colors cursor-pointer" title="Xóa">
-                                                        <i className="fas fa-trash text-[10px]"></i>
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
+                                        )}
                                     </div>
                                 );
                             })

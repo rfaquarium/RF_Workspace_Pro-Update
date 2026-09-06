@@ -1163,7 +1163,8 @@
                 }
 
                 currentIndex = endIndex;
-                setProgress(Math.min(Math.floor(((currentIndex - headerIdx - 1) / (totalRows - headerIdx - 1)) * 100), 100));
+                const denom = Math.max(1, totalRows - headerIdx - 1);
+                setProgress(Math.min(Math.floor(((currentIndex - headerIdx - 1) / denom) * 100), 100));
                 if (currentIndex < totalRows) { setTimeout(processBatch, 10); }
                 else {
                     const result = Object.values(orderMap).map(o => {
@@ -1254,57 +1255,78 @@
             setTimeout(processBatch, 50);
         };
 
+        const handleCancel = () => {
+            setIsProcessing(false);
+            setFileName('');
+            setProgress(0);
+            setPreview([]);
+            onClose();
+        };
+
+        // TỰ ĐỘNG NẠP THƯ VIỆN XLSX VÀ ĐỌC FILE LINH HOẠT (ARRAY BUFFER + BINARY FALLBACK)
         // TỰ ĐỘNG NẠP THƯ VIỆN XLSX VÀ ĐỌC FILE LINH HOẠT (ARRAY BUFFER + BINARY FALLBACK)
         const handleFileUpload = async (file) => {
             if (!file) return;
-            setFileName(file.name); setIsProcessing(true); setProgress(0); setPreview([]);
+            setFileName(file.name); setIsProcessing(true); setProgress(15); setPreview([]);
             try {
                 if (typeof window.ensureXLSXLoaded === 'function') {
+                    setProgress(25);
                     await window.ensureXLSXLoaded();
+                } else if (!window.XLSX) {
+                    throw new Error("Thư viện xử lý Excel chưa sẵn sàng. Vui lòng tải lại trang.");
                 }
-                const reader = new FileReader();
-                reader.onload = (e) => {
+                setProgress(45);
+
+                let buffer = null;
+                // 1. Ưu tiên đọc trực tiếp qua Web API file.arrayBuffer() của trình duyệt hiện đại
+                if (typeof file.arrayBuffer === 'function') {
                     try {
-                        let wb;
-                        const data = new Uint8Array(e.target.result);
-                        try {
-                            wb = window.XLSX.read(data, { type: 'array' });
-                        } catch (errArr) {
-                            // Fallback binary reader cho định dạng đặc thù (HTML ẩn danh .xls)
-                            const binReader = new FileReader();
-                            binReader.onload = (be) => {
-                                try {
-                                    const wbBin = window.XLSX.read(be.target.result, { type: 'binary' });
-                                    let sheetName = wbBin.SheetNames.find(s => s.toLowerCase().trim() === 'orders');
-                                    if (!sheetName) sheetName = wbBin.SheetNames[0];
-                                    const rows = window.XLSX.utils.sheet_to_json(wbBin.Sheets[sheetName], { header: 1, defval: '' });
-                                    processExcelData(rows);
-                                } catch (errBin) {
-                                    console.error("Lỗi đọc file binary:", errBin);
-                                    alert("Lỗi đọc file Excel! Vui lòng đảm bảo file chuẩn.");
-                                    setFileName(''); setIsProcessing(false);
-                                }
-                            };
-                            binReader.readAsBinaryString(file);
-                            return;
-                        }
-
-                        let sheetName = wb.SheetNames.find(s => s.toLowerCase().trim() === 'orders');
-                        if (!sheetName) sheetName = wb.SheetNames[0];
-
-                        const rows = window.XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
-                        processExcelData(rows);
-                    } catch (error) {
-                        console.error("Lỗi đọc file Excel:", error);
-                        alert("Lỗi đọc file Excel! Vui lòng đảm bảo file chuẩn.");
-                        setFileName(''); setIsProcessing(false);
+                        buffer = await file.arrayBuffer();
+                    } catch (abErr) {
+                        console.warn("file.arrayBuffer lỗi, chuyển sang FileReader:", abErr);
                     }
-                };
-                reader.readAsArrayBuffer(file);
-            } catch (loadErr) {
-                console.error("Lỗi nạp thư viện XLSX:", loadErr);
-                alert("Không thể nạp thư viện xử lý Excel. Vui lòng tải lại trang hoặc kiểm tra kết nối mạng!");
-                setFileName(''); setIsProcessing(false);
+                }
+
+                // 2. Fallback sang FileReader nếu file.arrayBuffer không khả dụng
+                if (!buffer) {
+                    buffer = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onerror = (err) => {
+                            reject(new Error("Không thể truy cập tệp tin. Có thể file đang được mở trong Microsoft Excel hoặc ứng dụng khác. Vui lòng đóng Excel và thử chọn lại file!"));
+                        };
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.readAsArrayBuffer(file);
+                    });
+                }
+
+                setProgress(65);
+                let wb;
+                const data = new Uint8Array(buffer);
+                try {
+                    wb = window.XLSX.read(data, { type: 'array' });
+                } catch (errArr) {
+                    console.warn("Lỗi đọc array buffer, fallback binary:", errArr);
+                    const binData = await new Promise((resolve, reject) => {
+                        const binReader = new FileReader();
+                        binReader.onerror = (binErr) => reject(new Error("Không thể đọc tệp tin theo định dạng nhị phân."));
+                        binReader.onload = (be) => resolve(be.target.result);
+                        binReader.readAsBinaryString(file);
+                    });
+                    wb = window.XLSX.read(binData, { type: 'binary' });
+                }
+
+                let sheetName = wb.SheetNames.find(s => s.toLowerCase().trim() === 'orders');
+                if (!sheetName) sheetName = wb.SheetNames[0];
+
+                const rows = window.XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
+                setProgress(80);
+                processExcelData(rows);
+            } catch (error) {
+                console.error("Lỗi đọc file Excel:", error);
+                alert(error.message || "Lỗi đọc file Excel! Vui lòng đảm bảo file không bị khóa bởi ứng dụng khác và đúng định dạng.");
+                setFileName(''); 
+                setIsProcessing(false); 
+                setProgress(0);
             }
         };
 
@@ -1616,11 +1638,25 @@
         const validCount = preview.filter(p => !p.isDuplicate).length;
 
         return (
-            <div className="fixed inset-0 bg-black/80 z-[110] flex items-end sm:items-center justify-center sm:p-4 backdrop-blur-sm">
-                <div className="bg-[#141414] border border-[#333] w-full max-w-lg h-[88vh] sm:h-auto sm:max-h-[90vh] rounded-t-3xl sm:rounded-3xl flex flex-col shadow-2xl overflow-hidden">
+            <div 
+                className="fixed inset-0 bg-black/80 z-[110] flex items-end sm:items-center justify-center sm:p-4 backdrop-blur-sm"
+                onClick={(e) => { if (e.target === e.currentTarget && !isSubmitting) handleCancel(); }}
+            >
+                <div 
+                    className="bg-[#141414] border border-[#333] w-full max-w-lg h-[88vh] sm:h-auto sm:max-h-[90vh] rounded-t-3xl sm:rounded-3xl flex flex-col shadow-2xl overflow-hidden"
+                    onClick={(e) => e.stopPropagation()}
+                >
                     <div className="p-4 border-b border-[#222] bg-[#1a1a1a] flex justify-between items-center">
                         <h2 className="font-black text-lg text-[#3b82f6] tracking-wide"><i className="fas fa-file-excel mr-2"></i>TRẠM BƠM ĐƠN</h2>
-                        <button onClick={onClose} disabled={isSubmitting || isProcessing} className="w-8 h-8 bg-[#222] rounded-full text-gray-400 hover:text-rose-500 flex items-center justify-center disabled:opacity-50 transition-colors"><i className="fas fa-times"></i></button>
+                        <button 
+                            type="button" 
+                            onClick={handleCancel} 
+                            disabled={isSubmitting} 
+                            className="w-8 h-8 bg-[#222] rounded-full text-gray-400 hover:text-rose-500 flex items-center justify-center disabled:opacity-50 transition-colors"
+                            title="Đóng / Hủy"
+                        >
+                            <i className="fas fa-times"></i>
+                        </button>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
@@ -1634,8 +1670,18 @@
                             setIsDragging(false); if (e.dataTransfer.files.length > 0) handleFileUpload(e.dataTransfer.files[0]);
                         }} className={`relative w-full h-32 flex flex-col items-center justify-center border-2 border-dashed rounded-2xl transition-all ${isDragging ?
                             'border-[#3b82f6] bg-[#3b82f6]/10' : 'border-[#333] bg-[#0a0a0a]'}`}>
-                            <input type="file" accept=".xlsx, .xls, .csv" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => handleFileUpload(e.target.files[0])} />
-                            <div className="group-hover:-translate-y-1 transition-transform text-center">
+                            <input 
+                                type="file" 
+                                accept=".xlsx, .xls, .csv" 
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                                onClick={(e) => { e.target.value = null; }} 
+                                onChange={(e) => {
+                                    if (e.target.files && e.target.files.length > 0) {
+                                        handleFileUpload(e.target.files[0]);
+                                    }
+                                }} 
+                            />
+                            <div className="group-hover:-translate-y-1 transition-transform text-center pointer-events-none">
                                 <i className={`fas ${fileName ? 'fa-file-excel text-[#10b981]' : 'fa-cloud-upload-alt text-[#3b82f6]'} text-4xl mb-3 drop-shadow-md`}></i>
                                 <div className="text-[13px] font-bold text-[#f5f5f5] mb-1">{fileName ? fileName : 'Chạm để chọn file Excel / CSV'}</div>
                                 <div className="text-[10px] text-gray-500 font-medium">Hỗ trợ mọi định dạng xuất từ Shopee/Tiktok</div>
@@ -1739,8 +1785,20 @@
 
                     <div className="p-4 bg-[#1a1a1a] border-t border-[#333] rounded-b-3xl sm:rounded-b-3xl flex flex-col gap-2.5">
                         <div className="flex gap-3">
-                            <button onClick={onClose} disabled={isSubmitting || isProcessing} className="flex-1 py-3.5 bg-[#222] hover:bg-[#333] text-gray-300 font-black text-[12px] rounded-xl active:scale-95 transition-all disabled:opacity-50">HỦY TÁC VỤ</button>
-                            <button onClick={submit} disabled={isSubmitting || isProcessing || validCount === 0} className={`flex-[2] py-3.5 text-white rounded-xl font-black text-[13px] tracking-wide shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 ${isSubmitting || isProcessing || validCount === 0 ? 'bg-[#333] text-gray-500' : 'bg-[#3b82f6] hover:bg-[#2563eb]'}`}>
+                            <button 
+                                type="button" 
+                                onClick={handleCancel} 
+                                disabled={isSubmitting} 
+                                className="flex-1 py-3.5 bg-[#222] hover:bg-[#333] text-gray-300 font-black text-[12px] rounded-xl active:scale-95 transition-all disabled:opacity-50"
+                            >
+                                HỦY TÁC VỤ
+                            </button>
+                            <button 
+                                type="button" 
+                                onClick={submit} 
+                                disabled={isSubmitting || isProcessing || validCount === 0} 
+                                className={`flex-[2] py-3.5 text-white rounded-xl font-black text-[13px] tracking-wide shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 ${isSubmitting || isProcessing || validCount === 0 ? 'bg-[#333] text-gray-500' : 'bg-[#3b82f6] hover:bg-[#2563eb]'}`}
+                            >
                                 {isSubmitting ? <><i className="fas fa-spinner fa-spin"></i> ĐANG XỬ LÝ...</> : `CHỐT BƠM ${validCount} ĐƠN`}
                             </button>
                         </div>

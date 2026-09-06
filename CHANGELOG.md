@@ -2,6 +2,32 @@
 
 Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến trúc, tối ưu nghiệp vụ và sửa lỗi của hệ điều hành `RF_Workspace_Pro`.
 
+## [v2.45.4] - 2026-09-06
+
+### 📱 Chuẩn Hóa Công Thái Học Modal Tài Chính Mobile (Hallmark), Khắc Phục Lỗi Đồng Bộ Quỹ & Tối Ưu Đọc File Trạm Bơm Đơn
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **1. Lỗi tạo phiếu chi trên điện thoại nhưng máy tính không có (Ghost Vouchers)**:
+    - *Triệu chứng*: Khi nhân viên lập phiếu chi trên điện thoại, giao diện hiện phiếu thành công nhưng máy tính không hề có dữ liệu, đồng thời hiện thông báo cảnh báo lỗi ghi dữ liệu.
+    - *Cơ chế sinh lỗi*: Hàm `validateTableWritePermission` trong `Code.js` trước đây chỉ cho phép vai trò `TỐI CAO` và `KẾ TOÁN` được quyền ghi bảng `Accounts`. Khi các chức danh quản lý khác (`QUẢN LÝ BÁN HÀNG`, `QUẢN LÝ KHO VẬN`, `CỘNG TÁC VIÊN`) tạo phiếu thu/chi có cập nhật số dư tài khoản, server trả về `PERMISSION_DENIED`. Do phía client (`handleSaveTx`) cập nhật state lạc quan trước mà không kiểm tra kết quả `pushDeltas`, điện thoại giữ lại giao dịch rác trong bộ nhớ tạm trong khi Google Sheets không hề ghi nhận.
+  - **2. Khung phiếu chi bị trôi, nảy và không cuộn được danh mục trên mobile**:
+    - *Triệu chứng*: Khung tạo phiếu chi trên điện thoại không đứng yên, bị giật nảy khi bàn phím ảo bật lên hoặc khi vuốt ngón tay; danh sách chọn danh mục chi phí không cuộn lên xuống được.
+    - *Cơ chế sinh lỗi*: Modal dùng căn giữa `items-center` với `max-h-[92vh]`. Khi bàn phím ảo xuất hiện, visual viewport của trình duyệt mobile co lại đột ngột khiến modal bị dịch chuyển liên tục. Ngoài ra, màn hình nền (`body`) không được khóa cuộn gây hiệu ứng rubber-banding của iOS, và sự kiện chạm `touchmove` trong danh sách dropdown danh mục bị nổi bọt (bubble) lên container cha khiến trình duyệt cuộn cả modal thay vì danh sách con.
+  - **3. Lỗi đọc file Excel bị chặn / đơ tại Trạm Bơm Đơn**:
+    - *Triệu chứng*: Khi người dùng chọn file Excel đang mở trên máy tính, trình duyệt hiện thông báo `Không thể đọc tệp tin. Có thể tệp đang mở trong ứng dụng khác hoặc bị chặn`, và nút Hủy/Đóng bị kẹt.
+    - *Cơ chế sinh lỗi*: API `FileReader.readAsArrayBuffer` cổ điển bị hệ điều hành Windows chặn handle truy cập độc quyền (exclusive lock) khi tệp đang mở trong Microsoft Excel. Đồng thời trạng thái `isProcessing` không được dọn dẹp sạch sẽ nếu không bắt lỗi đúng cách.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật**:
+  1. **Ủy Quyền Ghi Bảng Accounts & Cơ Chế Chống Phiếu Rác (Rollback Protection)**:
+     - `Code.js`: Cho phép các vai trò tài chính được ủy quyền (`TỐI CAO`, `KẾ TOÁN`, `QUẢN LÝ BÁN HÀNG`, `QUẢN LÝ KHO VẬN`, `CỘNG TÁC VIÊN`) cập nhật số dư tài khoản khi ghi nhận giao dịch thu chi.
+     - `Tab_Finance.html`: Chuẩn hóa trường `date` kèm 24H timestamp đầy đủ; lấy snapshot trạng thái trước khi cập nhật lạc quan, tự động hoàn tác (rollback) nếu `pushDeltas` trả về thất bại, bảo vệ 100% tính nhất quán giữa điện thoại và máy tính.
+  2. **Tái Thiết Kế Modal Tài Chính Chuẩn Công Thái Học Hallmark Bottom Sheet Mobile**:
+     - Chuyển đổi `TransactionFormModal` trên thiết bị di động thành Hallmark Bottom Sheet cố định ở đáy màn hình (`items-end sm:items-center`, `rounded-t-3xl sm:rounded-3xl`), có thanh kéo xúc giác, cố định nút Hủy và Lưu ở đầu/cuối không bao giờ bị nhảy khi bật bàn phím.
+     - Tự động khóa cuộn nền (`document.body.style.overflow = 'hidden'`) khi modal mở, loại bỏ hoàn toàn hiện tượng trôi nền.
+     - Cách ly sự kiện cảm ứng trên danh sách danh mục chi phí (`touchAction: 'pan-y'`, `stopPropagation`), bổ sung 4 chip chọn nhanh 1 chạm (*Mua Vật Tư*, *Mua Nguyên Liệu*, *Thanh Toán Hoá Đơn*, *Chi Phí Khác*), nâng chiều cao cảm ứng đạt chuẩn công thái học >= 44px.
+  3. **Tối Ưu Trạm Bơm Đơn với Native file.arrayBuffer()**:
+     - `Modals_Orders.html`: Ưu tiên đọc file trực tiếp bằng Web API hiện đại `file.arrayBuffer()`, bắt ngoại lệ chi tiết và hướng dẫn rõ ràng cho người dùng khi file đang bị Excel khóa; tự động reset sạch sẽ biến trạng thái để giao diện không bao giờ bị đơ.
+
+---
+
 ## [v2.45.3] - 2026-09-05
 
 ### 📊 Đồng Bộ Dữ Liệu Thời Gian Thực Vào War Room & Triệt Tiêu Hallucination 7 Agents

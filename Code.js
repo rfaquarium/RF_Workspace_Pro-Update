@@ -4107,8 +4107,9 @@ function validateTableWritePermission(auth, tableName, isDelete, deltaItems) {
     if (isDelete) {
       return { allowed: false, reason: 'Chỉ có Boss Tối Cao mới có quyền xóa tài khoản ngân hàng / sổ quỹ' };
     }
-    if (role !== 'KẾ TOÁN' && role !== 'TỐI CAO') {
-      return { allowed: false, reason: 'Chỉ có Kế Toán / Tối Cao mới có quyền điều chỉnh tài khoản quỹ' };
+    var allowedAccountRoles = ['TỐI CAO', 'KẾ TOÁN', 'QUẢN LÝ BÁN HÀNG', 'QUẢN LÝ KHO VẬN', 'CỘNG TÁC VIÊN'];
+    if (allowedAccountRoles.indexOf(role) === -1) {
+      return { allowed: false, reason: 'Chỉ có Kế Toán / Tối Cao / Quản Lý mới có quyền điều chỉnh tài khoản quỹ' };
     }
     return { allowed: true };
   }
@@ -13348,6 +13349,8 @@ function onOpen() {
   try {
     SpreadsheetApp.getUi()
       .createMenu('⚡ RF Hệ Thống')
+      .addItem('🔥 Nạp Sạch & Chuẩn Hóa Sao Kê (CTY & Giám Đốc)', 'AAA_IMPORT_REAL_STATEMENTS_TO_DB')
+      .addSeparator()
       .addItem('📦 Đồng bộ SKU Nguyên Liệu (Products ➡️ BOM_Config)', 'AAA_SYNC_BOM_MATERIAL_SKUS')
       .addItem('🏷️ Chuẩn hóa mã SKU Kho (Products & Sync All)', 'standardizeWarehouseSKU')
       .addItem('🧹 Xóa Sạch Phạt & Cảnh Báo SLA Đóng Gói', 'AAA_CLEANUP_PACKING_SLA_PENALTIES')

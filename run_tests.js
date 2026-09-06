@@ -1156,7 +1156,7 @@ const componentsV2452 = fs.readFileSync(path.join(__dirname, 'Components.html'),
 const tabProdV2452 = fs.readFileSync(path.join(__dirname, 'Tab_Production.html'), 'utf8');
 
 assert('App_Main.html: Contains Royal v2.45.2 in RELEASES', appMainV2452.includes("version: 'Royal v2.45.2'"));
-assert('App_Main.html: Sidebar badge displays >= v2.45.2', appMainV2452.includes('>v2.45.2</span>') || appMainV2452.includes('>v2.45.3</span>'));
+assert('App_Main.html: Sidebar badge displays >= v2.45.2', />v2\.(4[5-9]|\d{2,})\.\d+<\/span>/.test(appMainV2452));
 assert('CHANGELOG.md: Documents v2.45.2 release notes', changelogV2452.includes('## [v2.45.2] - 2026-09-05'));
 assert('Components.html: Implements interactive chatInput state', componentsV2452.includes('chatInput'));
 assert('Components.html: Replaced simulation buttons with chat form', !componentsV2452.includes('Chạy Mô Phỏng Chiến Lược') && componentsV2452.includes('Nhập sự vụ xưởng, thắc mắc kỹ thuật'));
@@ -1171,7 +1171,7 @@ const agentWarRoomV2453 = fs.readFileSync(path.join(__dirname, 'agent_war_room.p
 const serverKcsV2453 = fs.readFileSync(path.join(__dirname, 'server_kcs.py'), 'utf8');
 
 assert('App_Main.html: Contains Royal v2.45.3 in RELEASES', appMainV2453.includes("version: 'Royal v2.45.3'"));
-assert('App_Main.html: Sidebar badge displays v2.45.3', appMainV2453.includes('>v2.45.3</span>'));
+assert('App_Main.html: Sidebar badge displays >= v2.45.3', />v2\.(4[5-9]|\d{2,})\.\d+<\/span>/.test(appMainV2453));
 assert('CHANGELOG.md: Documents v2.45.3 release notes', changelogV2453.includes('## [v2.45.3] - 2026-09-05'));
 assert('Components.html: Defines buildLiveOperationalContext', componentsV2453.includes('buildLiveOperationalContext'));
 assert('Components.html: Sends context in /api/warroom/discuss payload', componentsV2453.includes('context: payloadContext'));
@@ -1180,6 +1180,22 @@ assert('agent_war_room.py: Implements IncidentRequest with optional context', ag
 assert('agent_war_room.py: Implements format_war_room_prompt with data grounding', agentWarRoomV2453.includes('format_war_room_prompt') && agentWarRoomV2453.includes('KPI_Progress'));
 assert('agent_war_room.py: Anti-hallucination rules prohibit fake names (anh Tuấn)', agentWarRoomV2453.includes('anh Tuấn'));
 assert('server_kcs.py: Passes payload.context to generate_agent_dialogue', serverKcsV2453.includes('generate_agent_dialogue(payload.incident, payload.context)'));
+
+console.log('\n--- 24. Testing Royal v2.45.4 Hallmark Mobile Finance & Seamless Sync ---');
+const appMainV2454 = fs.readFileSync(appMainPath, 'utf8');
+const changelogV2454 = fs.readFileSync(changelogPath, 'utf8');
+const codeJsV2454 = fs.readFileSync(path.join(__dirname, 'Code.js'), 'utf8');
+const tabFinanceV2454 = fs.readFileSync(path.join(__dirname, 'Tab_Finance.html'), 'utf8');
+const modalsOrdersV2454 = fs.readFileSync(path.join(__dirname, 'Modals_Orders.html'), 'utf8');
+
+assert('App_Main.html: Contains Royal v2.45.4 in RELEASES', appMainV2454.includes("version: 'Royal v2.45.4'"));
+assert('App_Main.html: Sidebar badge displays >= v2.45.4', />v2\.(4[5-9]|\d{2,})\.\d+<\/span>/.test(appMainV2454));
+assert('CHANGELOG.md: Documents v2.45.4 release notes', changelogV2454.includes('## [v2.45.4] - 2026-09-06'));
+assert('Code.js: Allows authorized finance roles to write to Accounts table', codeJsV2454.includes("'QUẢN LÝ BÁN HÀNG', 'QUẢN LÝ KHO VẬN', 'CỘNG TÁC VIÊN'"));
+assert('Tab_Finance.html: Implements Hallmark Bottom Sheet on mobile', tabFinanceV2454.includes('items-end sm:items-center') && tabFinanceV2454.includes('rounded-t-3xl sm:rounded-3xl'));
+assert('Tab_Finance.html: Implements touch scroll isolation for category select', tabFinanceV2454.includes('touchAction') && tabFinanceV2454.includes('e.stopPropagation()'));
+assert('Tab_Finance.html: Rollback protection on pushDeltas failure', tabFinanceV2454.includes('prevTxsSnapshot') && tabFinanceV2454.includes('res.success === false'));
+assert('Modals_Orders.html: Implements native file.arrayBuffer() with clear file lock handling', modalsOrdersV2454.includes('file.arrayBuffer()') && modalsOrdersV2454.includes('Microsoft Excel'));
 
 // SUMMARY
 

@@ -1313,19 +1313,28 @@
 
             const payload = { ...editAtt, totalHours: (diffMins / 60).toFixed(2), status: status, penalty: 0, isEdited: true };
 
+            // 🚀 OPTIMISTIC UI: Đóng form tức thì (Zero-latency)
+            setEditAtt(null);
+
             try {
-                await pushDeltas({ attendance: [payload] }, 'Cập nhật chấm công thành công!', 'fa-check');
-                setEditAtt(null);
-            } catch (e) { triggerToast('Lỗi đồng bộ!', 'fa-times', 'danger'); }
+                await pushDeltas({ Attendance: [payload] }, 'Cập nhật chấm công thành công!', 'fa-check');
+            } catch (e) { 
+                triggerToast('Lỗi đồng bộ chấm công!', 'fa-times', 'danger'); 
+            }
         };
 
         const handleDirectPenalty = async () => {
             if (!directPenalty.amount || !directPenalty.note) return triggerToast('Vui lòng nhập đầy đủ tiền và lý do phạt', 'fa-times', 'danger');
             const payload = { id: 'BP_PENALTY_' + Date.now(), user: directPenalty.user, amount: -Math.abs(Number(directPenalty.amount)), type: 'Phạt Quy Định', note: directPenalty.note, date: payrollTargetDate, orderCode: '' };
+            
+            // 🚀 OPTIMISTIC UI: Đóng form phạt tức thì
+            setDirectPenalty(null);
+
             try {
                 await pushDeltas({ BonusPenalty: [payload] }, 'Đã ghi nhận phạt!', 'fa-gavel');
-                setDirectPenalty(null);
-            } catch (e) { triggerToast('Lỗi đồng bộ!', 'fa-times', 'danger'); }
+            } catch (e) { 
+                triggerToast('Lỗi đồng bộ!', 'fa-times', 'danger'); 
+            }
         };
 
         const submitLeave = async () => {
@@ -2125,8 +2134,13 @@
                 guide: String(kpiForm.note || '').trim(),
                 lastUpdated: new Date().toISOString()
             };
-            await pushDeltas({ KPI_Progress: [payload] }, editKPI ? 'Cập nhật KPI thành công!' : `Lưu thiết lập KPI ${kpiCycle === 'WEEK' ? 'Hàng Tuần' : 'Hàng Tháng'} thành công!`, 'fa-check');
-            setShowKPIModal(false); setEditKPI(null);
+            setShowKPIModal(false); 
+            setEditKPI(null);
+            try {
+                await pushDeltas({ KPI_Progress: [payload] }, editKPI ? 'Cập nhật KPI thành công!' : `Lưu thiết lập KPI ${kpiCycle === 'WEEK' ? 'Hàng Tuần' : 'Hàng Tháng'} thành công!`, 'fa-check');
+            } catch(e) {
+                triggerToast('Lỗi lưu KPI!', 'fa-times', 'danger');
+            }
         };
 
         const handleOpenSelfAssessment = (k, e) => {
@@ -3445,9 +3459,9 @@
                 payload.Accounts.push({ ...selectedAcc, balance: Number(selectedAcc.balance) - amt });
             }
 
+            setPayrollAction(null);
             try {
                 await pushDeltas(payload, 'Đã lưu hệ thống!', 'fa-check');
-                setPayrollAction(null);
             } catch (e) { triggerToast('Lỗi hệ thống', 'fa-times', 'danger'); }
         };
 

@@ -55,8 +55,9 @@
 
   <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js" id="babel-script"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <!-- ON-DEMAND LAZY LOADERS (Tiết kiệm >150MB RAM/VRAM) -->
+  <!-- ON-DEMAND LAZY LOADERS -->
   <script>
     window.ensureModelViewerLoaded = function () {
       if (customElements.get('model-viewer')) return Promise.resolve();
@@ -73,14 +74,40 @@
     };
 
     window.ensureXLSXLoaded = function () {
-      if (window.XLSX) return Promise.resolve(window.XLSX);
+      if (typeof window.XLSX !== 'undefined' && window.XLSX.read) return Promise.resolve(window.XLSX);
       if (window._xlsxPromise) return window._xlsxPromise;
+      
+      var CDNS = [
+        'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+        'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js'
+      ];
+      
       window._xlsxPromise = new Promise(function (resolve, reject) {
-        var script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-        script.onload = function () { resolve(window.XLSX); };
-        script.onerror = function (e) { reject(e); };
-        document.head.appendChild(script);
+        var cdnIndex = 0;
+        function tryNextCDN() {
+          if (typeof window.XLSX !== 'undefined' && window.XLSX.read) return resolve(window.XLSX);
+          if (cdnIndex >= CDNS.length) {
+            window._xlsxPromise = null;
+            return reject(new Error('Không thể tải thư viện XLSX từ CDN'));
+          }
+          var script = document.createElement('script');
+          script.src = CDNS[cdnIndex++];
+          var timer = setTimeout(function () {
+            script.onload = script.onerror = null;
+            tryNextCDN();
+          }, 3000);
+          script.onload = function () {
+            clearTimeout(timer);
+            resolve(window.XLSX);
+          };
+          script.onerror = function () {
+            clearTimeout(timer);
+            tryNextCDN();
+          };
+          document.head.appendChild(script);
+        }
+        tryNextCDN();
       });
       return window._xlsxPromise;
     };

@@ -781,9 +781,99 @@
 
         const RELEASES = [
             {
-                version: 'Royal v2.45.8',
+                version: 'Royal v2.45.11',
                 date: '07/09/2026',
                 isLatest: true,
+                badge: 'IMPORT/EXPORT STABILITY & SUPPLIER SYNC HOTFIX',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Khắc Phục Triệt Để Lỗi Lưu Phiếu Kho (totalDebtAdd) & Đồng Bộ Tức Thì Nhà Cung Cấp Mới',
+                summary: 'Khắc phục hoàn toàn 2 lỗi nghiêm trọng tại màn hình Tạo Phiếu Kho (Tab Xuất Nhập): (1) Đưa các biến tính toán công nợ và ghi chú (totalDebtAdd, finalNote) ra phạm vi hàm save() toàn cục, triệt tiêu dứt điểm lỗi ReferenceError: totalDebtAdd is not defined làm nghẽn tiến trình lưu phiếu nhập hàng; (2) Tích hợp Local Optimistic State (localSuppliers) và mở rộng bộ lọc ngành hàng khi thêm nhanh Nhà Cung Cấp: NCC mới tạo được hiển thị ngay lập tức 100% trong dropdown để chọn ghi sổ, không bị bộ lọc ngành hàng ẩn mất.',
+                categories: ['Kho Vận', 'Nhà Cung Cấp', 'Tạo Phiếu Kho', 'Hotfix', 'Optimistic UI'],
+                items: [
+                    {
+                        icon: 'fa-file-invoice-dollar',
+                        color: 'text-amber-400',
+                        title: 'Khắc Phục Lỗi totalDebtAdd Is Not Defined',
+                        desc: 'Đưa biến totalDebtAdd và finalNote ra đúng phạm vi khối lệnh của hàm save(), đảm bảo mọi phiếu Nhập/Xuất lưu dữ liệu và tạo phiếu chi an toàn 100%.'
+                    },
+                    {
+                        icon: 'fa-truck-field',
+                        color: 'text-emerald-400',
+                        title: 'Đồng Bộ Tức Thì Nhà Cung Cấp Mới (0ms Độ Trễ)',
+                        desc: 'Tự động gán category chuẩn theo tab (Nguyên liệu hoặc Hàng hoá) và cập nhật tức thời vào dropdown, không còn tình trạng thêm NCC xong bị biến mất.'
+                    },
+                    {
+                        icon: 'fa-filter',
+                        color: 'text-blue-400',
+                        title: 'Mở Rộng Bộ Lọc & Bảo Toàn NCC Đang Chọn',
+                        desc: 'Chấp nhận đa dạng từ khóa ngành hàng (Keo, Kính, Cát, Đá, Lũa, Xốp, Bao bì, PE) và luôn giữ lại NCC đang được chọn trong dropdown.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.45.10',
+                date: '07/09/2026',
+                isLatest: false,
+                badge: 'BOM AUTOMATION & PORTAL ZERO-OVERLAY',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Tự Động Hóa 100% BOM Bể Kính, Miễn Trừ Phiếu Vật Tư Thủ Công & Triệt Tiêu Lỗi Chồng Đè Modal',
+                summary: 'Khắc phục triệt để 2 bất cập vận hành lớn tại xưởng sản xuất: (1) Loại bỏ hoàn toàn chốt chặn Phiếu nhận nguyên liệu đối với Bể Kính: Bể kính được tính toán định mức BOM tự động 100% (kính đáy, kính thành mài vi tính, keo silicon) và tự khấu trừ kho khi hoàn thành, giải phóng thợ dán bể vào việc ngay không bị popup cản trở; (2) Dùng ReactDOM.createPortal mount trực tiếp ra document.body với z-[999999] cho các Modal vật tư, giải thoát hoàn toàn khỏi Stacking Context của Card cha, xóa bỏ triệt để hiện tượng toolbar, nút bấm và ảnh hàng của các thẻ sản xuất khác đè xuyên thấu lên modal.',
+                categories: ['Sản Xuất', 'Bể Kính', 'BOM Tự Động', 'React Portal', 'UI/UX'],
+                items: [
+                    {
+                        icon: 'fa-cubes-stacked',
+                        color: 'text-amber-400',
+                        title: '100% BOM Bể Kính Tự Động & Trừ Kho Chuẩn',
+                        desc: 'Bể kính mọi kích thước không bị coi là đơn custom cần kê khai thủ công. Thợ bấm [Nhận làm] là vào việc ngay, hệ thống tự đối soát BOM và trừ kho khi xong.'
+                    },
+                    {
+                        icon: 'fa-clone',
+                        color: 'text-indigo-400',
+                        title: 'Thoát Bẫy Stacking Context Với ReactDOM.createPortal',
+                        desc: 'Đưa MaterialRequisitionModal và MaterialSettlementModal ra ngoài body với z-[999999], không còn bị các card sản xuất bên dưới đè xuyên qua màn hình.'
+                    },
+                    {
+                        icon: 'fa-bolt',
+                        color: 'text-emerald-400',
+                        title: 'Triệt Tiêu Lãng Phí Thao Tác (Muda)',
+                        desc: 'Thợ dán bể và thợ layout tập trung 100% vào chuyên môn sản xuất, tốc độ nhận lệnh và nghiệm thu ảnh đạt 0ms độ trễ.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.45.9',
+                date: '07/09/2026',
+                isLatest: false,
+                badge: 'HOOK ORDER HOTFIX & IMMUTABLE REACT COMPLIANCE',
+                badgeColor: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+                title: 'Khắc Phục Triệt Để Minified React Error #310 (Hook Order Invariance Trong WorkerPhaseV2)',
+                summary: 'Khắc phục dứt điểm sự cố sập giao diện (Minified React error #310: Rendered more hooks than during previous render): (1) Đưa toàn bộ 17 Hooks (đặc biệt là availableWorkers) lên khai báo tuyệt đối tại tầng đầu tiên (top-level) của WorkerPhaseV2 trước mọi câu lệnh trả về điều kiện (if (isLocked) return null), bảo đảm số lượng Hook bất biến 100% giữa mọi chu kỳ render; (2) Chuẩn hóa các Modal vật tư (MaterialRequisitionModal & MaterialSettlementModal) để tuân thủ tuyệt đối quy tắc Rules of Hooks; (3) Tối ưu chuỗi realtime Firebase sync để giao diện cập nhật mượt mà khi thợ bấm nhận việc hoặc hoàn thành khâu.',
+                categories: ['Sản Xuất', 'Hotfix', 'React 18', 'Rules of Hooks', 'Poka-Yoke'],
+                items: [
+                    {
+                        icon: 'fa-shield-halved',
+                        color: 'text-rose-400',
+                        title: 'Đưa Hooks Lên Đầu (Top-Level Hook Invariance)',
+                        desc: 'Chuyển hook availableWorkers (React.useMemo) lên trước điều kiện rẽ nhánh isLocked, loại bỏ hoàn toàn vi phạm thứ tự Hook khi thẻ sản xuất chuyển trạng thái.'
+                    },
+                    {
+                        icon: 'fa-boxes-packing',
+                        color: 'text-amber-400',
+                        title: 'Bọc An Toàn Cho Modal Vật Tư (Requisition & Settlement)',
+                        desc: 'Di chuyển các hook tính toán vật tư và danh sách tiêu hao lên trước điều kiện kiểm tra isOpen/item, triệt tiêu rủi ro sập luồng khi mở modal.'
+                    },
+                    {
+                        icon: 'fa-bolt',
+                        color: 'text-emerald-400',
+                        title: 'Khôi Phục Dòng Chảy Re-render & Firebase Sync',
+                        desc: 'Khi các thợ xưởng (Hương, Tâm, Tân, Dương) thao tác đồng thời, giao diện tự động đồng bộ mà không bao giờ bị đứng hoặc trắng trang.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.45.8',
+                date: '07/09/2026',
+                isLatest: false,
                 badge: 'LEAN PRODUCTION PULL & WORKER RESTORATION',
                 badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
                 title: 'Khắc Phục Triệt Để Thợ Ảo "Kho Hàng" / "Hàng" Khâu 2 & Khôi Phục Danh Sách Nhân Sự Đầy Đủ',
@@ -6844,7 +6934,7 @@
                                     <div className="w-5 flex justify-center text-[#d4af37] text-[13px]"><i className="fas fa-rocket"></i></div>
                                     <span>Bản Cập Nhật</span>
                                 </div>
-                                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 font-black px-1.5 py-0.5 rounded border border-emerald-500/30">v2.45.8</span>
+                                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 font-black px-1.5 py-0.5 rounded border border-emerald-500/30">v2.45.11</span>
                             </button>
                         </div>
                     </div>

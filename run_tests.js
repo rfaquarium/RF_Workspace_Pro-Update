@@ -1270,6 +1270,30 @@ const simIsOwner = !simEffectiveUser || simEffectiveUser === 'Nguyễn Văn A';
 assert('Logic Test: Fake user "Kho Hàng" displays "Chờ nhận việc"', simUserName === 'Chờ nhận việc');
 assert('Logic Test: Fake user allows craftsman to be isOwner and claim task', simIsOwner === true);
 
+console.log('\n--- 27. Testing Royal v2.45.9 Hook Order Invariance & Minified React Error #310 Hotfix ---');
+const appMainV2459 = fs.readFileSync(path.join(__dirname, 'App_Main.html'), 'utf8');
+const changelogV2459 = fs.readFileSync(path.join(__dirname, 'CHANGELOG.md'), 'utf8');
+const tabProdV2459 = fs.readFileSync(path.join(__dirname, 'Tab_Production.html'), 'utf8');
+
+assert('App_Main.html: Contains Royal v2.45.9 in RELEASES', appMainV2459.includes("version: 'Royal v2.45.9'"));
+assert('App_Main.html: Sidebar badge displays >= v2.45.9', />v2\.(4[5-9]|\d{2,})\.\d+<\/span>/.test(appMainV2459));
+assert('CHANGELOG.md: Documents v2.45.9 release notes', changelogV2459.includes('## [v2.45.9] - 2026-09-07'));
+
+// React Hook Order Invariance Checks: All hooks MUST be declared before any conditional early returns
+const availWorkerPos = tabProdV2459.indexOf('const availableWorkers = React.useMemo');
+const isLockedPos = tabProdV2459.indexOf('if (isLocked) return null;');
+assert('Tab_Production.html: availableWorkers hook is declared BEFORE if (isLocked) return null', availWorkerPos !== -1 && isLockedPos !== -1 && availWorkerPos < isLockedPos);
+
+// Material Requisition Modal Hook Order
+const reqHookPos = tabProdV2459.indexOf('const availableMaterials = React.useMemo');
+const reqReturnPos = tabProdV2459.indexOf('if (!isOpen || !item) return null;');
+assert('Tab_Production.html: MaterialRequisitionModal declares availableMaterials BEFORE if (!isOpen || !item) return null', reqHookPos !== -1 && reqReturnPos !== -1 && reqHookPos < reqReturnPos);
+
+// Material Settlement Modal Hook Order
+const setHookPos = tabProdV2459.indexOf('const initialList = React.useMemo');
+const setReturnPos = tabProdV2459.indexOf('if (!isOpen || !item) return null;', reqReturnPos + 1);
+assert('Tab_Production.html: MaterialSettlementModal declares initialList BEFORE if (!isOpen || !item) return null', setHookPos !== -1 && setReturnPos !== -1 && setHookPos < setReturnPos);
+
 // SUMMARY
 
 console.log(`\n========================================`);

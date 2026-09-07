@@ -164,9 +164,7 @@
     // CHUYÊN BIỆT CHO: BỂ KÍNH ➔ BỂ LẺ SIZE & LAYOUT ➔ COVER
     // -------------------------------------------------------------------------
     const MaterialRequisitionModal = React.memo(function MaterialRequisitionModal({ isOpen, onClose, item, order, erpProducts = [], onConfirm, triggerToast }) {
-        if (!isOpen || !item) return null;
-
-        const isGlass = item.type === 'Bể Kính' || String(item.name || '').toLowerCase().includes('bể');
+        const isGlass = item?.type === 'Bể Kính' || String(item?.name || '').toLowerCase().includes('bể');
         const targetSubCat = isGlass ? 'NGUYÊN LIỆU BỂ KÍNH' : 'NGUYÊN LIỆU LAYOUT';
         
         // Lọc danh sách nguyên liệu từ kho Products
@@ -184,6 +182,8 @@
 
         const [selectedRows, setSelectedRows] = React.useState([]);
         const [searchQuery, setSearchQuery] = React.useState('');
+
+        if (!isOpen || !item) return null;
 
         const handleAddMaterial = (mat) => {
             if (!mat) return;
@@ -237,8 +237,8 @@
             String(m.sku || '').toLowerCase().includes(searchQuery.toLowerCase())
         );
 
-        return (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 animate-fade-in" onClick={onClose}>
+        return ReactDOM.createPortal(
+            <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[999999] flex items-center justify-center p-3 animate-fade-in select-none" onClick={onClose}>
                 <div className="bg-[#121215] border border-indigo-500/30 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
                     {/* Header */}
                     <div className="p-4 bg-gradient-to-r from-[#181820] to-[#141418] border-b border-white/[0.08] flex items-center justify-between">
@@ -384,7 +384,8 @@
                         </button>
                     </div>
                 </div>
-            </div>
+            </div>,
+            document.body
         );
     });
 
@@ -392,10 +393,8 @@
     // ⚖️ MODAL 2: QUYẾT TOÁN TIÊU HAO & TRẢ THỪA (CUỐI CA - NỘP ẢNH HOÀN THÀNH)
     // -------------------------------------------------------------------------
     const MaterialSettlementModal = React.memo(function MaterialSettlementModal({ isOpen, onClose, item, order, onConfirm, triggerToast }) {
-        if (!isOpen || !item) return null;
-
         const initialList = React.useMemo(() => {
-            const raw = item.materialUsageData || [];
+            const raw = item?.materialUsageData || [];
             if (Array.isArray(raw) && raw.length > 0) {
                 return raw.map(m => ({
                     sku: m.sku,
@@ -415,6 +414,8 @@
         React.useEffect(() => {
             setRows(initialList);
         }, [initialList]);
+
+        if (!isOpen || !item) return null;
 
         const handleReturnedChange = (idx, val) => {
             setRows(prev => {
@@ -436,8 +437,8 @@
             onConfirm(finalData);
         };
 
-        return (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 animate-fade-in" onClick={onClose}>
+        return ReactDOM.createPortal(
+            <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[999999] flex items-center justify-center p-3 animate-fade-in select-none" onClick={onClose}>
                 <div className="bg-[#121215] border border-emerald-500/30 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
                     {/* Header */}
                     <div className="p-4 bg-gradient-to-r from-[#181820] to-[#141418] border-b border-white/[0.08] flex items-center justify-between">
@@ -529,7 +530,8 @@
                         </button>
                     </div>
                 </div>
-            </div>
+            </div>,
+            document.body
         );
     });
 
@@ -1728,18 +1730,18 @@
         const [qcSide, setQcSide] = React.useState(null);
         const [completedSerialModal, setCompletedSerialModal] = React.useState(null);
 
-        // KIỂM TRA ĐƠN TÙY CHỈNH (CHỈ ÁP DỤNG: BỂ KÍNH ➔ BỂ LẺ SIZE & LAYOUT ➔ COVER)
+        // KIỂM TRA ĐƠN TÙY CHỈNH (CHỈ ÁP DỤNG: LAYOUT ➔ COVER CẦN NHẶT VẬT TƯ THỦ CÔNG)
+        // LƯU Ý KỶ LUẬT VẬN HÀNH: BỂ KÍNH TUYỆT ĐỐI KHÔNG ÁP DỤNG PHIẾU NÀY VÌ ĐÃ CÓ BOM CHUẨN 100% (TỰ ĐỘNG KHẤU TRỪ THEO CÔNG THỨC DIỆN TÍCH KÍNH & SILICON)
         const isCustomItem = React.useMemo(() => {
+            if (isGlassProduct) return false;
             const nameLower = String(item.name || '').toLowerCase().trim();
-            const typeUpper = String(item.type || item.category || '').toUpperCase().trim();
             let subCat = '';
             if (erpProducts && Array.isArray(erpProducts)) {
                 const p = erpProducts.find(x => x.name === item.name || x.sku === item.name);
                 if (p) subCat = String(p.sub_category || '').toUpperCase().trim();
             }
-            const isGlassLeSize = subCat === 'BỂ LẺ SIZE' || subCat === 'BE LE SIZE' || nameLower.includes('bể lẻ size') || nameLower.includes('lẻ size') || (isGlassProduct && /(\d+)\s*[xX*×]\s*(\d+)/.test(nameLower));
             const isLayoutCover = subCat === 'COVER' || nameLower.includes('cover') || nameLower.includes('làm theo ảnh') || nameLower.includes('theo mẫu');
-            return isGlassLeSize || isLayoutCover;
+            return isLayoutCover;
         }, [item, erpProducts, isGlassProduct]);
 
         const parseDateSafe = (val) => {
@@ -1856,6 +1858,24 @@
             const diffMins = Math.round((endMs - startMs) / 60000);
             return `Làm mất ${diffMins} phút`;
         }, [isDone, data.start, data.endTime]);
+
+        const availableWorkers = React.useMemo(() => {
+            const rawList = [
+                ...(Array.isArray(userConfigs?.users) ? userConfigs.users : []),
+                ...Object.values(userConfigs?.pins || {}).map(u => u?.name).filter(Boolean),
+                ...(Array.isArray(attendance) ? attendance.map(a => a?.user).filter(Boolean) : [])
+            ];
+            const seen = new Set();
+            const result = [];
+            rawList.forEach(uName => {
+                const clean = String(uName || '').trim();
+                if (clean && clean !== 'Kho Hàng' && clean !== 'Hàng' && clean.toLowerCase() !== 'khách' && !seen.has(clean)) {
+                    seen.add(clean);
+                    result.push(clean);
+                }
+            });
+            return result;
+        }, [userConfigs, attendance]);
 
         if (isLocked) return null;
 
@@ -2558,24 +2578,6 @@
             <Avatar name={effectiveUser} userConfigs={userConfigs} className="w-[32px] h-[32px] shrink-0 border border-[#333] shadow-sm rounded-full" />
             :
             <div className="w-[32px] h-[32px] rounded-full bg-[#222] border border-[#333] flex items-center justify-center text-gray-500"><i className="fas fa-user text-[14px]"></i></div>;
-
-        const availableWorkers = React.useMemo(() => {
-            const rawList = [
-                ...(Array.isArray(userConfigs?.users) ? userConfigs.users : []),
-                ...Object.values(userConfigs?.pins || {}).map(u => u?.name).filter(Boolean),
-                ...(Array.isArray(attendance) ? attendance.map(a => a?.user).filter(Boolean) : [])
-            ];
-            const seen = new Set();
-            const result = [];
-            rawList.forEach(uName => {
-                const clean = String(uName || '').trim();
-                if (clean && clean !== 'Kho Hàng' && clean !== 'Hàng' && clean.toLowerCase() !== 'khách' && !seen.has(clean)) {
-                    seen.add(clean);
-                    result.push(clean);
-                }
-            });
-            return result;
-        }, [userConfigs, attendance]);
 
         return (
             <div className={`w-full py-2.5 rounded-xl px-3 border transition-all flex flex-col gap-1.5 bg-transparent ${isDone

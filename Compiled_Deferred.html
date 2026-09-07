@@ -229,8 +229,7 @@ const MaterialRequisitionModal = React.memo(function MaterialRequisitionModal({
   onConfirm,
   triggerToast
 }) {
-  if (!isOpen || !item) return null;
-  const isGlass = item.type === 'Bể Kính' || String(item.name || '').toLowerCase().includes('bể');
+  const isGlass = item?.type === 'Bể Kính' || String(item?.name || '').toLowerCase().includes('bể');
   const targetSubCat = isGlass ? 'NGUYÊN LIỆU BỂ KÍNH' : 'NGUYÊN LIỆU LAYOUT';
 
   // Lọc danh sách nguyên liệu từ kho Products
@@ -247,6 +246,7 @@ const MaterialRequisitionModal = React.memo(function MaterialRequisitionModal({
   }, [erpProducts, isGlass, targetSubCat]);
   const [selectedRows, setSelectedRows] = React.useState([]);
   const [searchQuery, setSearchQuery] = React.useState('');
+  if (!isOpen || !item) return null;
   const handleAddMaterial = mat => {
     if (!mat) return;
     const exists = selectedRows.find(r => r.sku === mat.sku || r.name === mat.name);
@@ -287,8 +287,8 @@ const MaterialRequisitionModal = React.memo(function MaterialRequisitionModal({
     onConfirm(validItems);
   };
   const filteredStockList = availableMaterials.filter(m => String(m.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || String(m.sku || '').toLowerCase().includes(searchQuery.toLowerCase()));
-  return /*#__PURE__*/React.createElement("div", {
-    className: "fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 animate-fade-in",
+  return ReactDOM.createPortal( /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/85 backdrop-blur-md z-[999999] flex items-center justify-center p-3 animate-fade-in select-none",
     onClick: onClose
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-[#121215] border border-indigo-500/30 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]",
@@ -413,7 +413,7 @@ const MaterialRequisitionModal = React.memo(function MaterialRequisitionModal({
     className: "px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-indigo-500/30 flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
   }, /*#__PURE__*/React.createElement("i", {
     className: "fas fa-check-circle text-sm"
-  }), /*#__PURE__*/React.createElement("span", null, "\u2705 X\xC1C NH\u1EACN L\u0128NH V\u1EACT T\u01AF")))));
+  }), /*#__PURE__*/React.createElement("span", null, "\u2705 X\xC1C NH\u1EACN L\u0128NH V\u1EACT T\u01AF"))))), document.body);
 });
 
 // -------------------------------------------------------------------------
@@ -427,9 +427,8 @@ const MaterialSettlementModal = React.memo(function MaterialSettlementModal({
   onConfirm,
   triggerToast
 }) {
-  if (!isOpen || !item) return null;
   const initialList = React.useMemo(() => {
-    const raw = item.materialUsageData || [];
+    const raw = item?.materialUsageData || [];
     if (Array.isArray(raw) && raw.length > 0) {
       return raw.map(m => ({
         sku: m.sku,
@@ -447,6 +446,7 @@ const MaterialSettlementModal = React.memo(function MaterialSettlementModal({
   React.useEffect(() => {
     setRows(initialList);
   }, [initialList]);
+  if (!isOpen || !item) return null;
   const handleReturnedChange = (idx, val) => {
     setRows(prev => {
       const next = [...prev];
@@ -465,8 +465,8 @@ const MaterialSettlementModal = React.memo(function MaterialSettlementModal({
     }));
     onConfirm(finalData);
   };
-  return /*#__PURE__*/React.createElement("div", {
-    className: "fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 animate-fade-in",
+  return ReactDOM.createPortal( /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/85 backdrop-blur-md z-[999999] flex items-center justify-center p-3 animate-fade-in select-none",
     onClick: onClose
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-[#121215] border border-emerald-500/30 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]",
@@ -552,7 +552,7 @@ const MaterialSettlementModal = React.memo(function MaterialSettlementModal({
     className: "px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-black font-black rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/30 flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
   }, /*#__PURE__*/React.createElement("i", {
     className: "fas fa-rocket text-sm"
-  }), /*#__PURE__*/React.createElement("span", null, "\uD83D\uDE80 HO\xC0N TH\xC0NH & CH\u1ED0T V\u1EACT T\u01AF")))));
+  }), /*#__PURE__*/React.createElement("span", null, "\uD83D\uDE80 HO\xC0N TH\xC0NH & CH\u1ED0T V\u1EACT T\u01AF"))))), document.body);
 });
 
 // -------------------------------------------------------------------------
@@ -1626,18 +1626,18 @@ const WorkerPhaseV2 = React.memo(function WorkerPhaseV2({
   const [qcSide, setQcSide] = React.useState(null);
   const [completedSerialModal, setCompletedSerialModal] = React.useState(null);
 
-  // KIỂM TRA ĐƠN TÙY CHỈNH (CHỈ ÁP DỤNG: BỂ KÍNH ➔ BỂ LẺ SIZE & LAYOUT ➔ COVER)
+  // KIỂM TRA ĐƠN TÙY CHỈNH (CHỈ ÁP DỤNG: LAYOUT ➔ COVER CẦN NHẶT VẬT TƯ THỦ CÔNG)
+  // LƯU Ý KỶ LUẬT VẬN HÀNH: BỂ KÍNH TUYỆT ĐỐI KHÔNG ÁP DỤNG PHIẾU NÀY VÌ ĐÃ CÓ BOM CHUẨN 100% (TỰ ĐỘNG KHẤU TRỪ THEO CÔNG THỨC DIỆN TÍCH KÍNH & SILICON)
   const isCustomItem = React.useMemo(() => {
+    if (isGlassProduct) return false;
     const nameLower = String(item.name || '').toLowerCase().trim();
-    const typeUpper = String(item.type || item.category || '').toUpperCase().trim();
     let subCat = '';
     if (erpProducts && Array.isArray(erpProducts)) {
       const p = erpProducts.find(x => x.name === item.name || x.sku === item.name);
       if (p) subCat = String(p.sub_category || '').toUpperCase().trim();
     }
-    const isGlassLeSize = subCat === 'BỂ LẺ SIZE' || subCat === 'BE LE SIZE' || nameLower.includes('bể lẻ size') || nameLower.includes('lẻ size') || isGlassProduct && /(\d+)\s*[xX*×]\s*(\d+)/.test(nameLower);
     const isLayoutCover = subCat === 'COVER' || nameLower.includes('cover') || nameLower.includes('làm theo ảnh') || nameLower.includes('theo mẫu');
-    return isGlassLeSize || isLayoutCover;
+    return isLayoutCover;
   }, [item, erpProducts, isGlassProduct]);
   const parseDateSafe = val => {
     if (!val) return NaN;
@@ -1729,6 +1729,19 @@ const WorkerPhaseV2 = React.memo(function WorkerPhaseV2({
     const diffMins = Math.round((endMs - startMs) / 60000);
     return `Làm mất ${diffMins} phút`;
   }, [isDone, data.start, data.endTime]);
+  const availableWorkers = React.useMemo(() => {
+    const rawList = [...(Array.isArray(userConfigs?.users) ? userConfigs.users : []), ...Object.values(userConfigs?.pins || {}).map(u => u?.name).filter(Boolean), ...(Array.isArray(attendance) ? attendance.map(a => a?.user).filter(Boolean) : [])];
+    const seen = new Set();
+    const result = [];
+    rawList.forEach(uName => {
+      const clean = String(uName || '').trim();
+      if (clean && clean !== 'Kho Hàng' && clean !== 'Hàng' && clean.toLowerCase() !== 'khách' && !seen.has(clean)) {
+        seen.add(clean);
+        result.push(clean);
+      }
+    });
+    return result;
+  }, [userConfigs, attendance]);
   if (isLocked) return null;
   const act = async (s, confirmed = false, customMaterialData = null) => {
     if (item.assignee && String(item.assignee).trim() !== '' && !isStaffMatch(item.assignee, currentUser) && !isAdmin) {
@@ -2393,19 +2406,6 @@ const WorkerPhaseV2 = React.memo(function WorkerPhaseV2({
   }, /*#__PURE__*/React.createElement("i", {
     className: "fas fa-user text-[14px]"
   }));
-  const availableWorkers = React.useMemo(() => {
-    const rawList = [...(Array.isArray(userConfigs?.users) ? userConfigs.users : []), ...Object.values(userConfigs?.pins || {}).map(u => u?.name).filter(Boolean), ...(Array.isArray(attendance) ? attendance.map(a => a?.user).filter(Boolean) : [])];
-    const seen = new Set();
-    const result = [];
-    rawList.forEach(uName => {
-      const clean = String(uName || '').trim();
-      if (clean && clean !== 'Kho Hàng' && clean !== 'Hàng' && clean.toLowerCase() !== 'khách' && !seen.has(clean)) {
-        seen.add(clean);
-        result.push(clean);
-      }
-    });
-    return result;
-  }, [userConfigs, attendance]);
   return /*#__PURE__*/React.createElement("div", {
     className: `w-full py-2.5 rounded-xl px-3 border transition-all flex flex-col gap-1.5 bg-transparent ${isDone ? 'border-emerald-500/30 shadow-sm' : isInProgress ? 'border-blue-500/40 shadow-sm' : 'border-white/[0.05]'}`
   }, /*#__PURE__*/React.createElement("div", {
@@ -12490,8 +12490,28 @@ function IEFormModal({
   const [newSup, setNewSup] = React.useState({
     name: '',
     phone: '',
-    category: 'HÀNG HOÁ'
+    category: 'NGUYÊN LIỆU & VẬT TƯ'
   });
+  const [localSuppliers, setLocalSuppliers] = React.useState([]);
+  const allSuppliers = React.useMemo(() => {
+    const merged = [...localSuppliers];
+    const seen = new Set(localSuppliers.map(s => s.id));
+    (data?.Suppliers || []).forEach(s => {
+      if (!seen.has(s.id)) {
+        seen.add(s.id);
+        merged.push(s);
+      }
+    });
+    return merged;
+  }, [localSuppliers, data?.Suppliers]);
+  const openAddSup = () => {
+    setNewSup({
+      name: '',
+      phone: '',
+      category: importSubTab === 'NguyenLieu' ? 'NGUYÊN LIỆU & VẬT TƯ' : 'HÀNG HOÁ'
+    });
+    setShowAddSup(true);
+  };
   const [items, setItems] = React.useState([]);
   const [searchProd, setSearchProd] = React.useState('');
   const [showDropdown, setShowDropdown] = React.useState(false);
@@ -12587,26 +12607,29 @@ function IEFormModal({
   const handleCreateSupplier = async () => {
     if (!newSup.name.trim()) return alert('Vui lòng nhập Tên Nhà Cung Cấp!');
     const sId = 'SUP_' + Date.now();
+    const supCat = newSup.category?.trim() || (importSubTab === 'NguyenLieu' ? 'NGUYÊN LIỆU & VẬT TƯ' : 'HÀNG HOÁ');
     const payloadSup = {
       id: sId,
-      name: newSup.name,
-      phone: newSup.phone,
-      category: newSup.category,
+      name: newSup.name.trim(),
+      phone: newSup.phone?.trim() || '',
+      category: supCat,
       totalDebt: 0
     };
     try {
-      await pushData({
-        Suppliers: [payloadSup]
-      });
+      setLocalSuppliers(prev => [payloadSup, ...prev]);
       setSupplierId(sId);
       setShowAddSup(false);
       setNewSup({
         name: '',
         phone: '',
-        category: 'HÀNG HOÁ'
+        category: importSubTab === 'NguyenLieu' ? 'NGUYÊN LIỆU & VẬT TƯ' : 'HÀNG HOÁ'
       });
+      await pushData({
+        Suppliers: [payloadSup]
+      });
+      if (triggerToast) triggerToast(`Đã thêm nhà cung cấp: ${payloadSup.name}!`, 'fa-check', 'success');
     } catch (e) {
-      alert('Lỗi tạo NCC!');
+      alert('Lỗi tạo NCC: ' + (e.message || e));
     }
   };
   const save = async () => {
@@ -12624,6 +12647,8 @@ function IEFormModal({
     let formattedDate = (dateStr || '').replace('T', ' ');
     let logId = '';
     let targetName = '';
+    let totalDebtAdd = 0;
+    let finalNote = note || '';
     if (type === 'Kiểm Kho') {
       let nhapItems = [];
       let xuatItems = [];
@@ -12685,7 +12710,6 @@ function IEFormModal({
       });
     } else {
       logId = 'IE_' + Date.now();
-      let totalDebtAdd = 0;
       items.forEach(i => {
         const p = (data?.Products || []).find(x => x.id === i.id);
         if (p && type !== 'Đặt Hàng') {
@@ -12762,7 +12786,7 @@ function IEFormModal({
           }
         }
       }
-      let finalNote = note;
+      finalNote = note;
       if (type === 'Nhập') {
         const u = (localStorage.getItem('rf_user') || 'Admin').split(' ').pop();
         finalNote = `${note ? note + ' - ' : ''}Nhập từ NCC (Người tạo: ${u})`;
@@ -13019,8 +13043,8 @@ function IEFormModal({
   }, /*#__PURE__*/React.createElement("label", {
     className: "text-[9px] font-black text-gray-500 uppercase tracking-widest"
   }, "Nh\xE0 Cung C\u1EA5p"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowAddSup(true),
-    className: "text-[8px] font-black text-[#10b981] hover:underline uppercase"
+    onClick: openAddSup,
+    className: "text-[8px] font-black text-[#10b981] hover:underline uppercase cursor-pointer"
   }, /*#__PURE__*/React.createElement("i", {
     className: "fas fa-plus text-[7px]"
   }), " Th\xEAm NCC")), /*#__PURE__*/React.createElement("select", {
@@ -13030,9 +13054,15 @@ function IEFormModal({
     onChange: e => setSupplierId(e.target.value)
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
-  }, "-- H\xE0ng tr\xF4i n\u1ED5i / Kh\xE1c --"), (data?.Suppliers || []).filter(s => {
-    if (importSubTab === 'NguyenLieu') return String(s.category).toUpperCase().includes('NGUYÊN LIỆU') || String(s.category).toUpperCase().includes('VẬT TƯ');
-    if (importSubTab === 'HangHoa') return String(s.category).toUpperCase().includes('HÀNG HOÁ') || !s.category;
+  }, "-- H\xE0ng tr\xF4i n\u1ED5i / Kh\xE1c --"), allSuppliers.filter(s => {
+    if (s.id === supplierId) return true;
+    const cat = String(s.category || '').toUpperCase();
+    if (importSubTab === 'NguyenLieu') {
+      return cat.includes('NGUYÊN LIỆU') || cat.includes('VẬT TƯ') || cat.includes('KEO') || cat.includes('KÍNH') || cat.includes('CÁT') || cat.includes('ĐÁ') || cat.includes('LŨA') || cat.includes('XỐP') || cat.includes('BAO BÌ') || cat.includes('PE') || cat === '' || !s.category;
+    }
+    if (importSubTab === 'HangHoa') {
+      return !cat.includes('NGUYÊN LIỆU') && !cat.includes('VẬT TƯ');
+    }
     return true;
   }).map(s => /*#__PURE__*/React.createElement("option", {
     key: s.id,

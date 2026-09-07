@@ -22964,9 +22964,34 @@ const ChangelogTab = React.memo(function ChangelogTab({
   const [filterTag, setFilterTag] = React.useState('ALL');
   const [searchQuery, setSearchQuery] = React.useState('');
   const RELEASES = [{
-    version: 'Royal v2.45.8',
+    version: 'Royal v2.45.9',
     date: '07/09/2026',
     isLatest: true,
+    badge: 'HOOK ORDER HOTFIX & IMMUTABLE REACT COMPLIANCE',
+    badgeColor: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+    title: 'Khắc Phục Triệt Để Minified React Error #310 (Hook Order Invariance Trong WorkerPhaseV2)',
+    summary: 'Khắc phục dứt điểm sự cố sập giao diện (Minified React error #310: Rendered more hooks than during previous render): (1) Đưa toàn bộ 17 Hooks (đặc biệt là availableWorkers) lên khai báo tuyệt đối tại tầng đầu tiên (top-level) của WorkerPhaseV2 trước mọi câu lệnh trả về điều kiện (if (isLocked) return null), bảo đảm số lượng Hook bất biến 100% giữa mọi chu kỳ render; (2) Chuẩn hóa các Modal vật tư (MaterialRequisitionModal & MaterialSettlementModal) để tuân thủ tuyệt đối quy tắc Rules of Hooks; (3) Tối ưu chuỗi realtime Firebase sync để giao diện cập nhật mượt mà khi thợ bấm nhận việc hoặc hoàn thành khâu.',
+    categories: ['Sản Xuất', 'Hotfix', 'React 18', 'Rules of Hooks', 'Poka-Yoke'],
+    items: [{
+      icon: 'fa-shield-halved',
+      color: 'text-rose-400',
+      title: 'Đưa Hooks Lên Đầu (Top-Level Hook Invariance)',
+      desc: 'Chuyển hook availableWorkers (React.useMemo) lên trước điều kiện rẽ nhánh isLocked, loại bỏ hoàn toàn vi phạm thứ tự Hook khi thẻ sản xuất chuyển trạng thái.'
+    }, {
+      icon: 'fa-boxes-packing',
+      color: 'text-amber-400',
+      title: 'Bọc An Toàn Cho Modal Vật Tư (Requisition & Settlement)',
+      desc: 'Di chuyển các hook tính toán vật tư và danh sách tiêu hao lên trước điều kiện kiểm tra isOpen/item, triệt tiêu rủi ro sập luồng khi mở modal.'
+    }, {
+      icon: 'fa-bolt',
+      color: 'text-emerald-400',
+      title: 'Khôi Phục Dòng Chảy Re-render & Firebase Sync',
+      desc: 'Khi các thợ xưởng (Hương, Tâm, Tân, Dương) thao tác đồng thời, giao diện tự động đồng bộ mà không bao giờ bị đứng hoặc trắng trang.'
+    }]
+  }, {
+    version: 'Royal v2.45.8',
+    date: '07/09/2026',
+    isLatest: false,
     badge: 'LEAN PRODUCTION PULL & WORKER RESTORATION',
     badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
     title: 'Khắc Phục Triệt Để Thợ Ảo "Kho Hàng" / "Hàng" Khâu 2 & Khôi Phục Danh Sách Nhân Sự Đầy Đủ',
@@ -28421,7 +28446,7 @@ function App() {
     className: "fas fa-rocket"
   })), /*#__PURE__*/React.createElement("span", null, "B\u1EA3n C\u1EADp Nh\u1EADt")), /*#__PURE__*/React.createElement("span", {
     className: "text-[9px] bg-emerald-500/20 text-emerald-400 font-black px-1.5 py-0.5 rounded border border-emerald-500/30"
-  }, "v2.45.8")))), /*#__PURE__*/React.createElement("div", {
+  }, "v2.45.9")))), /*#__PURE__*/React.createElement("div", {
     className: "p-3.5 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-white/[0.08] bg-[#141418] flex items-center gap-3"
   }, typeof Avatar !== 'undefined' ? /*#__PURE__*/React.createElement(Avatar, {
     name: currentUser,

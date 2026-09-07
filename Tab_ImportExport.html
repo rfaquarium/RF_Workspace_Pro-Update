@@ -1881,6 +1881,30 @@ function IEFormModal({ data, onClose, pushData, prefilledProduct, userConfigs, o
    const [isSaving, setIsSaving] = React.useState(false);
    
    const [linkedReqId, setLinkedReqId] = React.useState('');
+   const [showAddSup, setShowAddSup] = React.useState(false);
+   const [newSup, setNewSup] = React.useState({ name: '', phone: '', category: 'NGUYÊN LIỆU & VẬT TƯ' });
+   const [localSuppliers, setLocalSuppliers] = React.useState([]);
+
+   const allSuppliers = React.useMemo(() => {
+       const merged = [...localSuppliers];
+       const seen = new Set(localSuppliers.map(s => s.id));
+       (data?.Suppliers || []).forEach(s => {
+           if (!seen.has(s.id)) {
+               seen.add(s.id);
+               merged.push(s);
+           }
+       });
+       return merged;
+   }, [localSuppliers, data?.Suppliers]);
+
+   const openAddSup = () => {
+       setNewSup({ 
+           name: '', 
+           phone: '', 
+           category: importSubTab === 'NguyenLieu' ? 'NGUYÊN LIỆU & VẬT TƯ' : 'HÀNG HOÁ' 
+       });
+       setShowAddSup(true);
+   };
 
    React.useEffect(() => {
        if (prefilledProduct && Object.keys(prefilledProduct).length > 0) {
@@ -1923,9 +1947,6 @@ function IEFormModal({ data, onClose, pushData, prefilledProduct, userConfigs, o
    const [note, setNote] = React.useState('');
    const [dateStr, setDateStr] = React.useState(getVNTime()); 
    
-   const [showAddSup, setShowAddSup] = React.useState(false);
-   const [newSup, setNewSup] = React.useState({ name: '', phone: '', category: 'HÀNG HOÁ' });
-
    const [items, setItems] = React.useState([]);
    const [searchProd, setSearchProd] = React.useState('');
    const [showDropdown, setShowDropdown] = React.useState(false); 
@@ -1980,7 +2001,20 @@ function IEFormModal({ data, onClose, pushData, prefilledProduct, userConfigs, o
        return list.filter(p => String(p.name).toLowerCase().includes(query) || String(p.sku).toLowerCase().includes(query)).slice(0, 30); 
    }, [data?.Products, searchProd, showDropdown, type, importSubTab, exportSubTab]);
 
-   const selectedProductInfo = React.useMemo(() => (data?.Products||[]).find(x => x.id === selProd), [data?.Products, selProd]);
+   const handleCreateSupplier = async () => {
+        if (!newSup.name.trim()) return alert('Vui lòng nhập Tên Nhà Cung Cấp!');
+        const sId = 'SUP_' + Date.now();
+        const supCat = newSup.category?.trim() || (importSubTab === 'NguyenLieu' ? 'NGUYÊN LIỆU & VẬT TƯ' : 'HÀNG HOÁ');
+        const payloadSup = { id: sId, name: newSup.name.trim(), phone: newSup.phone?.trim() || '', category: supCat, totalDebt: 0 };
+        try {
+            setLocalSuppliers(prev => [payloadSup, ...prev]);
+            setSupplierId(sId);
+            setShowAddSup(false);
+            setNewSup({ name: '', phone: '', category: importSubTab === 'NguyenLieu' ? 'NGUYÊN LIỆU & VẬT TƯ' : 'HÀNG HOÁ' });
+            await pushData({ Suppliers: [payloadSup] });
+            if (triggerToast) triggerToast(`Đã thêm nhà cung cấp: ${payloadSup.name}!`, 'fa-check', 'success');
+        } catch (e) { alert('Lỗi tạo NCC: ' + (e.message || e)); }
+    };
 
    const handleSelectProduct = (p) => { 
        setSelProd(p.id); setSearchProd(p.name); setSelPrice(type === 'Nhập' ? p.costPrice : p.price); setShowDropdown(false); 
@@ -2008,18 +2042,6 @@ function IEFormModal({ data, onClose, pushData, prefilledProduct, userConfigs, o
        setIsUsingImportUnit(false);
    };
 
-   const handleCreateSupplier = async () => {
-       if (!newSup.name.trim()) return alert('Vui lòng nhập Tên Nhà Cung Cấp!');
-       const sId = 'SUP_' + Date.now();
-       const payloadSup = { id: sId, name: newSup.name, phone: newSup.phone, category: newSup.category, totalDebt: 0 };
-       try {
-           await pushData({ Suppliers: [payloadSup] });
-           setSupplierId(sId);
-           setShowAddSup(false);
-           setNewSup({ name: '', phone: '', category: 'HÀNG HOÁ' });
-       } catch (e) { alert('Lỗi tạo NCC!'); }
-   };
-
    const save = async () => {
      if (isSaving) return;
      if (type === 'Kiểm Kho' && !checkSubCat) return alert('Vui lòng chọn danh mục con để kiểm kho!');
@@ -2030,6 +2052,8 @@ function IEFormModal({ data, onClose, pushData, prefilledProduct, userConfigs, o
      let formattedDate = (dateStr || '').replace('T', ' ');
      let logId = '';
      let targetName = '';
+     let totalDebtAdd = 0;
+     let finalNote = note || '';
 
      if (type === 'Kiểm Kho') {
          let nhapItems = []; let xuatItems = []; let totalNhapAmt = 0; let totalXuatAmt = 0;
@@ -2055,7 +2079,7 @@ function IEFormModal({ data, onClose, pushData, prefilledProduct, userConfigs, o
          if (nhapItems.length > 0) payload.ImportExport.push({ id: 'IE_GCHK_N_' + Date.now(), type: 'Nhập', target: 'Kiểm kho (Cân tăng)', totalAmount: totalNhapAmt, date: formattedDate, note: `Cân đối kiểm kho tăng danh mục: ${checkSubCat}`, itemsData: JSON.stringify(nhapItems) });
          if (xuatItems.length > 0) payload.ImportExport.push({ id: 'IE_GCHK_X_' + Date.now() + 1, type: 'Xuất', target: 'Kiểm kho (Cân giảm)', totalAmount: totalXuatAmt, date: formattedDate, note: `Cân đối kiểm kho giảm danh mục: ${checkSubCat}`, itemsData: JSON.stringify(xuatItems) });
      } else {
-         logId = 'IE_'+Date.now(); let totalDebtAdd = 0;
+         logId = 'IE_'+Date.now();
          items.forEach(i => { 
              const p = (data?.Products||[]).find(x=>x.id===i.id); 
              if(p && type !== 'Đặt Hàng') {
@@ -2066,7 +2090,7 @@ function IEFormModal({ data, onClose, pushData, prefilledProduct, userConfigs, o
          targetName = 'Nội bộ/Khác';
 
          if(type === 'Nhập' || type === 'Đặt Hàng') {
-            targetName = supplierId ? ((data?.Suppliers||[]).find(s=>s.id===supplierId)?.name || 'Khác') : 'Khác';
+            targetName = supplierId ? (allSuppliers.find(s=>s.id===supplierId)?.name || 'Khác') : 'Khác';
             if(supplierId) {
                 const paid = parseInt(paidAmount) || 0; totalDebtAdd = totalAmount - paid;
                 if(paid > 0) { 
@@ -2076,7 +2100,7 @@ function IEFormModal({ data, onClose, pushData, prefilledProduct, userConfigs, o
                     payload.Transactions.push({ id: 'TX_'+Date.now(), type: 'Chi', category: 'Thanh Toán Hoá Đơn', amount: paid, fromAccount: accId, toAccount: '', title: `Thanh toán nhập hàng: ${targetName}`, date: formattedDate, note: `Hệ thống tạo tự động từ Phiếu ${type} (${logId})` });
                 }
                 if(totalDebtAdd > 0) { 
-                    const sup = (data?.Suppliers||[]).find(s=>s.id===supplierId);
+                    const sup = allSuppliers.find(s=>s.id===supplierId);
                     payload.Suppliers.push({...sup, totalDebt: Number(sup.totalDebt) + totalDebtAdd}); 
                 }
             }
@@ -2094,7 +2118,6 @@ function IEFormModal({ data, onClose, pushData, prefilledProduct, userConfigs, o
              }
          }
          
-         let finalNote = note;
          if(type === 'Nhập') { 
              const u = (localStorage.getItem('rf_user') || 'Admin').split(' ').pop(); 
              finalNote = `${note ? note + ' - ' : ''}Nhập từ NCC (Người tạo: ${u})`;
@@ -2300,13 +2323,19 @@ function IEFormModal({ data, onClose, pushData, prefilledProduct, userConfigs, o
                         <div>
                             <div className="flex justify-between items-end mb-1.5">
                                 <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Nhà Cung Cấp</label>
-                                <button onClick={() => setShowAddSup(true)} className="text-[8px] font-black text-[#10b981] hover:underline uppercase"><i className="fas fa-plus text-[7px]"></i> Thêm NCC</button>
+                                <button onClick={openAddSup} className="text-[8px] font-black text-[#10b981] hover:underline uppercase cursor-pointer"><i className="fas fa-plus text-[7px]"></i> Thêm NCC</button>
                             </div>
                             <select disabled={isSaving} className="w-full p-2 bg-[#141414] rounded-lg border border-[#222] text-[11px] font-bold outline-none text-white focus:border-[#10b981] cursor-pointer" value={supplierId} onChange={e=>setSupplierId(e.target.value)}>
                                 <option value="">-- Hàng trôi nổi / Khác --</option>
-                                {(data?.Suppliers||[]).filter(s => {
-                                    if (importSubTab === 'NguyenLieu') return String(s.category).toUpperCase().includes('NGUYÊN LIỆU') || String(s.category).toUpperCase().includes('VẬT TƯ');
-                                    if (importSubTab === 'HangHoa') return String(s.category).toUpperCase().includes('HÀNG HOÁ') || !s.category;
+                                {allSuppliers.filter(s => {
+                                    if (s.id === supplierId) return true;
+                                    const cat = String(s.category || '').toUpperCase();
+                                    if (importSubTab === 'NguyenLieu') {
+                                        return cat.includes('NGUYÊN LIỆU') || cat.includes('VẬT TƯ') || cat.includes('KEO') || cat.includes('KÍNH') || cat.includes('CÁT') || cat.includes('ĐÁ') || cat.includes('LŨA') || cat.includes('XỐP') || cat.includes('BAO BÌ') || cat.includes('PE') || cat === '' || !s.category;
+                                    }
+                                    if (importSubTab === 'HangHoa') {
+                                        return !cat.includes('NGUYÊN LIỆU') && !cat.includes('VẬT TƯ');
+                                    }
                                     return true;
                                 }).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
                             </select>

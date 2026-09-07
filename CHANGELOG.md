@@ -2,6 +2,84 @@
 
 Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến trúc, tối ưu nghiệp vụ và sửa lỗi của hệ điều hành `RF_Workspace_Pro`.
 
+## [v2.45.11] - 2026-09-07
+
+### 📦 Khắc Phục Triệt Để Lỗi Lưu Phiếu Kho (totalDebtAdd) & Đồng Bộ Tức Thì Nhà Cung Cấp Mới
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **1. Sự cố lưu phiếu nhập/xuất kho báo lỗi `totalDebtAdd is not defined`**:
+    - *Triệu chứng*: Khi kế toán hoặc quản lý kho tạo phiếu nhập hàng (ví dụ nhập Màng Pe từ NCC) và bấm nút `[ 💾 LƯU PHIẾU NHẬP ]`, hệ thống chặn lại và hiển thị thông báo alert: `Lỗi lưu phiếu: totalDebtAdd is not defined`.
+    - *Tầng 1 (Thao tác & Vận hành)*: Quá trình lưu phiếu bị đình trệ hoàn toàn, phiếu nhập không thể ghi sổ vào bảng `ImportExport`, hàng hóa không tăng tồn kho trong `Products`.
+    - *Tầng 2 (Quy trình phần mềm)*: Khi phiếu lưu thành công, hệ thống gọi callback `onSaveSuccess` để tạo bản ghi thông tin đối soát kèm các chỉ số công nợ (`debtAmount: totalDebtAdd`) và ghi chú (`note: finalNote`).
+    - *Tầng 3 (Dữ liệu & Mã nguồn)*: Trong `Tab_ImportExport.html`, biến `totalDebtAdd` và `finalNote` được khai báo bằng từ khóa `let` bên trong khối `else` (`} else { logId = ...; let totalDebtAdd = 0; ... }`). Do phạm vi khối lệnh (Block Scope) của ES6, khi khối `else` kết thúc, các biến này bị hủy khỏi bộ nhớ. Đến khi callback `onSaveSuccess` ở tầng ngoài gọi `debtAmount: totalDebtAdd`, JavaScript lập tức ném lỗi `ReferenceError: totalDebtAdd is not defined`.
+  - **2. Sự cố tạo Nhà Cung Cấp mới nhưng không thấy trong danh sách chọn (NCC biến mất)**:
+    - *Triệu chứng*: Tại màn hình tạo phiếu nhập, người dùng bấm `+ Thêm NCC` để tạo nhanh đối tác mới (ví dụ NCC cung cấp Màng Pe, Keo, Kính...), bấm lưu thành công nhưng dropdown Nhà Cung Cấp vẫn hiển thị `-- Hàng trôi nổi / Khác --` và mở dropdown ra không thấy NCC vừa tạo đâu.
+    - *Nguyên nhân gốc rễ*:
+      1. Khởi tạo sai Category: State `newSup` luôn mặc định khởi tạo là `category: 'HÀNG HOÁ'`. Khi người dùng đang đứng ở tab "NGUYÊN LIỆU & VẬT TƯ" và bấm thêm NCC, NCC mới bị lưu mặc định là HÀNG HOÁ.
+      2. Bộ lọc dropdown quá khắt khe: Bộ lọc dropdown khi ở tab `NguyenLieu` chỉ chấp nhận NCC có chứa chuỗi `"NGUYÊN LIỆU"` hoặc `"VẬT TƯ"`. NCC mới tạo bị gán category HÀNG HOÁ hoặc người dùng nhập ngành hàng cụ thể (Keo, Kính, PE, Bao bì...) ngay lập tức bị bộ lọc loại bỏ khỏi dropdown.
+      3. Thiếu Local Optimistic State: Khi đẩy NCC mới qua `pushData`, component con `IEFormModal` phụ thuộc hoàn toàn vào prop `data.Suppliers` từ component cha. Do độ trễ đồng bộ mạng, prop chưa re-render kịp, khiến `supplierId` được gán vào một id chưa tồn tại trong danh sách option của `<select>`, trình duyệt tự động fallback về option đầu tiên rỗng.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật**:
+  1. **Khắc Phục Dứt Điểm Phạm Vi Biến Trong Hàm `save()`**:
+     - Đưa toàn bộ các biến `totalDebtAdd` và `finalNote` ra khai báo tường minh tại phạm vi toàn cục của hàm `save()` trong `Tab_ImportExport.html`.
+     - Đảm bảo 100% các nhánh thực thi (Nhập kho, Xuất kho, Kiểm kho) đều truy cập biến an toàn, callback `onSaveSuccess` nhận đầy đủ số liệu công nợ và ghi chú không bao giờ gặp lỗi ReferenceError.
+  2. **Tích Hợp Local Optimistic State & Chuẩn Hóa Nhóm Ngành Hàng**:
+     - Bổ sung state `localSuppliers` bên trong `IEFormModal`: Khi người dùng bấm "LƯU NCC", dữ liệu đối tác lập tức được merge vào danh sách `allSuppliers` tức thì (0ms độ trễ), không cần chờ đợi mạng.
+     - Tự động gán ngành hàng mặc định theo tab: Đang đứng ở tab `NguyenLieu` thì NCC mới tự động mang category `NGUYÊN LIỆU & VẬT TƯ`.
+     - Mở rộng bộ lọc dropdown: Hỗ trợ tìm và chọn đa dạng ngành hàng thực tế tại xưởng (Kính, Keo, Cát, Đá, Lũa, Xốp, Bao bì, PE...).
+     - Quy tắc bảo toàn NCC: Nếu `s.id === supplierId` (NCC vừa tạo hoặc đang được chọn), dropdown LUÔN LUÔN giữ lại hiển thị, xóa bỏ triệt để hiện tượng NCC biến mất.
+  3. **Đồng Bộ Hoàn Toàn 100% Cả Hai Bản Build**:
+     - Đã cập nhật chính xác trên cả `Tab_ImportExport.html` và `Compiled_Deferred.html`.
+
+---
+
+## [v2.45.10] - 2026-09-07
+
+### 🧊 Tự Động Hóa 100% BOM Bể Kính, Miễn Trừ Phiếu Vật Tư Thủ Công & Triệt Tiêu Lỗi Chồng Đè Modal (Portal Escape)
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **1. Sự cố lệnh sản xuất Bể Kính bị chặn bởi "Phiếu Nhận Nguyên Liệu & Vật Tư"**:
+    - *Triệu chứng*: Khi thợ bể kính (Dương) hoặc quản lý bấm `[ ▶ NHẬN LÀM ]` cho sản phẩm bể kính (ví dụ: `Bể 25x12x14cm`), hệ thống bật lên popup bắt buộc `PHIẾU NHẬN NGUYÊN LIỆU & VẬT TƯ (BỂ LẺ SIZE)` yêu cầu chọn kính và gõ số lượng m² thủ công. Khi làm xong chụp ảnh nghiệm thu, hệ thống lại bật tiếp popup `QUYẾT TOÁN TIÊU HAO VẬT TƯ`.
+    - *Tầng 1 (Thao tác & Vận hành)*: Thợ bị gián đoạn công việc, phải thao tác thủ công nhiều bước không cần thiết, làm nghẽn dòng chảy One-Piece Flow và tăng thời gian chết (Muda).
+    - *Tầng 2 (Quy trình nghiệp vụ Lean)*: Tại Rich Fish Aquarium, Bể Kính là nhóm hàng đã được toán học hóa công thức 100% (diện tích kính đáy, diện tích kính thành mài vi tính MVT và chiều dài keo silicon). Khi lệnh sản xuất hoàn thành, hệ thống tự động khấu trừ kho theo `BOM_Config` và log sang `ImportExport`. Việc bắt thợ kê khai từng miếng kính trên app là thừa thãi và trái với nguyên lý tự động hóa BOM.
+    - *Tầng 3 (Dữ liệu & Mã nguồn)*: Trong `Tab_Production.html` dòng 1740, biểu thức regex `(isGlassProduct && /(\d+)\s*[xX*×]\s*(\d+)/.test(nameLower))` được dùng để nhận diện `isGlassLeSize`. Do toàn bộ tên bể kính đều có kích thước dạng Dài x Rộng x Cao (ví dụ: `25x12x14cm`), regex này match 100% các bể kính, khiến toàn bộ bể kính bị đánh đồng thành hàng tùy chỉnh `isCustomItem = true`.
+  - **2. Lỗi giao diện Modal bị chồng đè (UI Stacking Context / Portal Trap)**:
+    - *Triệu chứng*: Khi mở `MaterialRequisitionModal`, trên nền modal xuất hiện hàng loạt nút toolbar (`fa-bolt`, `fa-layer-group`, `fa-camera`, `fa-trash-alt`, `chevron`) và ảnh thumbnail sản phẩm kèm số thứ tự tròn `{idx_num}` của các Card sản xuất khác (Card 6, Card 7, Card 8) đè xuyên thấu lên trên modal.
+    - *Nguyên nhân gốc rễ*: `MaterialRequisitionModal` và `MaterialSettlementModal` được render bên trong component `WorkerPhaseV2` (bên trong thẻ Card sản xuất). Thẻ Card cha có các thuộc tính CSS tạo Local Stacking Context (`transform`, `backdrop-filter`). Do đó, thuộc tính `position: fixed` của modal bị giới hạn trong Card cha mà không thoát ra được `body`. Các Card sản xuất phía sau có `z-index: 10`, `z-index: 30` được render sau nên vẽ đè xuyên thấu lên trên modal.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật**:
+  1. **Giải Phóng Hoàn Toàn Bể Kính Khỏi `isCustomItem`**:
+     - Thiết lập quy tắc tường minh: `if (isGlassProduct) return false;` trong Hook `isCustomItem`.
+     - Bể kính thuộc mọi kích thước (tiêu chuẩn hay lẻ size) đều vận hành tự động 100% qua BOM và `ensureGlassTankBOM`.
+     - Thợ dán bể bấm `[ ▶ NHẬN LÀM ]` là bắt đầu làm việc ngay, chụp ảnh là nghiệm thu ngay, không bị cản trở bởi bất kỳ popup nào.
+     - Phiếu nhận vật tư chỉ kích hoạt duy nhất cho Layout dạng `COVER` (hàng khách đặt làm theo ảnh không có BOM cố định).
+  2. **Thoát Khỏi Bẫy Stacking Context Với `ReactDOM.createPortal`**:
+     - Bọc toàn bộ JSX trả về của `MaterialRequisitionModal` và `MaterialSettlementModal` trong `ReactDOM.createPortal(..., document.body)`.
+     - Nâng cấp `z-index` lên chuẩn tối cao `z-[999999] backdrop-blur-md bg-black/85 select-none`.
+     - Modal mount trực tiếp ra thẻ `<body>`, phủ kín toàn bộ viewport và triệt tiêu 100% hiện tượng các thành phần của card khác đè xuyên thấu lên trên.
+  3. **Đồng Bộ Tuyệt Đối Trên Cả 2 Bản Build**:
+     - Đồng bộ chính xác đồng thời tại `Tab_Production.html` và `Compiled_Deferred.html`.
+
+---
+
+## [v2.45.9] - 2026-09-07
+
+### ⚡ Khắc Phục Triệt Để Minified React Error #310 (Hook Order Invariance Trong WorkerPhaseV2)
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **1. Triệu chứng Sập Giao diện Xưởng Sản Xuất (Minified React Error #310)**:
+    - *Triệu chứng*: Khi thợ hoặc quản lý mở tab Sản Xuất hoặc khi Firebase Realtime đẩy bản ghi đồng bộ mới từ thợ xưởng (Nguyễn Thị Diệu Hương, Lại Trường Tâm, Trần Duy Tân, Nguyễn Hoàng Dương), toàn bộ ứng dụng bị crash văng ra ngoài kèm lỗi console: `Error: Minified React error #310; visit https://reactjs.org/docs/error-decoder.html?invariant=310 at sa (react-dom.production.min.js:106:484) at Object.Yh [as useMemo] (react-dom.production.min.js:114:148) at WorkerPhaseV2`.
+    - *Tầng 1 (Thao tác & Vận hành)*: React Error #310 xuất hiện khi: *"Rendered more hooks than during the previous render"* (Thành phần render số lượng Hook ở lần render này nhiều hơn lần render trước).
+    - *Tầng 2 (Quy trình mã nguồn & Cấu trúc Hook)*: Trong bản phát hành `v2.45.8`, hook `availableWorkers = React.useMemo(...)` được đưa vào `WorkerPhaseV2` để khử trùng danh sách thợ. Tuy nhiên, hook này được đặt tại dòng 2562 (sát return JSX), nằm SAU câu lệnh rẽ nhánh sớm `if (isLocked) return null;` tại dòng 1860.
+    - *Tầng 3 (Dòng chảy dữ liệu & Cắt cúp chu kỳ Hook)*: Khi sản phẩm có Khâu 2 đang bị khoá (`isLocked = true`, chờ Khâu 1 hoàn tất), component `WorkerPhaseV2` gặp `if (isLocked) return null;` và trả về ngay sau Hook thứ 16 (`completedDurationText`), hoàn toàn bỏ qua Hook thứ 17 (`availableWorkers`). Đến khi Khâu 1 xong, Firebase sync kích hoạt trạng thái mở khoá (`isLocked = false`), `WorkerPhaseV2` re-render và chạy tiếp xuống dòng 2562 gọi Hook thứ 17 `availableWorkers` ➔ React phát hiện số lượng Hook bị thay đổi giữa các lần render và lập tức ném lỗi ngoại lệ bất biến #310.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật**:
+  1. **Đưa Toàn Bộ 17 Hook Lên Tầng Đầu Tiên (Top-Level Hook Invariance) Trong `WorkerPhaseV2`**:
+     - Di chuyển hook `availableWorkers = React.useMemo(...)` từ cuối component lên ngay sau `completedDurationText` (trước câu lệnh `if (isLocked) return null;`).
+     - Đảm bảo 100% tất cả 17 Hooks (`useState`, `useMemo`, `useEffect`) được thực thi với thứ tự và số lượng bất biến tuyệt đối trên mọi chu kỳ render, bất kể `isLocked` là `true` hay `false`.
+  2. **Chuẩn Hóa Phòng Vệ Cho Các Modal Phụ Thuộc Dữ Liệu**:
+     - Trong `MaterialRequisitionModal`: Di chuyển câu lệnh `if (!isOpen || !item) return null;` xuống sau các hook `useMemo`, `useState` và dùng optional chaining `item?.type`, bảo đảm không bao giờ vi phạm Hook Order nếu modal được mount ngầm.
+     - Trong `MaterialSettlementModal`: Di chuyển câu lệnh `if (!isOpen || !item) return null;` xuống sau `useMemo`, `useState`, `useEffect`.
+  3. **Biên Dịch Sạch & Khôi Phục Dòng Chảy Realtime**:
+     - Pre-compile lại toàn bộ bundle qua `tools/precompile_jsx.js` (`Compiled_Core.html` và `Compiled_Deferred.html`).
+     - Xác thực 100% hash toàn vẹn với `tools/verify_build.js` và vượt qua toàn bộ 363 unit tests trong `run_tests.js`.
+
+---
+
 ## [v2.45.8] - 2026-09-07
 
 ### 🛠️ Khắc Phục Triệt Để Thợ Ảo "Kho Hàng" / "Hàng" Khâu 2 Sản Xuất & Khôi Phục Danh Sách Nhân Sự Đầy Đủ

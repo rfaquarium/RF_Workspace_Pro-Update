@@ -4,6 +4,19 @@ Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến tr
 
 ---
 
+## [v2.45.8] - 2026-09-07
+
+### 🛠️ Khắc Phục Triệt Để Thợ Ảo "Kho Hàng" / "Hàng" Khâu 2 Sản Xuất & Khôi Phục Danh Sách Nhân Sự Đầy Đủ
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - Khâu 2 hiển thị người làm là "Hàng", khóa thẻ `KHOÁ: HÀNG` khiến thợ không thể nhận làm. Dropdown chọn nhân sự trống rỗng do thiếu trường `pins` trong `getUserConfig()`.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật**:
+  1. Khôi phục trường `pins: {}` trong `getUserConfig()` nạp đầy đủ mã PIN và nhân sự từ `Config_NhanSu`.
+  2. Triệt tiêu chuỗi thợ ảo `"Kho Hàng"` / `"Hàng"` trong backend (`formatProd`, `syncDeltas`) và frontend (`Modals_Orders.html`).
+  3. Xây dựng danh sách `availableWorkers` đa nguồn kết hợp de-duplication, khôi phục đầy đủ nhân sự trong dropdowns.
+  4. Bãi bỏ cơ chế tự động chỉ định ngẫu nhiên Khâu 2 khi Khâu 1 hoàn tất, giải phóng nút `[ ▶ NHẬN LÀM ]` chuẩn Lean Pull Flow.
+
+---
+
 ## [v2.45.7] - 2026-09-07
 
 ### 🔄 Tự Động Đưa Đơn Hoàn Tháng Cũ (T8) Về Mục Hoàn Tháng Này (T9) Cho Diệu Hương Đi Kiểm

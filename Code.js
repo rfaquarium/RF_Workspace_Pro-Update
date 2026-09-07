@@ -2617,8 +2617,10 @@ function formatProd(p) {
   
   var p1St = ph1.status || p.p1_status || (isFulfilledStock ? 'Done' : 'Pending');
   var p2St = ph2.status || p.p2_status || (isFulfilledStock ? 'Done' : 'Pending');
-  var p1U = ph1.user || p.p1_user || (isFulfilledStock ? 'Kho Hàng' : '');
-  var p2U = ph2.user || p.p2_user || (isFulfilledStock ? 'Kho Hàng' : '');
+  var p1U = ph1.user || p.p1_user || '';
+  if (p1U === 'Kho Hàng' || p1U === 'Hàng') p1U = '';
+  var p2U = ph2.user || p.p2_user || '';
+  if (p2U === 'Kho Hàng' || p2U === 'Hàng') p2U = '';
   var qcSt = p.qc_status || (isFulfilledStock ? 'Đã Duyệt' : '');
 
   return { 
@@ -3246,8 +3248,8 @@ function syncDeltas(payload, pin) {
                     pItem.qc_status = 'Đã Duyệt';
                     pItem.note = 'Lấy từ tồn kho có sẵn';
                     pItem.phases = {
-                      phase1: { name: (pItem.type === 'Layout' ? 'Dựng Khung' : 'Cắt Dán'), status: 'Done', user: 'Kho Hàng' },
-                      phase2: { name: (pItem.type === 'Layout' ? 'Gia Cố' : 'Gọt Keo'), status: 'Done', user: 'Kho Hàng' }
+                      phase1: { name: (pItem.type === 'Layout' ? 'Dựng Khung' : 'Cắt Dán'), status: 'Done', user: '' },
+                      phase2: { name: (pItem.type === 'Layout' ? 'Gia Cố' : 'Gọt Keo'), status: 'Done', user: '' }
                     };
 
                     if (payload.orders) {
@@ -3805,7 +3807,7 @@ function getUserConfig() {
     if (!sheet) { console.error('Sheet Config_NhanSu not found'); return getEmptyConfig("Lỗi: Không tìm thấy sheet Config_NhanSu"); }
 
     var data = sheet.getDataRange().getValues();
-    var config = { avatars: {}, titles: {}, subTitles: {}, salaries: {}, users: [], roles: {} };
+    var config = { avatars: {}, titles: {}, subTitles: {}, salaries: {}, users: [], roles: {}, pins: {} };
 
     if (data.length === 0) return getEmptyConfig("Lỗi: Sheet Config_NhanSu không có dữ liệu (data.length === 0)");
     var headers = data[0];
@@ -3822,6 +3824,7 @@ function getUserConfig() {
     var titleCol = getCol(['Chức Danh'], 2);
     var subTitleCol = getCol(['Chức Danh Phụ'], -1);
     var roleCol = getCol(['Phân Quyền'], 3);
+    var pinCol = getCol(['Mã PIN', 'PIN', 'Mã Pin'], 4);
     var baseSalCol = getCol(['Lương Cơ Bản'], -1);
     var funcSalCol = getCol(['Lương Chức Vụ'], -1);
     var allowCol = getCol(['Phụ Cấp Xăng Xe'], -1);
@@ -3856,6 +3859,21 @@ function getUserConfig() {
         allowance: parseNumber(row[allowCol]),
         deduction: parseNumber(row[deductCol])
       };
+
+      var pin = (pinCol !== -1) ? String(row[pinCol] || '').trim() : '';
+      if (pin) pin = pin.replace(/\.0+$/, '');
+      var pinKey = pin || ('user_' + i);
+      var pinObj = {
+        name: name,
+        role: role,
+        title: title,
+        subTitle: (subTitleCol !== -1 && row[subTitleCol]) ? String(row[subTitleCol] || '').trim() : '',
+        avatar: config.avatars[name] || ''
+      };
+      config.pins[pinKey] = pinObj;
+      if (pin && /^\d+$/.test(pin) && pin.length < 6 && !config.pins[pin.padStart(6, '0')]) {
+        config.pins[pin.padStart(6, '0')] = pinObj;
+      }
     }
 
     try {

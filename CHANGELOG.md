@@ -2,6 +2,34 @@
 
 Tài liệu lưu trữ toàn bộ lịch sử phát hành, nâng cấp kiến trúc, tối ưu nghiệp vụ và sửa lỗi của hệ điều hành `RF_Workspace_Pro`.
 
+## [v2.45.8] - 2026-09-07
+
+### 🛠️ Khắc Phục Triệt Để Thợ Ảo "Kho Hàng" / "Hàng" Khâu 2 Sản Xuất & Khôi Phục Danh Sách Nhân Sự Đầy Đủ
+- **Bối cảnh & Phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA)**:
+  - **1. Triệu chứng "Hàng là thằng nào?" & Khóa nút Nhận làm Khâu 2**:
+    - *Triệu chứng*: Trên thẻ sản xuất ở xưởng (ví dụ Layout / Bể Kính), Khâu 2 (Gia Cố / Gọt Keo) bị hiển thị người nhận việc là `"Hàng"`, trạng thái thẻ bị khoá thành `KHOÁ: HÀNG`, thợ thật tại xưởng không thể bấm nút `[ ▶ NHẬN LÀM ]`.
+    - *Tầng 1 (Thao tác & Hiển thị)*: Trong `Tab_Production.html` line 2566, logic rút gọn tên hiển thị dùng `data.user.split(' ').pop()`. Khi `data.user` mang giá trị `"Kho Hàng"`, hàm cắt chuỗi lấy từ cuối cùng là chữ `"Hàng"`. Line 2675 kiểm tra `data.user` không rỗng và không khớp tên thợ đang đăng nhập nên hiển thị nút đỏ `KHOÁ: HÀNG`, khóa cứng thẻ việc.
+    - *Tầng 2 (Quy trình sản xuất Lean)*: Trong `Tab_Production.html` lines 2402-2417 (`submitQC`) và lines 2501-2516 (`adminAutoPass`), khi Khâu 1 hoàn tất, hệ thống tự động quét danh sách chấm công `attendance` và cưỡng chế gán Khâu 2 sang trạng thái `'In Progress'` với người đầu tiên trong danh sách. Cơ chế "Push" bừa bãi này phá vỡ nguyên lý kéo việc tự giác (Lean One-Piece Flow) và khiến thợ không chủ động nhận việc được.
+    - *Tầng 3 (Dữ liệu backend & Đơn hàng)*: Trong `Code.js` (`formatProd` lines 2620-2621, `syncDeltas` lines 3249-3250) và `Modals_Orders.html` lines 1409-1411, các sản phẩm lấy từ kho sẵn (`fulfilledFromStock = true`) được backend điền mặc định `user: 'Kho Hàng'`. Khi lệnh cần sản xuất bổ sung hoặc thợ làm thực tế, Khâu 2 vẫn bị vướng chuỗi thợ ảo `"Kho Hàng"`.
+  - **2. Triệu chứng không hiển thị danh sách nhân sự trong dropdown**:
+    - *Triệu chứng*: Khi Admin bấm icon cây bút sửa người nhận việc hoặc mở Modal gán việc hàng loạt, dropdown danh sách nhân viên hoàn toàn trống rỗng, chỉ hiện `-- Bỏ nhận việc --` hoặc `-- KHÔNG GIAO ĐÍCH DANH --`.
+    - *Nguyên nhân gốc rễ*: Trong `Tab_Production.html` (lines 2632 và 5940), dropdown chỉ render danh sách từ `userConfigs?.pins`. Tuy nhiên, trong `Code.js` hàm `getUserConfig()`, đối tượng trả về được khởi tạo là `{ avatars: {}, titles: {}, subTitles: {}, salaries: {}, users: [], roles: {} }` và KHÔNG HỀ có trường `pins`. Do đó, `userConfigs.pins` luôn là `undefined`, `Object.values(undefined || {})` ra mảng rỗng `[]`.
+- **Nâng Cấp Kiến Trúc & Giải Pháp Kỹ Thuật**:
+  1. **Khôi Phục Trường `pins` & Chuẩn Hóa `getUserConfig()` Trong `Code.js`**:
+     - Bổ sung `pins: {}` vào cấu trúc trả về của `getUserConfig()`. Đọc chính xác cột `Mã PIN` từ bảng `Config_NhanSu`, nạp đầy đủ thông tin từng nhân viên (`name`, `role`, `title`, `subTitle`, `avatar`) được đánh chỉ mục theo mã PIN sạch và đệm 6 số.
+  2. **Triệt Tiêu Hoàn Toàn Thợ Ảo `"Kho Hàng"` / `"Hàng"` Trong Backend & Frontend**:
+     - Trong `Code.js` (`formatProd`): Xóa bỏ việc gán `'Kho Hàng'` mặc định cho `p1U` và `p2U`, tự động dọn sạch mọi giá trị `'Kho Hàng'` hoặc `'Hàng'` thành chuỗi rỗng `''`.
+     - Trong `Code.js` (`syncDeltas`): Gán `user: ''` cho các khâu của hàng kho có sẵn.
+     - Trong `Modals_Orders.html`: Chuyển `user: 'Kho Hàng'` trong `stockPhases` sang `user: ''`.
+  3. **Khôi Phục Danh Sách Nhân Sự Đa Nguồn & Khử Trùng Trong `Tab_Production.html`**:
+     - Tạo danh sách `availableWorkers` thông minh kết hợp từ cả 3 nguồn: `userConfigs.users`, `userConfigs.pins`, và `attendance`.
+     - Lọc bỏ hoàn toàn các chuỗi thợ ảo `"Kho Hàng"`, `"Hàng"`, và vai trò `"Khách"`, khử trùng (de-duplicate) tên nhân viên để hiển thị 100% thợ xưởng thực tế trong menu sửa thợ và gán việc hàng loạt.
+  4. **Giải Phóng Nút [▶ NHẬN LÀM] & Thiết Lập Dòng Chảy Lean Pull Flow**:
+     - Trong `WorkerPhaseV2`: Nhận diện thợ ảo `isFakeUser = !rawUser || rawUser === 'Kho Hàng' || rawUser === 'Hàng'`. Nếu là thợ ảo, hiển thị nhãn chuẩn `Chờ nhận việc`, gán quyền sở hữu `isOwner = true` và giải phóng nút xanh `[ ▶ NHẬN LÀM ]` cho thợ bấm nhận việc.
+     - Bãi bỏ cơ chế tự động gán cưỡng chế Khâu 2 trong `submitQC` và `adminAutoPass`. Khi Khâu 1 xong, Khâu 2 giữ nguyên trạng thái `Pending` và xóa sạch thợ ảo cũ, sẵn sàng để thợ chuyên môn chủ động nhận việc theo nhịp độ Takt Time.
+
+---
+
 ## [v2.45.7] - 2026-09-07
 
 ### 🔄 Tự Động Đưa Đơn Hoàn Tháng Cũ (T8) Về Mục Hoàn Tháng Này (T9) Cho Diệu Hương Đi Kiểm

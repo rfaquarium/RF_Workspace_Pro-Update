@@ -781,9 +781,45 @@
 
         const RELEASES = [
             {
-                version: 'Royal v2.45.7',
+                version: 'Royal v2.45.8',
                 date: '07/09/2026',
                 isLatest: true,
+                badge: 'LEAN PRODUCTION PULL & WORKER RESTORATION',
+                badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                title: 'Khắc Phục Triệt Để Thợ Ảo "Kho Hàng" / "Hàng" Khâu 2 & Khôi Phục Danh Sách Nhân Sự Đầy Đủ',
+                summary: 'Khắc phục triệt để lỗi vận hành xưởng sản xuất: (1) Triệt tiêu hoàn toàn nhãn thợ ảo "Kho Hàng" (bị cắt cụt thành chữ "Hàng") và giải phóng nút [▶ NHẬN LÀM] ở Khâu 2 (Gia Cố / Gọt Keo) cho thợ nhận việc; (2) Chấm dứt cơ chế tự động chỉ định ngẫu nhiên Khâu 2 vào trạng thái In Progress khi Khâu 1 hoàn tất, chuyển về Lean Pull Flow để thợ phụ trách nhận việc đúng nhịp; (3) Khôi phục danh sách nhân sự đầy đủ trong dropdown chọn thợ và gán việc hàng loạt thông qua từ điển pins và danh sách users từ Config_NhanSu; (4) Khử sạch các giá trị thợ ảo "Kho Hàng" trong formatProd và syncDeltas.',
+                categories: ['Sản Xuất', 'Khâu 2', 'Kho Hàng', 'Lean Pull', 'Nhân Sự', 'Poka-Yoke'],
+                items: [
+                    {
+                        icon: 'fa-user-slash',
+                        color: 'text-rose-400',
+                        title: 'Triệt Tiêu Thợ Ảo "Kho Hàng" / "Hàng" & Mở Khoá Khâu 2',
+                        desc: 'Lọc bỏ hoàn toàn chuỗi thợ ảo "Kho Hàng" và "Hàng", chuyển trạng thái hiển thị về [Chờ nhận việc] và mở khóa nút [▶ NHẬN LÀM] cho thợ bấm bắt đầu.'
+                    },
+                    {
+                        icon: 'fa-users',
+                        color: 'text-emerald-400',
+                        title: 'Khôi Phục Danh Sách Nhân Sự Đầy Đủ (Config_NhanSu)',
+                        desc: 'Bổ sung trường pins trong getUserConfig() và cơ chế tra cứu đa nguồn kết hợp de-duplication, hiển thị 100% thợ xưởng thực tế trong menu chọn người làm.'
+                    },
+                    {
+                        icon: 'fa-arrows-split-up-and-left',
+                        color: 'text-amber-400',
+                        title: 'Chuyển Đổi Sang Dòng Chảy Kéo (Lean Pull Flow)',
+                        desc: 'Khâu 1 hoàn tất giữ Khâu 2 ở trạng thái Pending sẵn sàng, không tự động gán cưỡng chế người khác để thợ chủ động kéo việc theo năng lực chuyên môn.'
+                    },
+                    {
+                        icon: 'fa-shield-check',
+                        color: 'text-cyan-400',
+                        title: 'Đồng Bộ Chuẩn Hoá Backend (formatProd & syncDeltas)',
+                        desc: 'Backend Code.js tự động làm sạch trường user của các khâu đối với hàng tồn kho có sẵn, bảo đảm toàn vẹn dữ liệu xuyên suốt 23 bảng schema.'
+                    }
+                ]
+            },
+            {
+                version: 'Royal v2.45.7',
+                date: '07/09/2026',
+                isLatest: false,
                 badge: 'SMART RETURN SCANNER & ZERO-DROPPED AUDIT',
                 badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
                 title: 'Tự Động Đưa Đơn Hoàn Tháng Cũ (T8) Về Mục Hoàn Tháng Này (T9) Cho Diệu Hương Đi Kiểm',
@@ -6808,7 +6844,7 @@
                                     <div className="w-5 flex justify-center text-[#d4af37] text-[13px]"><i className="fas fa-rocket"></i></div>
                                     <span>Bản Cập Nhật</span>
                                 </div>
-                                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 font-black px-1.5 py-0.5 rounded border border-emerald-500/30">v2.45.7</span>
+                                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 font-black px-1.5 py-0.5 rounded border border-emerald-500/30">v2.45.8</span>
                             </button>
                         </div>
                     </div>

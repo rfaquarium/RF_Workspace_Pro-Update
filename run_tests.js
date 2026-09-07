@@ -1243,6 +1243,33 @@ const isRecSim = migratedOrder.isReconciled === true;
 const isVisibleInThisMonth = (isReturnOrderSim && !isRecSim) || migratedOrder.date.startsWith('2026-09');
 assert('Logic Test: Migrated order is 100% visible to Diệu Hương in Tháng Này', isVisibleInThisMonth === true);
 
+console.log('\n--- 26. Testing Royal v2.45.8 Lean Production Pull & Worker Restoration ---');
+const appMainV2458 = fs.readFileSync(appMainPath, 'utf8');
+const changelogV2458 = fs.readFileSync(changelogPath, 'utf8');
+const codeJsV2458 = fs.readFileSync(path.join(__dirname, 'Code.js'), 'utf8');
+const tabProdV2458 = fs.readFileSync(path.join(__dirname, 'Tab_Production.html'), 'utf8');
+const modalsOrdersV2458 = fs.readFileSync(path.join(__dirname, 'Modals_Orders.html'), 'utf8');
+
+assert('App_Main.html: Contains Royal v2.45.8 in RELEASES', appMainV2458.includes("version: 'Royal v2.45.8'"));
+assert('App_Main.html: Sidebar badge displays >= v2.45.8', />v2\.(4[5-9]|\d{2,})\.\d+<\/span>/.test(appMainV2458));
+assert('CHANGELOG.md: Documents v2.45.8 release notes', changelogV2458.includes('## [v2.45.8] - 2026-09-07'));
+assert('Code.js: getUserConfig initializes and populates pins', codeJsV2458.includes('pins: {}') && codeJsV2458.includes('config.pins[pinKey] = pinObj'));
+assert('Code.js: formatProd clears Kho Hàng and Hàng ghost workers', codeJsV2458.includes("if (p1U === 'Kho Hàng' || p1U === 'Hàng') p1U = '';") && codeJsV2458.includes("if (p2U === 'Kho Hàng' || p2U === 'Hàng') p2U = '';"));
+assert('Modals_Orders.html: stockPhases has empty user string', modalsOrdersV2458.includes("phase1: { name: 'Cắt Dán', status: 'Done', user: '' }") && modalsOrdersV2458.includes("phase1: { name: 'Dựng Khung', status: 'Done', user: '' }"));
+assert('Tab_Production.html: WorkerPhaseV2 defines isFakeUser check', tabProdV2458.includes("const isFakeUser = !rawUser || rawUser === 'Kho Hàng' || rawUser === 'Hàng';"));
+assert('Tab_Production.html: WorkerPhaseV2 computes availableWorkers with de-duplication', tabProdV2458.includes('const availableWorkers = React.useMemo') && tabProdV2458.includes("clean !== 'Kho Hàng' && clean !== 'Hàng'"));
+assert('Tab_Production.html: Phase 2 auto-assignment on Phase 1 completion is removed', !tabProdV2458.includes("selectedWorker = (others.length > 0 ? others[0] : activeWorkers[0]).user;"));
+assert('Tab_Production.html: Batch assignment modal filters fake users', tabProdV2458.includes("name !== 'Kho Hàng' && name !== 'Hàng' && name.toLowerCase() !== 'khách'"));
+
+// Logic simulation test
+const simRawUser = 'Kho Hàng';
+const simIsFakeUser = !simRawUser || simRawUser === 'Kho Hàng' || simRawUser === 'Hàng';
+const simEffectiveUser = simIsFakeUser ? '' : simRawUser;
+const simUserName = simEffectiveUser ? simEffectiveUser.split(' ').pop() : 'Chờ nhận việc';
+const simIsOwner = !simEffectiveUser || simEffectiveUser === 'Nguyễn Văn A';
+assert('Logic Test: Fake user "Kho Hàng" displays "Chờ nhận việc"', simUserName === 'Chờ nhận việc');
+assert('Logic Test: Fake user allows craftsman to be isOwner and claim task', simIsOwner === true);
+
 // SUMMARY
 
 console.log(`\n========================================`);

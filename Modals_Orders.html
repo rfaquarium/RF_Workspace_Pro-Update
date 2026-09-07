@@ -1407,8 +1407,8 @@
                                         chanUpper.includes('XUẤT KHẨU') || chanUpper.includes('EXPORT') || chanUpper.includes('QUỐC TẾ');
 
                                     const stockPhases = isGlass ?
-                                        { phase1: { name: 'Cắt Dán', status: 'Done', user: 'Kho Hàng' }, phase2: { name: 'Gọt Keo', status: 'Done', user: 'Kho Hàng' } } :
-                                        { phase1: { name: 'Dựng Khung', status: 'Done', user: 'Kho Hàng' }, phase2: { name: 'Gia Cố', status: 'Done', user: 'Kho Hàng' } };
+                                        { phase1: { name: 'Cắt Dán', status: 'Done', user: '' }, phase2: { name: 'Gọt Keo', status: 'Done', user: '' } } :
+                                        { phase1: { name: 'Dựng Khung', status: 'Done', user: '' }, phase2: { name: 'Gia Cố', status: 'Done', user: '' } };
 
                                     const orderCustomerNote = String(o.note || (o.existingRecord ? o.existingRecord.note : '') || '').trim();
 

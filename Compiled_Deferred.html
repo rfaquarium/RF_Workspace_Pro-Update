@@ -1662,7 +1662,10 @@ const WorkerPhaseV2 = React.memo(function WorkerPhaseV2({
     }).join(' | ').trim();
   };
   let isLocked = c.req.some(rk => ((item.phases || {})[rk] || {}).status !== 'Done') || item.qc_status === 'Yêu cầu làm lại' || item.qc_status === 'Need_Repair';
-  const isOwner = !data.user || String(data.user).trim() === '' || isStaffMatch(data.user, currentUser);
+  const rawUser = String(data.user || '').trim();
+  const isFakeUser = !rawUser || rawUser === 'Kho Hàng' || rawUser === 'Hàng';
+  const effectiveUser = isFakeUser ? '' : rawUser;
+  const isOwner = !effectiveUser || isStaffMatch(effectiveUser, currentUser);
   const isPending = data.status !== 'In Progress' && data.status !== 'Done';
   const isInProgress = data.status === 'In Progress';
   const isDone = data.status === 'Done';
@@ -2244,20 +2247,14 @@ const WorkerPhaseV2 = React.memo(function WorkerPhaseV2({
       let payload = {
         prodItems: [upd]
       };
-      if (c.k === 'phase1' && upd.phases['phase2'] && upd.phases['phase2'].status === 'Pending') {
-        let selectedWorker = null;
-        if (attendance && attendance.length > 0) {
-          const todayStr = safeDateFull.slice(0, 10);
-          const activeWorkers = attendance.filter(a => a.timeIn && !a.timeOut && String(a.date).startsWith(todayStr));
-          if (activeWorkers.length > 0) {
-            const others = activeWorkers.filter(a => a.user !== currentUser);
-            selectedWorker = (others.length > 0 ? others[0] : activeWorkers[0]).user;
-          }
+      if (c.k === 'phase1' && upd.phases['phase2']) {
+        const p2RawUser = String(upd.phases['phase2'].user || '').trim();
+        if (p2RawUser === 'Kho Hàng' || p2RawUser === 'Hàng') {
+          upd.phases['phase2'].user = '';
         }
-        if (selectedWorker) {
-          upd.phases['phase2'].status = 'In Progress';
-          upd.phases['phase2'].user = selectedWorker;
-          upd.phases['phase2'].start = currentDateTime;
+        if (upd.phases['phase2'].status !== 'Done') {
+          upd.phases['phase2'].status = 'Pending';
+          upd.phases['phase2'].start = '';
         }
       }
       const p1 = upd.phases['phase1']?.status || 'Pending';
@@ -2332,22 +2329,14 @@ const WorkerPhaseV2 = React.memo(function WorkerPhaseV2({
       let payloadDeltas = {
         prodItems: [upd]
       };
-      if (c.k === 'phase1') {
-        if (upd.phases['phase2'] && upd.phases['phase2'].status === 'Pending') {
-          let selectedWorker = null;
-          if (attendance && attendance.length > 0) {
-            const todayStr = safeDateFull.slice(0, 10);
-            const activeWorkers = attendance.filter(a => a.timeIn && !a.timeOut && String(a.date).startsWith(todayStr));
-            if (activeWorkers.length > 0) {
-              const others = activeWorkers.filter(a => a.user !== currentUser);
-              selectedWorker = (others.length > 0 ? others[0] : activeWorkers[0]).user;
-            }
-          }
-          if (selectedWorker) {
-            upd.phases['phase2'].status = 'In Progress';
-            upd.phases['phase2'].user = selectedWorker;
-            upd.phases['phase2'].start = currentDateTime;
-          }
+      if (c.k === 'phase1' && upd.phases['phase2']) {
+        const p2RawUser = String(upd.phases['phase2'].user || '').trim();
+        if (p2RawUser === 'Kho Hàng' || p2RawUser === 'Hàng') {
+          upd.phases['phase2'].user = '';
+        }
+        if (upd.phases['phase2'].status !== 'Done') {
+          upd.phases['phase2'].status = 'Pending';
+          upd.phases['phase2'].start = '';
         }
       }
       const p1 = upd.phases['phase1']?.status || 'Pending';
@@ -2394,9 +2383,9 @@ const WorkerPhaseV2 = React.memo(function WorkerPhaseV2({
       setProcessing(false);
     }
   };
-  const userName = data.user ? data.user.split(' ').pop() : 'Chờ nhận việc';
-  const phaseAvatar = data.user ? /*#__PURE__*/React.createElement(Avatar, {
-    name: data.user,
+  const userName = effectiveUser ? effectiveUser.split(' ').pop() : 'Chờ nhận việc';
+  const phaseAvatar = effectiveUser ? /*#__PURE__*/React.createElement(Avatar, {
+    name: effectiveUser,
     userConfigs: userConfigs,
     className: "w-[32px] h-[32px] shrink-0 border border-[#333] shadow-sm rounded-full"
   }) : /*#__PURE__*/React.createElement("div", {
@@ -2404,6 +2393,19 @@ const WorkerPhaseV2 = React.memo(function WorkerPhaseV2({
   }, /*#__PURE__*/React.createElement("i", {
     className: "fas fa-user text-[14px]"
   }));
+  const availableWorkers = React.useMemo(() => {
+    const rawList = [...(Array.isArray(userConfigs?.users) ? userConfigs.users : []), ...Object.values(userConfigs?.pins || {}).map(u => u?.name).filter(Boolean), ...(Array.isArray(attendance) ? attendance.map(a => a?.user).filter(Boolean) : [])];
+    const seen = new Set();
+    const result = [];
+    rawList.forEach(uName => {
+      const clean = String(uName || '').trim();
+      if (clean && clean !== 'Kho Hàng' && clean !== 'Hàng' && clean.toLowerCase() !== 'khách' && !seen.has(clean)) {
+        seen.add(clean);
+        result.push(clean);
+      }
+    });
+    return result;
+  }, [userConfigs, attendance]);
   return /*#__PURE__*/React.createElement("div", {
     className: `w-full py-2.5 rounded-xl px-3 border transition-all flex flex-col gap-1.5 bg-transparent ${isDone ? 'border-emerald-500/30 shadow-sm' : isInProgress ? 'border-blue-500/40 shadow-sm' : 'border-white/[0.05]'}`
   }, /*#__PURE__*/React.createElement("div", {
@@ -2425,7 +2427,7 @@ const WorkerPhaseV2 = React.memo(function WorkerPhaseV2({
   }, isEditingUser ? /*#__PURE__*/React.createElement("select", {
     autoFocus: true,
     className: "bg-[#141414] text-amber-400 font-bold text-[12px] border border-[#d4af37] rounded outline-none py-0.5 px-1 max-w-[120px]",
-    defaultValue: data.user,
+    defaultValue: effectiveUser,
     onChange: e => {
       const newName = e.target.value;
       const upd = JSON.parse(JSON.stringify(item));
@@ -2458,17 +2460,18 @@ const WorkerPhaseV2 = React.memo(function WorkerPhaseV2({
     onClick: e => e.stopPropagation()
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
-  }, "-- B\u1ECF nh\u1EADn vi\u1EC7c --"), Object.values(userConfigs?.pins || {}).map(u => /*#__PURE__*/React.createElement("option", {
-    key: u.name,
-    value: u.name
-  }, u.name))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+  }, "-- B\u1ECF nh\u1EADn vi\u1EC7c --"), availableWorkers.map(wName => /*#__PURE__*/React.createElement("option", {
+    key: wName,
+    value: wName
+  }, wName))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     className: `font-black text-[13px] truncate ${isOwner && !isDone && isInProgress ? 'text-amber-300' : isDone ? 'text-zinc-200' : 'text-zinc-400'}`
-  }, userName), isAdmin && data.user && !isDone && /*#__PURE__*/React.createElement("button", {
+  }, userName), isAdmin && !isDone && /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       setIsEditingUser(true);
     },
-    className: "w-5 h-5 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded flex items-center justify-center transition-colors"
+    className: "w-5 h-5 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded flex items-center justify-center transition-colors",
+    title: "Giao th\u1EE3 / \u0110\u1ED5i ng\u01B0\u1EDDi l\xE0m"
   }, /*#__PURE__*/React.createElement("i", {
     className: "fas fa-pencil-alt text-[8.5px]"
   })))), isDone && completedDurationText && /*#__PURE__*/React.createElement("span", {
@@ -2494,7 +2497,7 @@ const WorkerPhaseV2 = React.memo(function WorkerPhaseV2({
     className: "w-full py-1.5 mb-1.5 bg-rose-500/15 text-rose-300 border border-rose-500/40 hover:bg-rose-500 hover:text-white rounded-lg font-black text-[10px] uppercase tracking-wider flex justify-center items-center gap-1.5 shadow-sm active:scale-95 transition-all"
   }, /*#__PURE__*/React.createElement("i", {
     className: "fas fa-exclamation-circle text-[11px]"
-  }), " XEM L\u1ED6I KCS"), isPending && !isCTV && (!data.user || String(data.user).trim() === String(currentUser).trim() || isAdmin ? /*#__PURE__*/React.createElement("button", {
+  }), " XEM L\u1ED6I KCS"), isPending && !isCTV && (!effectiveUser || effectiveUser === String(currentUser).trim() || isAdmin ? /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       act('In Progress');
@@ -2509,7 +2512,7 @@ const WorkerPhaseV2 = React.memo(function WorkerPhaseV2({
     className: "w-full py-2 bg-zinc-800/80 text-rose-400 rounded-lg font-black text-[10px] uppercase tracking-wider text-center border border-rose-500/30 flex justify-center items-center gap-1"
   }, /*#__PURE__*/React.createElement("i", {
     className: "fas fa-lock text-[9px]"
-  }), " KHO\xC1: ", String(data.user).split(' ').pop().toUpperCase())), isPending && isCTV && /*#__PURE__*/React.createElement("div", {
+  }), " KHO\xC1: ", effectiveUser.split(' ').pop().toUpperCase())), isPending && isCTV && /*#__PURE__*/React.createElement("div", {
     className: "w-full py-2 bg-zinc-900 text-zinc-500 rounded-lg font-bold text-[10px] uppercase tracking-wider text-center border border-zinc-800"
   }, "CH\u1EDC L\xC0M"), isInProgress && isOwner && !isCTV && (c.k === 'phase1' ? item.qc_status === 'Chờ duyệt khung' ? /*#__PURE__*/React.createElement("div", {
     className: "w-full py-2 bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 rounded-lg text-center font-black text-[10px] uppercase tracking-wider flex items-center justify-center gap-1"
@@ -4863,25 +4866,22 @@ const ProductionTab = React.memo(function ProductionTab({
     const EXCLUDED_USERS = ['Nguyễn Thị Huyền Trang', 'Trung Kiên', 'Nguyễn Thị Diệu Hương', 'Huyền Trang', 'Diệu Hương'];
 
     // 1. Khởi tạo danh sách thợ từ userConfigs (Config_NhanSu)
-    if (userConfigs && userConfigs.pins) {
-      Object.values(userConfigs.pins).forEach(u => {
-        if (u && u.name) {
-          const fullName = String(u.name).trim();
-          if (fullName && !EXCLUDED_USERS.includes(fullName) && !statsMap[fullName]) {
-            statsMap[fullName] = {
-              fullName: fullName,
-              name: fullName.split(' ').pop(),
-              dungKhung: 0,
-              giaCo: 0,
-              catDan: 0,
-              gotKeo: 0,
-              reworkCount: 0,
-              overdueCount: 0
-            };
-          }
-        }
-      });
-    }
+    const rawUserList = [...(Array.isArray(userConfigs?.users) ? userConfigs.users : []), ...Object.values(userConfigs?.pins || {}).map(u => u?.name).filter(Boolean)];
+    rawUserList.forEach(fullNameRaw => {
+      const fullName = String(fullNameRaw || '').trim();
+      if (fullName && !EXCLUDED_USERS.includes(fullName) && !statsMap[fullName] && fullName !== 'Kho Hàng' && fullName !== 'Hàng') {
+        statsMap[fullName] = {
+          fullName: fullName,
+          name: fullName.split(' ').pop(),
+          dungKhung: 0,
+          giaCo: 0,
+          catDan: 0,
+          gotKeo: 0,
+          reworkCount: 0,
+          overdueCount: 0
+        };
+      }
+    });
     (prodItems || []).forEach(item => {
       const searchStr = (String(item.type || '') + ' ' + String(item.name || '')).toLowerCase();
       const isBeKinh = item.type === 'Bể Kính' || searchStr.includes('bể');
@@ -5885,10 +5885,10 @@ const ProductionTab = React.memo(function ProductionTab({
     className: "w-full bg-[#0a0a0a] border border-[#333] rounded-xl px-3 py-3 text-[12px] font-bold text-[#d4af37] outline-none focus:border-[#d4af37]"
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
-  }, "-- KH\xD4NG GIAO \u0110\xCDCH DANH --"), Object.values(userConfigs?.pins || {}).map(u => /*#__PURE__*/React.createElement("option", {
-    key: u.name,
-    value: u.name
-  }, u.name)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  }, "-- KH\xD4NG GIAO \u0110\xCDCH DANH --"), Array.from(new Set([...(Array.isArray(userConfigs?.users) ? userConfigs.users : []), ...Object.values(userConfigs?.pins || {}).map(u => u?.name).filter(Boolean)])).filter(name => name && name !== 'Kho Hàng' && name !== 'Hàng' && name.toLowerCase() !== 'khách').map(uName => /*#__PURE__*/React.createElement("option", {
+    key: uName,
+    value: uName
+  }, uName)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     className: "text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1.5"
   }, "H\u1EA1n b\xE0n giao"), /*#__PURE__*/React.createElement("input", {
     type: "datetime-local",

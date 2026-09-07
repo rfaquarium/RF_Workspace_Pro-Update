@@ -3117,8 +3117,7 @@ function Login({
   const [pin, setPin] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [errorShake, setErrorShake] = React.useState(false);
-  const inputRef = React.useRef(null);
-  const submitPin = async value => {
+  const submitPin = React.useCallback(async value => {
     if (!value || value.length < 4 || loading) return;
     setLoading(true);
     try {
@@ -3143,7 +3142,6 @@ function Login({
         setErrorShake(true);
         setTimeout(() => setErrorShake(false), 500);
         setPin('');
-        if (inputRef.current) inputRef.current.focus();
       }
     } catch (err) {
       setErrorShake(true);
@@ -3151,37 +3149,50 @@ function Login({
       setPin('');
     }
     setLoading(false);
-  };
-  const handleKeyClick = digit => {
+  }, [loading, onLogin]);
+  const handleKeyClick = React.useCallback(digit => {
     if (loading) return;
-    if (pin.length < 6) {
-      const nextPin = pin + digit;
-      setPin(nextPin);
+    setPin(prev => {
+      if (prev.length >= 6) return prev;
+      const nextPin = prev + digit;
       if (nextPin.length === 6) {
-        setTimeout(() => submitPin(nextPin), 80);
+        setTimeout(() => submitPin(nextPin), 60);
       }
-    }
-  };
-  const handleBackspace = () => {
+      return nextPin;
+    });
+  }, [loading, submitPin]);
+  const handleBackspace = React.useCallback(() => {
     if (loading) return;
     setPin(prev => prev.slice(0, -1));
-  };
-  const handleClear = () => {
+  }, [loading]);
+  const handleClear = React.useCallback(() => {
     if (loading) return;
     setPin('');
-  };
-  const handlePinChange = e => {
-    const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 6);
-    setPin(val);
-    if (val.length === 6) {
-      setTimeout(() => submitPin(val), 80);
-    }
-  };
-  const handleKeyDown = e => {
-    if (e.key === 'Enter' && pin.length >= 4) {
-      submitPin(pin);
-    }
-  };
+  }, [loading]);
+
+  // LẮNG NGHE BÀN PHÍM VẬT LÝ MÁY TÍNH - KHÔNG DÙNG THẺ INPUT ẨN ĐỂ TRÁNH BÀN PHÍM OS MOBILE BUNG LÊN GÂY GIẬT MÀN HÌNH
+  React.useEffect(() => {
+    const onKeyDown = e => {
+      if (loading) return;
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        handleKeyClick(e.key);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        handleBackspace();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        handleClear();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (pin.length >= 4) {
+          submitPin(pin);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [loading, handleKeyClick, handleBackspace, handleClear, submitPin, pin]);
   const keypadLetters = {
     '1': '',
     '2': 'ABC',
@@ -3194,83 +3205,122 @@ function Login({
     '9': 'WXYZ'
   };
   const canSubmit = pin.length >= 4 && !loading;
+  const submitBtnText = React.useMemo(() => {
+    if (loading) return 'ĐANG XÁC THỰC...';
+    if (canSubmit) return 'MỞ KHÓA HỆ THỐNG';
+    if (pin.length > 0) return 'ĐÃ NHẬP ' + pin.length + '/6 SỐ';
+    return 'NHẬP MÃ PIN (4 - 6 SỐ)';
+  }, [loading, canSubmit, pin.length]);
+  const submitBtnClass = React.useMemo(() => {
+    const base = 'w-full rounded-2xl font-black text-[13px] tracking-wider uppercase transition-colors duration-150 flex items-center justify-center gap-2.5 box-border border select-none ';
+    if (canSubmit) {
+      return base + 'bg-gradient-to-r from-amber-400 via-[#d4af37] to-amber-500 text-zinc-950 border-amber-400/80 shadow-[0_4px_20px_rgba(212,175,55,0.35)] hover:brightness-110 cursor-pointer';
+    }
+    if (loading) {
+      return base + 'bg-zinc-800 text-[#d4af37] border-[#d4af37]/30 cursor-wait';
+    }
+    return base + 'bg-zinc-800/40 text-zinc-600 border-white/[0.06] cursor-not-allowed opacity-75';
+  }, [canSubmit, loading]);
   return /*#__PURE__*/React.createElement("div", {
-    className: "fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-[#08080a] text-white select-none overflow-y-auto custom-scrollbar"
+    className: "fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-[#08080a] text-white select-none overflow-hidden overscroll-none touch-none"
   }, /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_15%,_rgba(212,175,55,0.06)_0%,_transparent_65%)]"
   }), /*#__PURE__*/React.createElement("div", {
-    className: `w-full max-w-[400px] sm:max-w-[440px] my-auto bg-[#121216] p-6 sm:p-8 rounded-[32px] sm:rounded-[36px] border border-white/[0.08] shadow-[0_30px_70px_-15px_rgba(0,0,0,0.95)] flex flex-col items-center relative z-10 transition-transform ${errorShake ? 'animate-shake' : ''}`
+    className: 'w-full max-w-[360px] sm:max-w-[390px] bg-[#121216] px-5 py-5 sm:px-7 sm:py-6 rounded-[28px] sm:rounded-[32px] border border-white/[0.08] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.95)] flex flex-col items-center relative z-10 box-border ' + (errorShake ? 'animate-shake' : ''),
+    style: {
+      minHeight: '520px'
+    }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "w-14 h-14 sm:w-16 sm:h-16 rounded-2xl sm:rounded-3xl bg-zinc-900/90 border border-white/[0.08] flex items-center justify-center mb-3.5 shadow-inner"
+    className: "w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-zinc-900/90 border border-white/[0.08] flex items-center justify-center mb-2.5 shadow-inner shrink-0",
+    style: {
+      width: '52px',
+      height: '52px'
+    }
   }, /*#__PURE__*/React.createElement("i", {
-    className: `fas ${canSubmit ? 'fa-unlock-alt text-[#d4af37]' : 'fa-lock text-zinc-400'} text-xl sm:text-2xl transition-colors duration-200`
+    className: 'fas text-xl transition-colors duration-150 ' + (canSubmit ? 'fa-unlock-alt text-[#d4af37]' : 'fa-lock text-zinc-400')
   })), /*#__PURE__*/React.createElement("h1", {
-    className: "text-white font-extrabold text-[19px] sm:text-[21px] tracking-tight text-center"
+    className: "text-white font-extrabold text-[18px] sm:text-[20px] tracking-tight text-center leading-tight"
   }, "RF Workspace Pro"), /*#__PURE__*/React.createElement("p", {
-    className: "text-zinc-400 text-[12px] sm:text-[13px] font-medium mb-5 sm:mb-6 text-center"
+    className: "text-zinc-400 text-[12px] font-medium mb-4 text-center h-4 flex items-center justify-center"
   }, "Nh\u1EADp m\xE3 PIN 4 - 6 s\u1ED1 \u0111\u1EC3 m\u1EDF kh\xF3a"), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-center gap-3.5 sm:gap-4 mb-6 sm:mb-7 py-1"
+    className: "flex items-center justify-center gap-3 mb-5 py-1 h-5 shrink-0",
+    style: {
+      height: '20px'
+    }
   }, [0, 1, 2, 3, 4, 5].map(idx => {
     const isFilled = idx < pin.length;
+    let dotBg = 'bg-zinc-800 border border-white/[0.12]';
+    if (errorShake) dotBg = 'bg-rose-500';else if (isFilled) dotBg = 'bg-[#d4af37]';
     return /*#__PURE__*/React.createElement("div", {
       key: idx,
-      className: `w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full transition-all duration-150 ${errorShake ? 'bg-rose-500 scale-110 shadow-[0_0_10px_rgba(244,63,94,0.7)]' : isFilled ? 'bg-[#d4af37] scale-110 shadow-[0_0_10px_rgba(212,175,55,0.7)]' : 'bg-zinc-800/80 border border-white/[0.12]'}`
+      className: 'rounded-full transition-colors duration-100 ' + dotBg,
+      style: {
+        width: '13px',
+        height: '13px',
+        minWidth: '13px',
+        minHeight: '13px'
+      }
     });
-  })), /*#__PURE__*/React.createElement("input", {
-    ref: inputRef,
-    type: "password",
-    inputMode: "numeric",
-    pattern: "[0-9]*",
-    value: pin,
-    onChange: handlePinChange,
-    onKeyDown: handleKeyDown,
-    disabled: loading,
-    className: "opacity-0 absolute w-0 h-0 pointer-events-none",
-    maxLength: 6,
-    autoFocus: true
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-3 gap-2.5 sm:gap-3 w-full mb-4 sm:mb-5"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-2 sm:gap-2.5 w-full mb-3.5 select-none",
+    style: {
+      touchAction: 'manipulation'
+    }
   }, ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => /*#__PURE__*/React.createElement("button", {
     key: num,
     type: "button",
     onClick: () => handleKeyClick(num),
     disabled: loading,
-    className: "h-14 sm:h-16 rounded-2xl bg-[#1c1c22] hover:bg-[#25252e] active:bg-[#d4af37] active:text-zinc-950 border border-white/[0.07] text-white flex flex-col items-center justify-center transition-all duration-100 active:scale-95 cursor-pointer shadow-sm disabled:opacity-50 group"
+    style: {
+      touchAction: 'manipulation'
+    },
+    className: "h-13 sm:h-14 rounded-2xl bg-[#1c1c22] hover:bg-[#25252e] active:bg-[#d4af37] active:text-zinc-950 border border-white/[0.07] text-white flex flex-col items-center justify-center transition-colors duration-75 cursor-pointer shadow-sm disabled:opacity-50 group select-none"
   }, /*#__PURE__*/React.createElement("span", {
     className: "font-extrabold text-xl sm:text-2xl leading-none group-active:text-zinc-950"
   }, num), keypadLetters[num] && /*#__PURE__*/React.createElement("span", {
-    className: "text-[9px] sm:text-[10px] font-bold tracking-widest text-zinc-500 group-active:text-zinc-800 leading-none mt-1"
+    className: "text-[9px] font-bold tracking-widest text-zinc-500 group-active:text-zinc-800 leading-none mt-1"
   }, keypadLetters[num]))), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: handleClear,
     disabled: loading || pin.length === 0,
-    className: "h-14 sm:h-16 rounded-2xl bg-[#15151a] hover:bg-zinc-800 border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-[12px] sm:text-[13px] font-bold uppercase transition-all active:scale-95 cursor-pointer flex items-center justify-center disabled:opacity-20"
+    style: {
+      touchAction: 'manipulation'
+    },
+    className: "h-13 sm:h-14 rounded-2xl bg-[#15151a] hover:bg-zinc-800 border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-[11.5px] sm:text-[12px] font-bold uppercase transition-colors duration-75 cursor-pointer flex items-center justify-center disabled:opacity-20 select-none"
   }, "X\xD3A H\u1EBET"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => handleKeyClick('0'),
     disabled: loading,
-    className: "h-14 sm:h-16 rounded-2xl bg-[#1c1c22] hover:bg-[#25252e] active:bg-[#d4af37] active:text-zinc-950 border border-white/[0.07] text-white flex items-center justify-center font-extrabold text-xl sm:text-2xl transition-all duration-100 active:scale-95 cursor-pointer shadow-sm disabled:opacity-50"
+    style: {
+      touchAction: 'manipulation'
+    },
+    className: "h-13 sm:h-14 rounded-2xl bg-[#1c1c22] hover:bg-[#25252e] active:bg-[#d4af37] active:text-zinc-950 border border-white/[0.07] text-white flex items-center justify-center font-extrabold text-xl sm:text-2xl transition-colors duration-75 cursor-pointer shadow-sm disabled:opacity-50 select-none"
   }, "0"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: handleBackspace,
     disabled: loading || pin.length === 0,
-    className: "h-14 sm:h-16 rounded-2xl bg-[#15151a] hover:bg-zinc-800 border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-lg transition-all active:scale-95 cursor-pointer flex items-center justify-center disabled:opacity-20",
+    style: {
+      touchAction: 'manipulation'
+    },
+    className: "h-13 sm:h-14 rounded-2xl bg-[#15151a] hover:bg-zinc-800 border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-base transition-colors duration-75 cursor-pointer flex items-center justify-center disabled:opacity-20 select-none",
     title: "X\xF3a 1 s\u1ED1"
   }, /*#__PURE__*/React.createElement("i", {
-    className: "fas fa-backspace text-base sm:text-lg"
+    className: "fas fa-backspace text-base"
   }))), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => submitPin(pin),
     disabled: !canSubmit,
-    className: `w-full py-3.5 sm:py-4 rounded-2xl font-black text-[13px] sm:text-[14px] uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2.5 ${canSubmit ? 'bg-gradient-to-r from-amber-400 via-[#d4af37] to-amber-500 text-zinc-950 shadow-[0_6px_25px_rgba(212,175,55,0.4)] hover:brightness-110 active:scale-[0.98] cursor-pointer' : loading ? 'bg-zinc-800 text-[#d4af37] border border-[#d4af37]/30 cursor-wait' : 'bg-zinc-800/40 text-zinc-600 border border-white/[0.05] cursor-not-allowed opacity-70'}`
-  }, loading ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("i", {
-    className: "fas fa-spinner fa-spin text-base text-[#d4af37]"
+    style: {
+      height: '50px',
+      touchAction: 'manipulation'
+    },
+    className: submitBtnClass
+  }, /*#__PURE__*/React.createElement("i", {
+    className: 'fas text-sm w-4 text-center ' + (loading ? 'fa-spinner fa-spin text-[#d4af37]' : canSubmit ? 'fa-unlock-alt' : 'fa-lock')
   }), /*#__PURE__*/React.createElement("span", {
-    className: "font-bold"
-  }, "\u0110ANG X\xC1C TH\u1EF0C...")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("i", {
-    className: `fas ${canSubmit ? 'fa-unlock-alt' : 'fa-lock'} text-sm`
-  }), /*#__PURE__*/React.createElement("span", null, canSubmit ? 'MỞ KHÓA HỆ THỐNG' : pin.length > 0 ? `ĐÃ NHẬP ${pin.length}/4 SỐ` : 'NHẬP TỐI THIỂU 4 SỐ'))), /*#__PURE__*/React.createElement("div", {
-    className: "mt-4 text-[10.5px] text-zinc-500 font-semibold tracking-wider uppercase text-center"
+    className: loading ? 'font-bold' : ''
+  }, submitBtnText)), /*#__PURE__*/React.createElement("div", {
+    className: "mt-3.5 text-[10px] text-zinc-500 font-semibold tracking-wider uppercase text-center shrink-0"
   }, "B\u1EA3o m\u1EADt n\u1ED9i b\u1ED9 \u2022 Rich Fish Aquarium")));
 }
 
@@ -6505,7 +6555,7 @@ function NtfySettingsModal({
       setTesting(false);
     }
   };
-  const ntfyUrl = 'https://ntfy.sh/' + (topic.trim() || 'rfworkspace');
+  const ntfyUrl = 'https:' + '/' + '/ntfy.sh/' + (topic.trim() || 'rfworkspace');
   return /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in"
   }, /*#__PURE__*/React.createElement("div", {
@@ -7990,23 +8040,23 @@ function BulkImportModal({
                   phase1: {
                     name: 'Cắt Dán',
                     status: 'Done',
-                    user: 'Kho Hàng'
+                    user: ''
                   },
                   phase2: {
                     name: 'Gọt Keo',
                     status: 'Done',
-                    user: 'Kho Hàng'
+                    user: ''
                   }
                 } : {
                   phase1: {
                     name: 'Dựng Khung',
                     status: 'Done',
-                    user: 'Kho Hàng'
+                    user: ''
                   },
                   phase2: {
                     name: 'Gia Cố',
                     status: 'Done',
-                    user: 'Kho Hàng'
+                    user: ''
                   }
                 };
                 const orderCustomerNote = String(o.note || (o.existingRecord ? o.existingRecord.note : '') || '').trim();
@@ -18986,12 +19036,25 @@ function ReturnScannerModal({
     });
     if (order) {
       const currentStatus = String(order.status || '').toUpperCase().trim();
-      if (currentStatus === 'HÀNG HOÀN' || currentStatus.indexOf('HOÀN CHỜ XỬ') > -1 || currentStatus.indexOf('HOÀN KHO') > -1) {
-        triggerToast('Đơn này đã ở trạng thái Hoàn rồi!', 'fa-info-circle', 'warning');
+      const safeDateFull = typeof getLocalISODate === 'function' ? getLocalISODate() : new Date().toISOString();
+      const returnedAt = safeDateFull.replace('T', ' ').slice(0, 19);
+      const safeDateOnly = safeDateFull.slice(0, 10);
+      const now = new Date();
+      const curY = now.getFullYear();
+      const curM = now.getMonth() + 1;
+      const curYm = `${curY}-${String(curM).padStart(2, '0')}`;
+      const origDateStr = String(order.date || order.createdAt || '').slice(0, 10);
+      const isOldMonth = origDateStr && !origDateStr.startsWith(curYm);
+      const origMonthMatch = origDateStr.match(/\d{4}-(\d{2})/);
+      const origMonthNum = origMonthMatch ? parseInt(origMonthMatch[1], 10) : '';
+
+      // Kiểm tra đơn đã từng quét nhận hoàn trong chính ngày hôm nay chưa (chống tít đúp vô tình)
+      const isAlreadyReturn = currentStatus === 'HÀNG HOÀN' || currentStatus.indexOf('HOÀN CHỜ XỬ') > -1 || currentStatus.indexOf('HOÀN KHO') > -1;
+      const alreadyScannedToday = isAlreadyReturn && String(order.returnedAt || '').includes(safeDateOnly);
+      if (alreadyScannedToday) {
+        triggerToast(`Đơn [${order.orderCode}] đã quét nhận hoàn hôm nay rồi!`, 'fa-info-circle', 'warning');
       } else {
         try {
-          const safeDateFull = typeof getLocalISODate === 'function' ? getLocalISODate() : new Date().toISOString();
-          const returnedAt = safeDateFull.replace('T', ' ').slice(0, 19);
           const effectiveReason = String(returnReason || '').trim();
           let updatedNote = String(order.note || '').trim();
           if (effectiveReason) {
@@ -19001,18 +19064,34 @@ function ReturnScannerModal({
               updatedNote = updatedNote ? `${updatedNote} | [Hoàn: ${effectiveReason}]` : `[Hoàn: ${effectiveReason}]`;
             }
           }
+
+          // Nếu là đơn tháng cũ (T8): ghi chú vết và chuyển ngày về tháng này để Diệu Hương kiểm
+          if (isOldMonth) {
+            const tag = `[Đơn cũ T${origMonthNum || 'trước'} đưa về Hoàn T${curM}: gốc ${origDateStr}]`;
+            if (!updatedNote.includes('đưa về Hoàn T')) {
+              updatedNote = updatedNote ? `${tag} ${updatedNote}` : tag;
+            }
+          }
           const newOrder = {
             ...order,
+            date: isOldMonth ? safeDateOnly : order.date || safeDateOnly,
             status: 'Hàng Hoàn',
+            _effectiveStatus: 'HÀNG HOÀN CHỜ XỬ LÝ',
             returnReason: effectiveReason || order.returnReason || '',
             note: updatedNote,
             returnedAt: returnedAt,
-            reconciledAt: order.reconciledAt || returnedAt
+            reconciledAt: order.reconciledAt || returnedAt,
+            updatedAt: safeDateFull,
+            isReconciled: false
           };
           await pushDeltas({
             orders: [newOrder]
-          }, `Đã nhận hoàn đơn: ${order.orderCode}${effectiveReason ? ` (${effectiveReason})` : ''}!`, 'fa-undo');
-          triggerToast(`Thành công! Đơn [${order.orderCode}] đã chuyển về Kho Hoàn.`, 'fa-check', 'success');
+          }, `Đã nhận hoàn đơn: ${order.orderCode} (Hoàn T${curM})${effectiveReason ? ` (${effectiveReason})` : ''}!`, 'fa-undo');
+          if (isOldMonth) {
+            triggerToast(`Thành công! Đơn [${order.orderCode}] (T${origMonthNum || 'cũ'}) đã được đưa về mục Hoàn Tháng ${curM} để Diệu Hương kiểm!`, 'fa-check-circle', 'success');
+          } else {
+            triggerToast(`Thành công! Đơn [${order.orderCode}] đã chuyển về Kho Hoàn Tháng ${curM} để Diệu Hương kiểm!`, 'fa-check-circle', 'success');
+          }
         } catch (err) {
           triggerToast('Lỗi kết nối đồng bộ kho hoàn!', 'fa-times', 'danger');
         }
@@ -19274,6 +19353,12 @@ function ReturnScannerModal({
     try {
       const safeDateFull = typeof getLocalISODate === 'function' ? getLocalISODate() : new Date().toISOString();
       const returnedAt = safeDateFull.replace('T', ' ').slice(0, 19);
+      const safeDateOnly = safeDateFull.slice(0, 10);
+      const now = new Date();
+      const curY = now.getFullYear();
+      const curM = now.getMonth() + 1;
+      const curYm = `${curY}-${String(curM).padStart(2, '0')}`;
+      let oldMonthCount = 0;
       const updatedOrders = scannedOrders.map(o => {
         const effectiveReason = String(returnReason || o.fileReturnReason || '').trim();
         let updatedNote = String(o.note || '').trim();
@@ -19284,20 +19369,39 @@ function ReturnScannerModal({
             updatedNote = updatedNote ? `${updatedNote} | [Hoàn: ${effectiveReason}]` : `[Hoàn: ${effectiveReason}]`;
           }
         }
+        const origDateStr = String(o.date || o.createdAt || '').slice(0, 10);
+        const isOldMonth = origDateStr && !origDateStr.startsWith(curYm);
+        const origMonthMatch = origDateStr.match(/\d{4}-(\d{2})/);
+        const origMonthNum = origMonthMatch ? parseInt(origMonthMatch[1], 10) : '';
+        if (isOldMonth) {
+          oldMonthCount++;
+          const tag = `[Đơn cũ T${origMonthNum || 'trước'} đưa về Hoàn T${curM}: gốc ${origDateStr}]`;
+          if (!updatedNote.includes('đưa về Hoàn T')) {
+            updatedNote = updatedNote ? `${tag} ${updatedNote}` : tag;
+          }
+        }
         return {
           ...o,
+          date: isOldMonth ? safeDateOnly : o.date || safeDateOnly,
           status: 'Hàng Hoàn',
+          _effectiveStatus: 'HÀNG HOÀN CHỜ XỬ LÝ',
           returnReason: effectiveReason || o.returnReason || '',
           note: updatedNote,
-          returnedAt: o.returnedAt || returnedAt,
-          reconciledAt: o.reconciledAt || returnedAt
+          returnedAt: returnedAt,
+          reconciledAt: o.reconciledAt || returnedAt,
+          updatedAt: safeDateFull,
+          isReconciled: false
         };
       });
-      const logMsg = returnReason ? `Đã chuyển ${updatedOrders.length} đơn về Hàng Hoàn (${returnReason})!` : `Đã chuyển ${updatedOrders.length} đơn về Hàng Hoàn!`;
+      const logMsg = returnReason ? `Đã chuyển ${updatedOrders.length} đơn về Hàng Hoàn T${curM} (${returnReason})!` : `Đã chuyển ${updatedOrders.length} đơn về Hàng Hoàn T${curM}!`;
       await pushDeltas({
         orders: updatedOrders
       }, logMsg, 'fa-undo');
-      triggerToast(`Thành công! Đã chuyển ${updatedOrders.length} đơn sang Hàng Hoàn.`, 'fa-check', 'success');
+      if (oldMonthCount > 0) {
+        triggerToast(`Thành công! Đã chuyển ${updatedOrders.length} đơn (có ${oldMonthCount} đơn tháng cũ) về mục Hoàn Tháng ${curM} cho Diệu Hương kiểm.`, 'fa-check-circle', 'success');
+      } else {
+        triggerToast(`Thành công! Đã chuyển ${updatedOrders.length} đơn sang Hàng Hoàn Tháng ${curM}.`, 'fa-check-circle', 'success');
+      }
       onClose();
     } catch (err) {
       triggerToast('Lỗi đồng bộ!', 'fa-times', 'danger');
@@ -19433,9 +19537,13 @@ function ReturnScannerModal({
     className: `w-full py-3.5 rounded-xl font-black text-[12px] tracking-wide shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 mt-1 cursor-pointer ${isProcessing || scannedOrders.length === 0 ? 'bg-[#333] text-gray-500' : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90 shadow-purple-900/30'}`
   }, isProcessing ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("i", {
     className: "fas fa-spinner fa-spin"
-  }), " \u0110ANG C\u1EACP NH\u1EACT TR\u1EA0NG TH\xC1I...") : `XÁC NHẬN ĐƯA ${scannedOrders.length} ĐƠN VỀ HÀNG HOÀN`)) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
-    className: "text-gray-400 text-[11px] mb-2.5 leading-relaxed mt-1"
+  }), " \u0110ANG C\u1EACP NH\u1EACT TR\u1EA0NG TH\xC1I...") : `XÁC NHẬN ĐƯA ${scannedOrders.length} ĐƠN VỀ HOÀN THÁNG ${new Date().getMonth() + 1} CHO HƯƠNG KIỂM`)) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
+    className: "text-gray-400 text-[11px] mb-1.5 leading-relaxed mt-1"
   }, "D\xF9ng s\xFAng b\u1EAFn m\xE3 v\u1EA1ch ho\u1EB7c n\xE9m file Excel Order.all / PDF v\xE0o \u0111\xE2y."), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-center gap-1.5 text-[9.5px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-xl w-fit mx-auto mb-2.5 font-bold shadow-sm"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fas fa-magic text-amber-400"
+  }), /*#__PURE__*/React.createElement("span", null, "\u0110\u01A1n th\xE1ng c\u0169 (T8) khi qu\xE9t s\u1EBD t\u1EF1 \u0111\u1ED9ng \u0111\u01B0a v\u1EC1 m\u1EE5c Ho\xE0n Th\xE1ng N\xE0y (T", new Date().getMonth() + 1, ") \u0111\u1EC3 H\u01B0\u01A1ng ki\u1EC3m tra")), /*#__PURE__*/React.createElement("div", {
     className: "w-full mb-3 bg-[#0d0d12] border border-purple-500/20 rounded-xl p-2.5 text-left"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-1.5 px-0.5"
@@ -20497,11 +20605,22 @@ const OrdersTab = React.memo(function OrdersTab({
   const matchTimeFilter = React.useCallback(order => {
     if (!filterTime || filterTime === 'ALL' || filterTime === 'Tất Cả') return true;
     const st = String(order.status || order._effectiveStatus || '').toUpperCase().trim();
-    const isClosed = st === 'HOÀN THÀNH' || st === 'ĐỐI SOÁT THÀNH CÔNG' || st === 'ĐÃ BÀN GIAO' || st === 'ĐƠN HUỶ' || st === 'ĐÃ NHẬP KHO' || st === 'HÀNG HOÀN' || st.includes('HOÀN CHỜ XỬ') || isReconciledSafe(order.isReconciled);
+    const isRec = isReconciledSafe(order.isReconciled);
+    const isReturnOrder = st === 'HÀNG HOÀN' || st.includes('HOÀN CHỜ XỬ') || st.includes('HOÀN TRẢ') || st === 'KIỂM HÀNG HOÀN';
+
+    // 🛡️ NGUYÊN TẮC ZERO-DROPPED CHO ĐƠN HOÀN CHỜ KIỂM:
+    // Đơn Hàng Hoàn mà chưa đối soát/duyệt kho (!isRec) là công việc tồn đọng cần Diệu Hương đi kiểm.
+    // Khi lọc "Tháng Này", LUÔN LUÔN hiển thị để không bao giờ bị sót việc!
+    if (isReturnOrder && !isRec && (filterTime === 'Tháng Này' || filterTime === 'this_month')) {
+      return true;
+    }
+    const isClosed = st === 'HOÀN THÀNH' || st === 'ĐỐI SOÁT THÀNH CÔNG' || st === 'ĐÃ BÀN GIAO' || st === 'ĐƠN HUỶ' || st === 'ĐÃ NHẬP KHO' || isReturnOrder && isRec || isRec;
     if (!isClosed && (filterTime === 'Tháng Này' || filterTime === 'this_month')) {
       return true;
     }
-    const dateCandidate = order.date || order.createdAt || order.reconciledAt || order.returnedAt || order.updatedAt;
+
+    // Với đơn Hàng Hoàn: ngày ưu tiên hàng đầu là ngày quét nhận hoàn (returnedAt)
+    const dateCandidate = isReturnOrder ? order.returnedAt || order.reconciledAt || order.date || order.createdAt || order.updatedAt : order.date || order.createdAt || order.reconciledAt || order.returnedAt || order.updatedAt;
     const orderDateObj = typeof window.parseOrderDateSafe === 'function' ? window.parseOrderDateSafe(dateCandidate) : null;
     const now = new Date();
     const curY = now.getFullYear();
@@ -20773,11 +20892,11 @@ const OrdersTab = React.memo(function OrdersTab({
     const todayStr = new Date().toISOString().split('T')[0];
     const getCleanStatus = status => String(status || '').toUpperCase().trim();
     const urgentAlerts = (orders || []).filter(o => {
-      const orderDate = String(o.updatedAt || o.createdAt || o.date || '');
+      const orderDate = String(o.returnedAt || o.updatedAt || o.createdAt || o.date || '');
       const isToday = orderDate.includes(todayStr);
       const cleanSt = getCleanStatus(o.status);
-      return (cleanSt === 'ĐƠN HỦY' || cleanSt === 'ĐƠN HUỶ' || cleanSt === 'HÀNG HOÀN') && isToday;
-    }).sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+      return (cleanSt === 'ĐƠN HỦY' || cleanSt === 'ĐƠN HUỶ' || cleanSt === 'HÀNG HOÀN' || cleanSt.includes('HOÀN')) && isToday;
+    }).sort((a, b) => new Date(b.returnedAt || b.updatedAt || b.createdAt || 0) - new Date(a.returnedAt || a.updatedAt || a.createdAt || 0));
     return {
       urgentAlerts
     };
@@ -22845,9 +22964,99 @@ const ChangelogTab = React.memo(function ChangelogTab({
   const [filterTag, setFilterTag] = React.useState('ALL');
   const [searchQuery, setSearchQuery] = React.useState('');
   const RELEASES = [{
+    version: 'Royal v2.45.8',
+    date: '07/09/2026',
+    isLatest: true,
+    badge: 'LEAN PRODUCTION PULL & WORKER RESTORATION',
+    badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    title: 'Khắc Phục Triệt Để Thợ Ảo "Kho Hàng" / "Hàng" Khâu 2 & Khôi Phục Danh Sách Nhân Sự Đầy Đủ',
+    summary: 'Khắc phục triệt để lỗi vận hành xưởng sản xuất: (1) Triệt tiêu hoàn toàn nhãn thợ ảo "Kho Hàng" (bị cắt cụt thành chữ "Hàng") và giải phóng nút [▶ NHẬN LÀM] ở Khâu 2 (Gia Cố / Gọt Keo) cho thợ nhận việc; (2) Chấm dứt cơ chế tự động chỉ định ngẫu nhiên Khâu 2 vào trạng thái In Progress khi Khâu 1 hoàn tất, chuyển về Lean Pull Flow để thợ phụ trách nhận việc đúng nhịp; (3) Khôi phục danh sách nhân sự đầy đủ trong dropdown chọn thợ và gán việc hàng loạt thông qua từ điển pins và danh sách users từ Config_NhanSu; (4) Khử sạch các giá trị thợ ảo "Kho Hàng" trong formatProd và syncDeltas.',
+    categories: ['Sản Xuất', 'Khâu 2', 'Kho Hàng', 'Lean Pull', 'Nhân Sự', 'Poka-Yoke'],
+    items: [{
+      icon: 'fa-user-slash',
+      color: 'text-rose-400',
+      title: 'Triệt Tiêu Thợ Ảo "Kho Hàng" / "Hàng" & Mở Khoá Khâu 2',
+      desc: 'Lọc bỏ hoàn toàn chuỗi thợ ảo "Kho Hàng" và "Hàng", chuyển trạng thái hiển thị về [Chờ nhận việc] và mở khóa nút [▶ NHẬN LÀM] cho thợ bấm bắt đầu.'
+    }, {
+      icon: 'fa-users',
+      color: 'text-emerald-400',
+      title: 'Khôi Phục Danh Sách Nhân Sự Đầy Đủ (Config_NhanSu)',
+      desc: 'Bổ sung trường pins trong getUserConfig() và cơ chế tra cứu đa nguồn kết hợp de-duplication, hiển thị 100% thợ xưởng thực tế trong menu chọn người làm.'
+    }, {
+      icon: 'fa-arrows-split-up-and-left',
+      color: 'text-amber-400',
+      title: 'Chuyển Đổi Sang Dòng Chảy Kéo (Lean Pull Flow)',
+      desc: 'Khâu 1 hoàn tất giữ Khâu 2 ở trạng thái Pending sẵn sàng, không tự động gán cưỡng chế người khác để thợ chủ động kéo việc theo năng lực chuyên môn.'
+    }, {
+      icon: 'fa-shield-check',
+      color: 'text-cyan-400',
+      title: 'Đồng Bộ Chuẩn Hoá Backend (formatProd & syncDeltas)',
+      desc: 'Backend Code.js tự động làm sạch trường user của các khâu đối với hàng tồn kho có sẵn, bảo đảm toàn vẹn dữ liệu xuyên suốt 23 bảng schema.'
+    }]
+  }, {
+    version: 'Royal v2.45.7',
+    date: '07/09/2026',
+    isLatest: false,
+    badge: 'SMART RETURN SCANNER & ZERO-DROPPED AUDIT',
+    badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    title: 'Tự Động Đưa Đơn Hoàn Tháng Cũ (T8) Về Mục Hoàn Tháng Này (T9) Cho Diệu Hương Đi Kiểm',
+    summary: 'Nâng cấp toàn diện cơ chế tiếp nhận và quản lý hàng hoàn: (1) Máy Quét Hoàn Tự Động (súng mã vạch, file Excel Order.all, dán mã) tự động nhận diện đơn tháng cũ (T8) và chuyển ngày đối soát/kiểm tra về kỳ Tháng Này (T9) để Diệu Hương mở máy ra là thấy ngay đi kiểm; (2) Chống bỏ chặn đơn đã từng ghi nhận hoàn ảo từ sàn trước đó, cho phép quét tít nhận hàng thực tế tại xưởng; (3) Tối ưu bộ lọc matchTimeFilter với cơ chế Zero-Dropped cho đơn Hàng Hoàn chưa đối soát, ưu tiên ngày hoàn returnedAt; (4) Đơn vừa quét hoàn trong ngày lập tức xuất hiện trên Banner Cảnh Báo Đỏ có nút [KIỂM HOÀN] trực quan.',
+    categories: ['Quét Đơn Hoàn', 'Vận Hành Kho', 'Quy Trình KCS', 'Zero-Dropped', 'Diệu Hương'],
+    items: [{
+      icon: 'fa-barcode',
+      color: 'text-emerald-400',
+      title: 'Tự Động Đưa Đơn Tháng Cũ Về Tháng Này',
+      desc: 'Khi tít súng mã vạch hoặc ném file Excel đơn hoàn T8, hệ thống tự động gán ngày hoàn hiện tại T9 và đưa đơn vào danh sách Hàng Hoàn của Tháng Này để Diệu Hương đi kiểm.'
+    }, {
+      icon: 'fa-box-archive',
+      color: 'text-amber-400',
+      title: 'Mở Khoá Quét Nhận Hàng Hoàn Thực Tế',
+      desc: 'Loại bỏ rào cản báo lỗi "Đơn đã ở trạng thái Hoàn", cho phép quét nhận hiện vật thật về kho cho các đơn sàn đã cập nhật trạng thái từ trước.'
+    }, {
+      icon: 'fa-filter',
+      color: 'text-blue-400',
+      title: 'Bộ Lọc Thông Minh (Zero-Dropped Return)',
+      desc: 'Đơn Hàng Hoàn chưa duyệt kho luôn luôn hiển thị khi xem Tháng Này, ưu tiên ngày quét returnedAt để không bao giờ bị trôi hoặc sót việc.'
+    }, {
+      icon: 'fa-exclamation-triangle',
+      color: 'text-rose-400',
+      title: 'Hiển Thị Tức Thì Trên Banner Cảnh Báo',
+      desc: 'Ngay khi quét tít, đơn hoàn nhảy ngay lên khối cảnh báo màu đỏ kèm nút [KIỂM HOÀN] ở đầu trang để kiểm tra ngoại quan 1 chạm.'
+    }]
+  }, {
+    version: 'Royal v2.45.6',
+    date: '07/09/2026',
+    isLatest: false,
+    badge: 'HALLMARK MOBILE & ZERO SHIFT KEYPAD',
+    badgeColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+    title: 'Khóa Cứng Bàn Phím PIN Zero Layout Shift, Triệt Tiêu Lỗi Cú Pháp Unterminated String & Tối Ưu Cảm Ứng Mobile 0ms',
+    summary: 'Bản phát hành chuẩn hóa thiết kế Hallmark Mobile Ergonomics và gia cố tính toàn vẹn mã nguồn: (1) Khóa cứng hình học bàn phím số PIN đứng im 100% (Zero Layout Shift), loại bỏ thẻ input tàng hình để chặn đứng bàn phím ảo OS bung lên làm co giật màn hình; (2) Cố định kích thước nút bấm 50px và viền 1px chuẩn border-box ở cả 2 trạng thái; (3) Phẳng hóa cấu trúc JSX của Login, loại bỏ hoàn toàn React Fragment (<> / </>) để chống gãy AST của linter; (4) Triệt tiêu lỗi cú pháp Unterminated String Constant do ký tự URL (https://) bị Apps Script hiểu nhầm là comment gạch chéo kép; (5) Tối ưu cảm ứng mobile với touch-action manipulation loại bỏ độ trễ 300ms.',
+    categories: ['Hallmark Mobile', 'Zero Layout Shift', 'Bảo Mật PIN', 'Vá Lỗi Cú Pháp', 'Tối Ưu Cảm Ứng'],
+    items: [{
+      icon: 'fa-lock',
+      color: 'text-amber-400',
+      title: 'Bàn Phím PIN Đứng Im Tuyệt Đối (Zero Layout Shift)',
+      desc: 'Khóa cứng kích thước modal, bỏ autoFocus input ẩn chống bung bàn phím ảo OS, loại bỏ co giãn chấm tròn, nút xác thực cố định 50px viền 1px không xê dịch dù 0.1px.'
+    }, {
+      icon: 'fa-shield-alt',
+      color: 'text-emerald-400',
+      title: 'Khắc Phục Dứt Điểm Lỗi Unterminated String Constant',
+      desc: 'Chuẩn hoá chuỗi URL ntfy.sh và icon thông báo qua phép nối ký tự an toàn, triệt tiêu 100% hiện tượng Apps Script ngắt dòng do hiểu nhầm hai dấu gạch chéo thành comment.'
+    }, {
+      icon: 'fa-mobile-alt',
+      color: 'text-blue-400',
+      title: 'Tối Ưu Cảm Ứng Mobile (Touch-Action: Manipulation)',
+      desc: 'Triệt tiêu độ trễ 300ms của trình duyệt di động trên toàn bộ các phím số, ngăn chặn hoàn toàn thao tác phóng to/thu nhỏ ngoài ý muốn khi bấm nhanh.'
+    }, {
+      icon: 'fa-code',
+      color: 'text-purple-400',
+      title: 'Phẳng Hóa Cây JSX & useMemo Tối Ưu Render',
+      desc: 'Tách toàn bộ logic text và class ra khỏi JSX, loại bỏ React Fragment rỗng (<>), giúp AST luôn nguyên vẹn và tăng tốc độ transpile trên mọi thiết bị.'
+    }]
+  }, {
     version: 'Royal v2.45.5',
     date: '06/09/2026',
-    isLatest: true,
+    isLatest: false,
     badge: 'PERFORMANCE ENGINE & DATA INTEGRITY',
     badgeColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
     title: 'Tối Ưu Hiệu Năng Toàn Diện: 2-Phase Execution (0ms JSX Compile), Bảo Toàn 100% Công Thức Sheet & Concurrency Guards',
@@ -27577,8 +27786,8 @@ function App() {
                 const notifBody = data.message || `${data.trigger_by || 'Nhân sự'} vừa cập nhật dữ liệu xưởng!`;
                 new Notification(notifTitle, {
                   body: notifBody,
-                  icon: 'https://i.postimg.cc/TYD5NncZ/icon.png',
-                  badge: 'https://i.postimg.cc/TYD5NncZ/icon.png',
+                  icon: 'https:' + '/' + '/i.postimg.cc/TYD5NncZ/icon.png',
+                  badge: 'https:' + '/' + '/i.postimg.cc/TYD5NncZ/icon.png',
                   tag: isSOS ? 'rf-sos-' + data.timestamp : isUrgent ? 'rf-urgent-' + data.timestamp : 'rf-action-' + data.timestamp,
                   renotify: true,
                   requireInteraction: isSOS || isUrgent,
@@ -28212,7 +28421,7 @@ function App() {
     className: "fas fa-rocket"
   })), /*#__PURE__*/React.createElement("span", null, "B\u1EA3n C\u1EADp Nh\u1EADt")), /*#__PURE__*/React.createElement("span", {
     className: "text-[9px] bg-emerald-500/20 text-emerald-400 font-black px-1.5 py-0.5 rounded border border-emerald-500/30"
-  }, "v2.45.5")))), /*#__PURE__*/React.createElement("div", {
+  }, "v2.45.8")))), /*#__PURE__*/React.createElement("div", {
     className: "p-3.5 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-white/[0.08] bg-[#141418] flex items-center gap-3"
   }, typeof Avatar !== 'undefined' ? /*#__PURE__*/React.createElement(Avatar, {
     name: currentUser,
